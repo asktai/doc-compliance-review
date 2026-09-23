@@ -83,8 +83,9 @@ def verify():
 
 def pack():
     os.makedirs(DIST, exist_ok=True)
+    # pack.py 契约：位置参数是技能根目录，输出目录用 --out 指定
     r = subprocess.run([sys.executable, os.path.join(RUN, "scripts", "pack.py"),
-                        "--out", DIST], capture_output=True, text=True)
+                        RUN, "--out", DIST], capture_output=True, text=True)
     print((r.stdout or r.stderr).strip())
     return r.returncode
 
