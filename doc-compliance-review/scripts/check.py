@@ -1,0 +1,754 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+文档合规审查助手AI合同审核全能版 · 结构校验与环境自检（Python 版）
+==================================================================
+替代原 `check.ps1`：**纯 Python 实现，无需 PowerShell、不绕过任何执行策略**，
+跨平台（Windows / macOS / Linux）一致运行，消除「依赖执行策略绕过参数运行脚本」带来的绕过面。
+
+用法：
+  python check.py                    结构 + 字段 + 头标 + 去企业化 + 规则ID + 配置 + 安全项 自检
+  python check.py --sign             生成/刷新脚本完整性指纹（scripts/.integrity.json）
+  python check.py --verify           仅校验脚本指纹是否与记录一致（防篡改）
+  python check.py --strict           指纹不一致时视为错误（默认仅告警）
+  python check.py --clean            清理 __pycache__ / *.pyc（缓存残留）
+  python check.py --quiet            只输出结论行
+
+退出码：0=通过（可能有告警）；1=存在错误。
+"""
+import sys as _sys
+_sys.dont_write_bytecode = True   # 不在技能目录留下 __pycache__（避免缓存残留）
+import os
+import re
+import json
+import glob
+import hashlib
+import argparse
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(HERE)
+INTEGRITY = os.path.join(HERE, ".integrity.json")
+
+ERRS = []
+WARNS = []
+INFOS = []
+
+
+def err(m):
+    ERRS.append(m)
+
+
+def warn(m):
+    WARNS.append(m)
+
+
+def info(m):
+    INFOS.append(m)
+
+
+def _load_forbidden():
+    """从外部文件加载"企业专属词"表。
+
+    设计要点：**词表不进脚本源码、不进发布包**——避免检查器自身泄露企业名
+    （检查器若把企业名写死，"去企业化"检查本身就制造了泄露）。
+    路径：`private/deidentify-words.txt`（每行一个词，`#` 开头为注释）；
+    该目录默认被 `pack.py` 排除，故不会随发布包外流。文件不存在时返回空表（跳过该项检查）。
+    """
+    p = os.path.join(ROOT, "private", "deidentify-words.txt")
+    if not os.path.exists(p):
+        return []
+    words = []
+    for line in _read(p).splitlines():
+        s = line.strip()
+        if s and not s.startswith("#"):
+            words.append(s)
+    return words
+
+REQUIRED_FILES = [
+    "SKILL.md",
+    "README.md",
+    "安装使用教程.md",
+    "LICENSE.md",
+    "VERSION.md",
+    os.path.join("scripts", "TONE.md"),   # 感谢语参考：藏于脚本目录，不入使用者的视线
+    "文档合规审查助手AI合同审核提示词版.md",
+    os.path.join("core", "01-general-risk-rules.md"),
+    # 按需加载的三份专项口径（SKILL.md 只留索引段指向它们，缺哪一个都是断链）
+    "permissions-and-libraries.md", "drafting-guide.md", "template-guide.md",
+]
+
+INDUSTRY_KEYS = ["industry", "slug", "display_name", "common_roles", "inherits", "core_version"]
+CORE_ID_RE = re.compile(r"\|\s*([PVLGICDHEQWMNJSTF]\d+)\s*\|")
+ASSET_REF_RE = re.compile(r"!\[[^\]]*\]\((?:\./)?(assets/[^)\s\"']+)\)")
+
+
+# ---------------------------------------------------------------- 校验项
+def check_required_files():
+    for f in REQUIRED_FILES:
+        if not os.path.exists(os.path.join(ROOT, f)):
+            err("缺少文件: %s" % f)
+
+
+def _industry_slugs():
+    """行业库 slug 列表。
+
+    **扁平化结构（V3.3.0 起）**：行业库为 `industries/<slug>-rules.md` 与
+    `industries/<slug>-meta.md` 两个平铺文件，不再有 `industries/<slug>/` 子目录
+    ——平台解析技能包时只接受「根目录/二级目录/文件」两级，三级目录直接拒绝。
+    """
+    ind = os.path.join(ROOT, "industries")
+    if not os.path.isdir(ind):
+        return []
+    out = []
+    for f in sorted(os.listdir(ind)):
+        m = re.match(r"^([A-Za-z0-9_]+)-rules\.md$", f)
+        if m and m.group(1) != "_template":
+            out.append(m.group(1))
+    return out
+
+
+def check_industries():
+    ind = os.path.join(ROOT, "industries")
+    if not os.path.isdir(ind):
+        warn("未发现 industries/ 行业库目录")
+        return
+    # 平台硬约束：包内至多两级目录，三级（如 industries/<slug>/rules.md）会被拒收
+    stray = [d for d in sorted(os.listdir(ind)) if os.path.isdir(os.path.join(ind, d))]
+    if stray:
+        err("industries/ 下仍有子目录（包内须「根/二级目录/文件」，三级会致平台解析失败）：%s"
+            % ", ".join(stray))
+    pkgs = _industry_slugs()
+    for slug in pkgs:
+        for rf in ("%s-meta.md" % slug, "%s-rules.md" % slug):
+            if not os.path.exists(os.path.join(ind, rf)):
+                err("[%s] 缺少 %s" % (slug, rf))
+        meta = os.path.join(ind, "%s-meta.md" % slug)
+        if os.path.exists(meta):
+            txt = _read(meta)
+            for k in INDUSTRY_KEYS:
+                if not re.search(r"(?m)^\s*%s\s*:" % k, txt):
+                    err("[%s] meta 缺少字段: %s" % (slug, k))
+    info("行业包数: %d（%s）" % (len(pkgs), ", ".join(pkgs) if pkgs else "无"))
+
+
+def check_assets():
+    """头标资源：文档中引用的 assets/ 文件必须真实存在。
+
+    动机：`assets/` 是「发布用头标」，README/SKILL 顶部直接引用它；
+    一旦资源缺失（漏打包、改名、删图），发布包里就是一张裂图——
+    而 .md 渲染不会报错，肉眼也未必在打包环节发现，故在此机器校验。
+    """
+    adir = os.path.join(ROOT, "assets")
+    refs = {}
+    for fn in ("SKILL.md", "README.md", "安装使用教程.md", "LICENSE.md", "VERSION.md",
+               os.path.join("scripts", "TONE.md"), "文档合规审查助手AI合同审核提示词版.md", "SECURITY.md"):
+        p = os.path.join(ROOT, fn)
+        if not os.path.exists(p):
+            continue
+        for m in ASSET_REF_RE.finditer(_read(p)):
+            refs.setdefault(m.group(1), []).append(fn)
+    missing = [a for a in refs if not os.path.exists(os.path.join(ROOT, a.replace("/", os.sep)))]
+    for a in missing:
+        err("文档引用了不存在的资源 %s（引用自 %s）" % (a, ", ".join(refs[a])))
+    if refs and not missing:
+        info("头标: 文档引用 %d 个 assets 资源，均存在" % len(refs))
+    elif not refs:
+        info("头标: 文档未引用 assets/ 资源")
+    if os.path.isdir(adir):
+        n = len([f for f in os.listdir(adir) if os.path.isfile(os.path.join(adir, f))])
+        info("assets/: %d 个文件" % n)
+    else:
+        warn("未发现 assets/ 目录（发布用头标缺失）")
+
+
+def check_deenterprise():
+    """去企业化：.md 文件中不得残留企业专属词（样例/归档/发布包除外）。
+
+    词表来自 `private/deidentify-words.txt`（外部文件，默认不随包分发）。
+    未配置词表时跳过本项检查——这是正常状态，不视为缺陷。
+    """
+    words = _load_forbidden()
+    if not words:
+        info("去企业化: 未配置专属词表（private/deidentify-words.txt 缺失或为空），已跳过")
+        return
+    hits = 0
+    for p in _walk(ROOT, exts=(".md",)):
+        rel = os.path.relpath(p, ROOT)
+        if re.search(r"[\\/](samples|_归档|_分发包|测试合同)[\\/]", rel) or rel.startswith("_归档"):
+            continue
+        txt = _read(p)
+        for w in words:
+            if w in txt:
+                err("发现企业专属词 %r 于 %s（词表：private/deidentify-words.txt）" % (w, rel))
+                hits += 1
+    if not hits:
+        info("去企业化: 未发现企业专属词（词表 %d 条）" % len(words))
+
+
+def check_rule_ids():
+    core = os.path.join(ROOT, "core", "01-general-risk-rules.md")
+    if not os.path.exists(core):
+        return
+    ids = CORE_ID_RE.findall(_read(core))
+    dup = sorted({i for i in ids if ids.count(i) > 1})
+    if dup:
+        warn("core 规则ID重复: %s" % ",".join(dup))
+    info("core 规则数: %d" % len(ids))
+    ind = os.path.join(ROOT, "industries")
+    if os.path.isdir(ind):
+        total = 0
+        for slug in _industry_slugs():
+            rf = os.path.join(ind, "%s-rules.md" % slug)
+            if os.path.exists(rf):
+                n = len(re.findall(r"[A-Z]{2}-\d+", _read(rf)))
+                total += n
+        if total:
+            info("行业规则条目: %d" % total)
+
+
+def check_rule_baseline():
+    """规则库回归基线：与 core/_rules-baseline.json 比对（检出规则增删改与评级变化）。"""
+    p = os.path.join(ROOT, "core", "_rules-baseline.json")
+    if not os.path.exists(p):
+        info("规则基线：未生成（python scripts/rule-baseline.py --update 建立）")
+        return
+    try:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("_rule_baseline",
+                                                      os.path.join(HERE, "rule-baseline.py"))
+        m = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(m)
+        meta = json.loads(_read(p))
+        # 三层都要传：规则条目 / 行业库文件 / 生效日与最近修订元数据
+        d = m.diff((meta.get("rules") or {}, meta.get("files") or {}, meta.get("meta") or {}),
+                   m.collect())
+        n = sum(len(v) for v in d.values())
+        if n:
+            warn("规则基线与当前规则库有 %d 处差异（须人工确认是否预期内）："
+                 "python scripts/rule-baseline.py" % n)
+        else:
+            info("规则基线一致（通用库 %d 条）" % meta.get("total", 0))
+    except Exception as e:
+        warn("规则基线比对失败：%s" % e)
+
+
+def check_config():
+    """config.json 合法性与可移植性。"""
+    cfg = os.path.join(HERE, "config.json")
+    if not os.path.exists(cfg):
+        info("config.json 不存在（将全用内置默认值）")
+        return
+    try:
+        data = json.loads(_read(cfg))
+    except Exception as e:
+        err("config.json 解析失败: %s" % e)
+        return
+    tools = data.get("tools") or {}
+    missing = []
+    for k, v in tools.items():
+        v = (v or "").strip()
+        if v and not os.path.exists(v):
+            missing.append("%s=%s" % (k, v))
+    if missing:
+        warn("config.json 中工具路径在本机不存在（将回退 PATH）: " + "; ".join(missing))
+    else:
+        info("config.json: 工具路径全部可用")
+    base = ((data.get("workdir") or {}).get("base_dir") or "").strip()
+    if base and base.lower() not in ("auto", "autodetect", "自动"):
+        parent = os.path.dirname(base)
+        if parent and not os.path.exists(parent):
+            warn("base_dir 的上级目录/盘符不存在（运行时自动顺延到下一候选）: %s" % base)
+    else:
+        info("base_dir=auto：工作根目录按候选链自动探测，无 D 盘也能落地")
+    try:
+        import _config as _cm
+        _b, _src = _cm.resolve_base(_cm.load(), create=False)
+        info("工作根目录解析结果：%s [来源：%s]" % (_b, _src))
+    except Exception as e:
+        warn("工作根目录解析失败：%s" % e)
+
+
+def check_hardcoded_paths():
+    """回归检查：D 盘硬编码是否已外置到 config.json（_config.py 的 DEFAULTS 除外）。"""
+    bad = []
+    for p in _walk(HERE, exts=(".py",)):
+        if os.path.basename(p) in ("_config.py", "check.py"):
+            continue
+        txt = _read(p)
+        # 统计盘符字面量；排除系统字体目录（跨平台字体候选，属正常硬编码）
+        lits = re.findall(r'r?"[A-Z]:\\[^"]*"', txt)
+        lits = [s for s in lits if "Windows\\Fonts" not in s and "Windows/Fonts" not in s]
+        n = len(lits)
+        if n:
+            bad.append("%s(%d处)" % (os.path.basename(p), n))
+    if bad:
+        warn("脚本内仍有盘符字面量（宜改为读 config.json）: " + ", ".join(bad))
+    else:
+        info("路径外置: 无残留盘符硬编码")
+
+
+def check_security():
+    """安全项：私有库空态、映射表隔离目录、缓存残留。"""
+    rules = []
+    for fn in ("rules.md", "meta.md"):
+        p = os.path.join(ROOT, "private", fn)
+        if not os.path.exists(p):
+            continue
+        txt = re.sub(r"<!--.*?-->", "", _read(p), flags=re.S)   # 注释内示例不计入生效规则
+        rules += [l for l in txt.splitlines()
+                  if l.strip().startswith("|") and re.search(r"PR-\d+", l)]
+    if rules:
+        info("私有库: 含 %d 条内控规则（打包分发请用 --include-private 显式确认）" % len(rules))
+    else:
+        info("私有库: 空库（默认，不参与审查）")
+    mapdir = os.environ.get("DCR_MAP_DIR") or os.path.join(os.path.expanduser("~"), ".dcr-maps")
+    info("脱敏映射表隔离目录: %s（%s）" % (mapdir, "存在" if os.path.isdir(mapdir) else "尚未创建"))
+    caches = _pycache_dirs()
+    if caches:
+        warn("发现 %d 个 __pycache__ 缓存目录（可用 python check.py --clean 清理）: %s"
+             % (len(caches), ", ".join(os.path.relpath(c, ROOT) for c in caches)))
+    else:
+        info("缓存残留: 无 __pycache__")
+
+
+# ---------------------------------------------------------------- 指纹
+def _script_files():
+    out = []
+    for p in _walk(HERE, exts=(".py", ".ps1")):
+        b = os.path.basename(p)
+        if b == "check.py":
+            continue
+        out.append(p)
+    return sorted(out)
+
+
+def _sha(p):
+    h = hashlib.sha256()
+    with open(p, "rb") as f:
+        h.update(f.read())
+    return h.hexdigest()
+
+
+def sign():
+    files = {os.path.relpath(p, HERE).replace("\\", "/"): _sha(p) for p in _script_files()}
+    payload = {"note": "脚本完整性指纹；校验用 python check.py --verify，刷新用 --sign",
+               "root": "scripts", "count": len(files), "sha256": files}
+    with open(INTEGRITY, "w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False, indent=2)
+    info("已写入指纹文件: %s（%d 个脚本）" % (INTEGRITY, len(files)))
+
+
+def verify(strict=False):
+    if not os.path.exists(INTEGRITY):
+        warn("未发现指纹文件，跳过校验（可先运行 python check.py --sign 建立基线）")
+        return
+    try:
+        rec = json.loads(_read(INTEGRITY)).get("sha256") or {}
+    except Exception as e:
+        err("指纹文件解析失败: %s" % e)
+        return
+    cur = {os.path.relpath(p, HERE).replace("\\", "/"): _sha(p) for p in _script_files()}
+    changed = [k for k in rec if k in cur and cur[k] != rec[k]]
+    missing = [k for k in rec if k not in cur]
+    added = [k for k in cur if k not in rec]
+    if changed:
+        (err if strict else warn)("脚本已被修改，指纹不一致: %s" % ", ".join(changed))
+    if missing:
+        warn("指纹记录中的脚本已缺失: %s" % ", ".join(missing))
+    if added:
+        warn("新增脚本未纳入指纹（建议 --sign 刷新）: %s" % ", ".join(added))
+    if not (changed or missing or added):
+        info("脚本完整性: %d 个脚本指纹一致" % len(rec))
+
+
+# ---------------------------------------------------------- 免责声明口径
+DISC_VERBATIM = ("AI不能替代人工，人工不能依赖AI，个人仅限研究、学习、交流、体验自用，商业使用须获作者书面授权"
+                 "；本技能仅作为辅助法律工作，不构成法律意见，不可直接作为决策依据；输出内容须经执业律师复核"
+                 "后方可使用；使用风险与后果由使用者自行承担。使用即为已知晓后果并免责作者，否则，请勿使用！")
+DISC_KEYS = ["AI不能替代人工", "人工不能依赖AI", "商业使用须获作者书面授权",
+             "不构成法律意见", "执业律师复核", "免责作者"]
+DISC_FULL_DOCS = ["SKILL.md", "LICENSE.md", "安装使用教程.md", "文档合规审查助手AI合同审核提示词版.md"]
+DISC_KEY_DOCS = ["README.md", "scripts/make-docx.py", "SECURITY.md", "core/01-general-risk-rules.md"]
+
+
+def _norm(t):
+    """去掉 Markdown 强调符与全部空白，便于跨排版比对同一句话。"""
+    return re.sub(r"[*_\s]", "", t or "")
+
+
+def check_disclaimer():
+    """《免责声明》口径一致：每次使用先输出的那段，入口文档须逐字一致。
+
+    入口文档（SKILL.md / LICENSE.md / 安装使用教程.md / 文档合规审查助手AI合同审核提示词版.md）要求**逐字全文**；
+    生成端与摘要处（README.md / make-docx.py / SECURITY.md / core 库）只查**关键句**，
+    允许节选改写——README 页首与「三、快速上手」各保留一句概要，全文在 `LICENSE.md`。
+    """
+    bad = []
+    for rel in DISC_FULL_DOCS:
+        p = os.path.join(ROOT, rel)
+        if not os.path.exists(p):
+            bad.append(rel + "(缺失)")
+        elif _norm(DISC_VERBATIM) not in _norm(_read(p)):
+            bad.append(rel)
+    if bad:
+        err("免责声明未含逐字全文：%s" % "、".join(bad))
+    for rel in DISC_KEY_DOCS:
+        p = os.path.join(ROOT, rel)
+        if not os.path.exists(p):
+            warn("免责声明关键句未检查（文件缺失）: %s" % rel)
+            continue
+        lack = [k for k in DISC_KEYS if k not in _read(p)]
+        if lack:
+            err("%s 免责声明缺关键句: %s" % (rel, "／".join(lack)))
+    if not bad:
+        info("免责声明: %d 处入口文档含逐字全文，生成端与摘要处关键句齐全" % len(DISC_FULL_DOCS))
+    sk = _read(os.path.join(ROOT, "SKILL.md"))
+    if "步骤 0.0 免责声明" not in sk:
+        err("SKILL.md 启动流程缺「步骤 0.0 免责声明」（每次使用先输出）")
+
+
+# ---------------------------------------------------------------- 长文档分批口径
+BATCH_DOCS = ["SKILL.md", "文档合规审查助手AI合同审核提示词版.md"]
+BATCH_KEYS = ["共 N 批", "按条款分批", "一次性"]
+
+
+def check_batch_guidance():
+    """《长文档分批》口径：主档与纯提示词版须同时具备，避免一处改一处漏（超长全文会静默漏条）。"""
+    bad = []
+    for rel in BATCH_DOCS:
+        p = os.path.join(ROOT, rel)
+        if not os.path.exists(p):
+            bad.append(rel + "(缺失)")
+            continue
+        t = _read(p)
+        lack = [k for k in BATCH_KEYS if k not in t]
+        if lack:
+            bad.append("%s(缺:%s)" % (rel, "／".join(lack)))
+    if bad:
+        err("长文档分批口径不一致/缺失：%s" % "、".join(bad))
+    else:
+        info("长文档分批: %d 处入口文档口径齐全（共 N 批 / 按条款分批 / 禁止一次性）" % len(BATCH_DOCS))
+
+
+def check_md_fences():
+    """代码围栏配对：漏一个闭合会把后续标题整段吞进代码块，阅读器大纲里直接消失。
+
+    只对 `## ` 级标题报警——代码块内的 `# 注释`（如 PowerShell 示例）是合法的，
+    若一并当标题会误报。
+    """
+    base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    bad = 0
+    for p in _walk(base, (".md",)):
+        rel = os.path.relpath(p, base).replace("\\", "/")
+        if rel.startswith("samples/") or rel.startswith("private/"):
+            continue
+        lines = _read(p).split("\n")
+        idx = [i for i, ln in enumerate(lines, 1) if ln.strip().startswith("```")]
+        if not idx:
+            continue
+        if len(idx) % 2:
+            err("Markdown 代码围栏未闭合：%s（围栏 %d 个，应为偶数）" % (rel, len(idx)))
+            bad += 1
+            continue
+        for k in range(0, len(idx), 2):
+            a, b = idx[k], idx[k + 1]
+            for j in range(a + 1, b):
+                t = lines[j - 1]
+                if t.lstrip().startswith("## "):
+                    err("Markdown 代码围栏吞掉标题：%s 第 %d 行「%s」落在代码块内（L%d~L%d）"
+                        % (rel, j, t.strip()[:40], a, b))
+                    bad += 1
+    if not bad:
+        info("Markdown 代码围栏：全部成对，无章节标题被吞")
+
+
+def _png_text(path):
+    """读取 PNG 的 tEXt 文本块（纯标准库实现，不给 check 引入 Pillow 依赖）。"""
+    out = {}
+    try:
+        with open(path, "rb") as f:
+            if f.read(8) != b"\x89PNG\r\n\x1a\n":
+                return out
+            while True:
+                hdr = f.read(8)
+                if len(hdr) < 8:
+                    break
+                ln = int.from_bytes(hdr[:4], "big")
+                ctype = hdr[4:8]
+                data = f.read(ln)
+                f.read(4)
+                if ctype == b"tEXt":
+                    k, _, v = data.partition(b"\x00")
+                    out[k.decode("latin-1", "ignore")] = v.decode("latin-1", "ignore")
+                if ctype == b"IEND":
+                    break
+    except OSError:
+        pass
+    return out
+
+
+def check_header_version():
+    """头标 PNG 内嵌的 Skill-Version 是否与 SKILL.md 版本一致。
+
+    头图上的版本串是**烧进像素**的，升版时若忘了重绘，图片看起来正常、
+    脚本也全绿，只有肉眼能发现。故由 make-header.py 在出图时把版本写进 PNG
+    的 tEXt 元数据，这里比对即可当场发现「图片版本过期」。
+    """
+    base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    m = re.search(r"(?m)^version:\s*([0-9][0-9.]*)\s*$", _read(os.path.join(base, "SKILL.md")))
+    cur = ("V" + m.group(1)) if m else None
+    adir = os.path.join(base, "assets")
+    if not cur or not os.path.isdir(adir):
+        return
+    seen, stale, unstamped = 0, [], []
+    for x in sorted(os.listdir(adir)):
+        if not x.lower().endswith(".png"):
+            continue
+        seen += 1
+        v = _png_text(os.path.join(adir, x)).get("Skill-Version")
+        if v is None:
+            unstamped.append(x)
+        elif v != cur:
+            stale.append("%s（内嵌 %s）" % (x, v))
+    if stale:
+        err("头标版本串过期：%s —— SKILL.md 现为 %s，请重跑 `python scripts/make-header.py` 刷新头图"
+            % ("、".join(stale), cur))
+    elif unstamped:
+        warn("头标缺版本戳（%s）：建议用 make-header.py 重绘一次；此后升版漏重绘会被本项检出"
+             % "、".join(unstamped))
+    if seen and not stale and not unstamped:
+        info("头标版本戳：%d 张图的 Skill-Version 均为 %s" % (seen, cur))
+
+
+def check_rule_metadata():
+    """《生效日／最近修订》元数据：核心库与每个行业包都要有，且不得缺项、不得晚于今天。
+
+    只查"有没有、对不对格式"，**内容变了没更新「最近修订」**由 `rule-baseline.py` 的 stale 判据
+    负责（已挂 `check_rule_baseline()`），此处不重复比对。
+    """
+    import datetime
+    today = datetime.date.today().isoformat()
+    bad, ok = [], 0
+    # 核心库：头部须有 版本 / 生效日 / 最近修订（沿革表已移除，修订史随项目维护、不随包）
+    for name in ("01-general-risk-rules.md", "02-legal-verification-checklist.md"):
+        p = os.path.join(ROOT, "core", name)
+        if not os.path.exists(p):
+            continue
+        head = "\n".join(_read(p).splitlines()[:40])
+        lack = []
+        if not re.search(r"生效日\s*\**\s*\d{4}-\d{2}-\d{2}", head):
+            lack.append("生效日")
+        if not re.search(r"最近修订\s*\**\s*\d{4}-\d{2}-\d{2}", head):
+            lack.append("最近修订")
+        for m in re.finditer(r"(?:生效日|最近修订)\s*\**\s*(\d{4}-\d{2}-\d{2})", head):
+            if m.group(1) > today:
+                lack.append("日期晚于今天(%s)" % m.group(1))
+        if lack:
+            bad.append("core/%s(缺:%s)" % (name, "／".join(lack)))
+        else:
+            ok += 1
+    # 行业包 <slug>-meta.md：生效日 / 最近修订 / revision
+    ind = os.path.join(ROOT, "industries")
+    if os.path.isdir(ind):
+        for slug in _industry_slugs():
+            p = os.path.join(ind, "%s-meta.md" % slug)
+            if not os.path.exists(p):
+                continue
+            t = _read(p)
+            lack = []
+            if not re.search(r"^effective_date:\s*\d{4}-\d{2}-\d{2}\s*$", t, re.M):
+                lack.append("effective_date")
+            if not re.search(r"^last_revised:\s*\d{4}-\d{2}-\d{2}\s*$", t, re.M):
+                lack.append("last_revised")
+            if not re.search(r"^\s*-\s*version:", t, re.M):
+                lack.append("revision")
+            for m in re.finditer(r"^(?:effective_date|last_revised):\s*(\d{4}-\d{2}-\d{2})\s*$",
+                                 t, re.M):
+                if m.group(1) > today:
+                    lack.append("日期晚于今天(%s)" % m.group(1))
+            if lack:
+                bad.append("industries/%s-meta.md(缺:%s)" % (slug, "／".join(lack)))
+            else:
+                ok += 1
+    if bad:
+        err("规则元数据（生效日/最近修订）缺失：%s" % "、".join(bad))
+    else:
+        info("规则元数据: %d 处齐全（生效日 / 最近修订）" % ok)
+
+
+def check_version_consistency():
+    """版本号一致性：SKILL.md frontmatter 为准，正文标题与各文档里的版本串都要跟上。
+
+    升版要改 10 处，最容易漏的就是"frontmatter 改了、正文没改"、"README 还是旧版"
+    与"漏了重绘头标（图片里的版本串是烧进像素的，只有肉眼看得出来，见
+    check_header_version）"。
+    这里让脚本守着，漏一处即报错（error，不是警告）。
+    """
+    skill = os.path.join(ROOT, "SKILL.md")
+    if not os.path.exists(skill):
+        return
+    t = _read(skill)
+    m = re.search(r"(?m)^version:\s*([\d.]+)\s*$", t)
+    if not m:
+        err("SKILL.md frontmatter 缺 version 字段")
+        return
+    ver = m.group(1)
+    v = "V" + ver
+    bad = []
+    # SKILL 正文标题里的版本串
+    if not re.search(r"\*\*%s\*\*" % re.escape(v), t):
+        bad.append("SKILL.md 正文标题")
+    # 各文档里应出现该版本串
+    for rel in ("README.md", "SECURITY.md", "文档合规审查助手AI合同审核提示词版.md"):
+        p = os.path.join(ROOT, rel)
+        if os.path.exists(p) and v not in _read(p):
+            bad.append(rel)
+    # 脚本数口径（新增脚本时常漏改文档）
+    n_py = len([f for f in os.listdir(os.path.join(ROOT, "scripts")) if f.endswith(".py")])
+    for rel in ("SKILL.md", "README.md", "SECURITY.md"):
+        p = os.path.join(ROOT, rel)
+        if not os.path.exists(p):
+            continue
+        hits = set(re.findall(r"(\d+)\s*个脚本", _read(p)))
+        if hits and str(n_py) not in hits:
+            bad.append("%s(脚本数=%d，文档写%s)" % (rel, n_py, "/".join(sorted(hits))))
+    if bad:
+        err("版本号 %s 未同步：%s" % (v, "、".join(bad)))
+    else:
+        info("版本一致性: %s（frontmatter / 正文 / README / SECURITY / 提示词版）一致；脚本数 %d 口径同步" % (v, n_py))
+
+
+def check_sample_baseline():
+    """样例级人工基线台账：结构、样例路径、规则 ID 是否真实存在（防台账写错而不自知）。"""
+    p = os.path.join(ROOT, "core", "_sample-baseline.json")
+    if not os.path.exists(p):
+        info("样例基线：未建立（python scripts/sample-baseline.py --record 登记）")
+        return
+    try:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "_sample_baseline", os.path.join(HERE, "sample-baseline.py"))
+        m = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(m)
+        problems = m.verify()
+    except Exception as e:
+        warn("样例基线校验失败：%s" % e)
+        return
+    if problems:
+        err("样例基线台账有问题 %d 处：%s" % (len(problems), "；".join(problems[:4])))
+        return
+    try:
+        data = json.loads(_read(p))
+        cases = data.get("cases") or []
+        n_c = sum(1 for c in cases if c.get("status") == "confirmed")
+        n_d = len(cases) - n_c
+        info("样例基线: %d 个用例（已确认 %d / 初拟 %d）" % (len(cases), n_c, n_d))
+        if n_c == 0 and cases:
+            info("样例基线：尚无 confirmed 用例，比对只提示不计失败——人工确认后改 status 为 confirmed")
+    except Exception:
+        pass
+
+
+# ---------------------------------------------------------------- 清理
+def _pycache_dirs():
+    out = []
+    for r, d, _f in os.walk(ROOT):
+        if "__pycache__" in d:
+            out.append(os.path.join(r, "__pycache__"))
+    return out
+
+
+def clean():
+    import shutil
+    n_dir = n_pyc = 0
+    for c in _pycache_dirs():
+        shutil.rmtree(c, ignore_errors=True)
+        n_dir += 1
+    for p in glob.glob(os.path.join(ROOT, "**", "*.pyc"), recursive=True):
+        try:
+            os.remove(p)
+            n_pyc += 1
+        except OSError:
+            pass
+    info("已清理 __pycache__ 目录 %d 个、.pyc 文件 %d 个" % (n_dir, n_pyc))
+
+
+# ---------------------------------------------------------------- 工具
+def _read(p):
+    for enc in ("utf-8-sig", "utf-8", "gbk"):
+        try:
+            with open(p, encoding=enc) as f:
+                return f.read()
+        except (UnicodeDecodeError, LookupError):
+            continue
+    with open(p, encoding="utf-8", errors="ignore") as f:
+        return f.read()
+
+
+def _walk(base, exts):
+    for r, d, fs in os.walk(base):
+        d[:] = [x for x in d if x != "__pycache__"]
+        for x in fs:
+            if x.lower().endswith(exts):
+                yield os.path.join(r, x)
+
+
+def main():
+    ap = argparse.ArgumentParser(description="文档合规审查助手AI合同审核全能版 · 结构与环境自检（Python 版，替代 check.ps1）")
+    ap.add_argument("--sign", action="store_true", help="生成/刷新脚本完整性指纹")
+    ap.add_argument("--verify", action="store_true", help="仅校验脚本指纹")
+    ap.add_argument("--strict", action="store_true", help="指纹不一致时视为错误")
+    ap.add_argument("--clean", action="store_true", help="清理 __pycache__ / *.pyc 后继续自检")
+    ap.add_argument("--quiet", action="store_true", help="只输出结论行")
+    a = ap.parse_args()
+
+    if a.clean:
+        clean()
+
+    if a.sign:
+        sign()
+        _report(a.quiet)
+        return 0
+
+    if not a.verify:
+        check_required_files()
+        check_assets()
+        check_industries()
+        check_deenterprise()
+        check_rule_ids()
+        check_rule_baseline()
+        check_disclaimer()
+        check_batch_guidance()
+        check_md_fences()
+        check_header_version()
+        check_rule_metadata()
+        check_sample_baseline()
+        check_version_consistency()
+        check_config()
+        check_hardcoded_paths()
+        check_security()
+    verify(strict=a.strict)
+    return _report(a.quiet)
+
+
+def _report(quiet):
+    if not quiet:
+        if INFOS:
+            for m in INFOS:
+                print("[i] " + m)
+        if WARNS:
+            for m in WARNS:
+                print("[W] " + m)
+    print("==== 校验结果 ====")
+    if ERRS:
+        for m in ERRS:
+            print("[E] " + m)
+        print("错误 %d 项，警告 %d 项 —— 未通过。" % (len(ERRS), len(WARNS)))
+        return 1
+    print("通过：结构 / 字段 / 头标 / 去企业化 / 规则ID / 免责声明 / 长文档分批 / 规则元数据 / 样例基线 / 版本一致性 / 配置 / 安全项 无错误（警告 %d 项，提示 %d 项）。"
+          % (len(WARNS), len(INFOS)))
+    return 0
+
+
+if __name__ == "__main__":
+    _sys.exit(main())

@@ -1,0 +1,1221 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+文档合规审查助手AI合同审核全能版 · 交付物产出脚本（10 类型 × WORD/MD，统一命名）
+===============================================================================
+交付物类型（勾选框 · 多选，**一次全部显示供勾选**，产出前询问用户）：
+  1) 修订版（首选）        2) 审查意见批注版      3) 修改后清洁版
+  4) 红线修订格式版        5) 审查意见报告        6) 原文脱敏版
+  7) 原文照录版            8) 文件比对报告        9) 新旧比对       10) 模板版
+  · 未勾选时默认产出 1、2、3 三类（--types 可显式指定，亦可用中文类型名）。
+  · 类型 1（修订版）：Word 原生修订痕迹（w:ins/w:del），可逐条接受/拒绝；
+    **只标到改动的最小范围**——句读对齐后对改写块再做字符级细分，差异过大才整段替换。
+  · 类型 4（红线修订格式版）：粒度同 1，痕迹改用灰色删除线／红色下划线，不依赖 Word 修订功能。
+  · 类型 2（批注版）：每条意见以 Word 批注锚定到对应条款；需 python-docx>=1.2，
+    低版本自动降级为「意见附于条款之后」。`--comments` 为兼容保留的等价开关。
+  · **不人为增加抬头（保持原版观感）**：1、3、4、6、7 五类＝还原原文的交付物，
+    标题即原文标题（**不加「（修订模式）」等类型后缀**）、正文**不加「说明：…」段**；
+    类型／审查人／轮次／时间写入 **docx 核心属性**（资源管理器右键「属性」即见）与文件名。
+    1、4 另在标题上挂 **1 条「这是什么文件」批注 ＋ 每处修改 1 条意见批注**；
+    3、6、7 **零批注**（可能对外发出或纯原文转录，不夹带内部审查意见）。
+    报告类（2、5、8、9、10）是本技能新写的文书，标题与报告免责声明属文书固有内容，不适用此节。
+  · 类型 8（文件比对报告）：比对**两份文件 / 两个版本**（如对方回稿 ↔ 我方上版），
+    输入 spec.compare{a_text,b_text,a_label,b_label}，或命令行 --cmp-a/--cmp-b 指定文本文件；
+    未提供两份全文时，自动降级为「条款级变更台账」（原文 ↔ 修改后）。
+  · 类型 9（新旧比对）：同一份文档的改前/改后条款级左右对照表。
+  · 类型 10（模板版）：由「撰写合同模板」与「转模板」两条链路产出——
+    占位符说明表 ＋ 模板正文 ＋ 可选条款区（逐条挂批注）＋ 使用须知；spec.template 见下方字段说明。
+    占位符一旦填实即成为具体合同，须经执业律师复核。
+
+文件格式（--formats，逗号分隔）：
+  docx   —— Word
+  md     —— Markdown
+  excel  —— Excel（openpyxl；比对/报告/照录/脱敏/清洁均有对应工作面）
+  pdf    —— PDF（由已生成的 docx 经 LibreOffice 无头转换；`render.pdf_export=false` 可关闭）
+
+排版样式档位（--style，或 spec.style、config.json 的 render.style）：
+  default  —— 不改动版式（保持既有的不居中、不缩进）
+  contract —— 合同风（**默认**）：文档标题居中、条款标题加粗不缩进、正文首行缩进 2 字符、行距 1.5
+  official —— 公文风：标题居中二号、正文三号首行缩进
+  · 只对 **1、3、4、6、7** 五类（要还原原文观感的交付物）生效；报告类 2、5、8、9、10 本就是新写文档，不套用。
+  · 说明：10 类 docx 均按 spec 重建、不读原文档格式（扫描件/OCR/粘贴文本亦无格式可继承），
+    故以「按文本特征推断段落角色 ＋ 样式档位」补齐版式，而非还原原稿。
+
+审查人：**必填**，不填不产出（写死）；写入文件名 `<审查人>` 字段，并作为 Word 真实修订的修订者（w:author）。读取顺序：--reviewer > spec.reviewer > 环境变量 REVIEWER；仍为空时，交互终端将现场追问，否则报错退出（纯自动化可用 --reviewer "AI 文档合规审查助手"）。
+
+工具路径与默认工作目录由 `scripts/config.json` 提供（见 `_config.py`）；命令行参数优先。
+
+用法：
+  python make-docx.py spec.json --reviewer 胡皓 [--out D:\某目录] [--subdir 采购合同A] [--types ...] [--formats docx,md,excel,pdf] [--cmp-a 旧版.txt --cmp-b 新版.txt] [--ts ...]
+  默认输出目录：<工作根目录>\输出（工作根目录按候选链自动探测，见 set-workdir.py；
+                可用 --out 覆盖；--subdir 建子文件夹）
+  （--ts 建议由 AI 传入准确时间，勿依赖本机时钟）
+  --types 可用 slug（tracked/redline/clean/report/reportc/masked/original/diff/compare/template）或中文类型名。
+  --source-docx <原稿.docx>：半档C 排版保真，仅对 3清洁版/6脱敏版/7照录版 生效（其余类型不受影响）；
+                             以原稿为底只替换段落文字，保留原稿版式；原稿不可用则自动回退样式档位。
+spec.json 关键字段：
+  name / source / report_title / disclaimer / reviewer / round
+  clauses[]: heading / original / revised / rating / basis / comment
+  original_text（可选）：原文照录版/原文脱敏版 需要（全文文本）
+  compare{a_label,a_text,b_label,b_text}（可选）：文件比对报告 需要（两份全文）
+  template{name,placeholders[],body,optional[],notes}（可选）：模板版 需要（转模板 / 撰写模板）
+依赖：python-docx（>=1.2，支持批注）；openpyxl（Excel 导出）；LibreOffice（PDF 导出，可选）。
+"""
+import sys as _sys
+_sys.dont_write_bytecode = True   # 不在技能目录留下 __pycache__（避免缓存残留）
+import os, re, sys, json, argparse, datetime, random, difflib
+from docx import Document
+from docx.shared import RGBColor, Pt
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.oxml import parse_xml
+from docx.oxml.ns import nsdecls
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+try:
+    import desensitize as _d
+except Exception:
+    _d = None
+try:
+    import _config as _cfgmod
+    _CFG = _cfgmod.load()
+except Exception:
+    _cfgmod = None
+    _CFG = {}
+
+BASE_DIR = (_cfgmod.workdir(_CFG, "base_dir") if _cfgmod
+            else os.path.join(os.path.expanduser("~"), "文档合规审查报告"))
+IN_DIR   = os.path.join(BASE_DIR, "输入")
+OUT_DIR  = (_cfgmod.workdir(_CFG, "out_dir") if _cfgmod else "") or os.path.join(BASE_DIR, "输出")
+SOFFICE  = (_cfgmod.tool(_CFG, "soffice") if _cfgmod else "soffice")
+PDF_EXPORT = (bool(_cfgmod.render_opt(_CFG, "pdf_export")) if _cfgmod else True)
+PDF_TIMEOUT = (int(_cfgmod.render_opt(_CFG, "pdf_timeout_sec") or 180) if _cfgmod else 180)
+
+REVIEWER = ""; ROUND = "1"; TS = ""; SOURCE = "contract"
+SLUGS = {
+    "tracked":  "修订版",
+    "reportc":  "审查意见批注版",
+    "clean":    "修改后清洁版",
+    "redline":  "红线修订格式版",
+    "report":   "审查意见报告",
+    "masked":   "原文脱敏版",
+    "original": "原文照录版",
+    "diff":     "文件比对报告",
+    "compare":  "新旧比对",
+    "template": "模板版",
+}
+# 10 类交付物（勾选框 · 多选，一次全部显示供勾选；顺序即清单排列顺序）
+# 1/2/3 为最常用三类，故置于最前；10 模板版由「撰写合同模板」与「转模板」两条链路产出
+TYPE_ORDER = ["tracked", "reportc", "clean", "redline", "report",
+              "masked", "original", "diff", "compare", "template"]
+# 用户未勾选时的默认产出：1 修订版 / 2 审查意见批注版 / 3 修改后清洁版
+DEFAULT_TYPES = ["tracked", "reportc", "clean"]
+# 原文脱敏版默认 **12 类全脱**（含信用代码/金额/地址/人名；比例不脱）。
+# 真源＝desensitize.py 的 ALL_TYPES，此处直接取用，避免两处各写一份而漂移。
+MASK_TYPES = (_d.ALL_TYPES.split(",") if _d is not None
+              else ["idcard", "phone", "bank", "email", "postcode", "im",
+                    "uscc", "amount", "addr", "name"])
+
+# 文件比对报告：变更内容命中以下词时，提示"涉实质条款、建议复核"
+DIFF_KEY_TERMS = ["赔偿", "责任", "违约金", "定金", "付款", "支付", "价款", "价格", "税率", "发票",
+                  "期限", "交付", "验收", "质量", "管辖", "仲裁", "诉讼", "保密", "知识产权",
+                  "数据", "个人信息", "解除", "终止", "担保", "保证", "质保金", "转让", "独家"]
+
+# ---------- 排版保真 · B 档：样式档位 ＋ 段落角色推断 ----------
+# 背景：9 类 docx 均按 spec 从零重建，不读原文档格式，故居中/缩进/段间距必然丢失
+# （扫描件、OCR、粘贴文本更无格式可继承）。B 档不改提取链路与 spec 约定，只在生成时
+# 按文本特征推断段落角色并套用样式档位，使 1、3、4、6、7 五类具备可读版式。
+# 报告类 2、5、8、9、10 本就是新写文档，无"原排版"概念，不套用。
+STYLE_ORDER = ["default", "contract", "official"]
+STYLE_PRESETS = {
+    # default＝保持既有行为，供不需要改版式的场景使用
+    "default": {"title_center": False, "title_size": None, "clause_bold": True,
+                "body_indent": False, "body_size": None,
+                "line_spacing": None, "space_before": None, "sign_right": False},
+    # contract＝合同风（默认）：标题居中、条款标题加粗不缩进、正文首行缩进 2 字符
+    "contract": {"title_center": True, "title_size": 16, "clause_bold": True,
+                 "body_indent": True, "body_size": 12,
+                 "line_spacing": 1.5, "space_before": 6, "sign_right": True},
+    # official＝公文风：标题二号居中、正文三号首行缩进
+    "official": {"title_center": True, "title_size": 22, "clause_bold": True,
+                 "body_indent": True, "body_size": 16,
+                 "line_spacing": 1.5, "space_before": 6, "sign_right": True},
+}
+STYLE = "contract"   # 由 --style / spec.style / config.render.style 覆盖
+
+_ROLE_CLAUSE = re.compile(r"^(第[一二三四五六七八九十百千零〇\d]+条|[一二三四五六七八九十]+[、．.])")
+_ROLE_NUM = re.compile(r"^\d+(\.\d+)*[、．.\s]")
+_ROLE_SIGN = re.compile(r"(甲方|乙方|丙方|丁方|签署|签章|盖章|签字|日期|年月日)")
+
+def set_style(name):
+    """设置样式档位；无法识别的名称一律忽略（回落当前值）。"""
+    global STYLE
+    v = (str(name).strip().lower() if name else "")
+    if v in STYLE_PRESETS:
+        STYLE = v
+
+def para_role(text, is_first=False):
+    """按文本特征推断段落角色（命中即止）：doc_title / clause / num_title / sign / body。"""
+    t = (text or "").strip()
+    if not t:
+        return "body"
+    if is_first and len(t) <= 30 and not t.endswith(("。", "；", "！", "？", ".", "!", "?")):
+        return "doc_title"
+    if _ROLE_CLAUSE.match(t):
+        return "clause"
+    if _ROLE_NUM.match(t) and len(t) <= 40:
+        return "num_title"
+    if len(t) <= 20 and _ROLE_SIGN.search(t):
+        return "sign"
+    return "body"
+
+def apply_role(p, role):
+    """把样式档位套到段落。只设段落级属性与整段字号，**不覆盖 run 级既有格式**
+    （红线版的删除线/下划线颜色、修订版的 w:ins/w:del 均不受影响）。"""
+    s = STYLE_PRESETS[STYLE]
+    pf = p.paragraph_format
+    if s["space_before"]:
+        pf.space_before = Pt(s["space_before"])
+    if s["line_spacing"]:
+        pf.line_spacing = s["line_spacing"]
+    if role == "doc_title":
+        if s["title_center"]:
+            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        if s["title_size"]:
+            for r in p.runs:
+                r.font.size = Pt(s["title_size"])
+    elif role in ("clause", "num_title"):
+        pf.first_line_indent = Pt(0)
+        pf.space_after = Pt(0)
+        if s["clause_bold"]:
+            for r in p.runs:
+                r.bold = True
+    elif role == "sign":
+        if s["sign_right"]:
+            p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    else:
+        if s["body_indent"]:
+            pf.first_line_indent = Pt((s["body_size"] or 12) * 2)   # 首行缩进 2 字符
+        if s["body_size"]:
+            for r in p.runs:
+                r.font.size = Pt(s["body_size"])
+    return p
+
+def add_title(doc, text):
+    """文档标题：保留 Title 大纲级别，再按样式档位居中/放大。"""
+    return apply_role(doc.add_heading(text or "", 0), "doc_title")
+
+def add_report_title(doc, text):
+    """报告型文书标题（2/5/8/9）：保留 Title 级字号与大纲级别，标题恒居中。
+
+    报告类不套样式档位（正文不缩进、行距不动），但标题对齐属报告固有版式——
+    Title 样式默认左对齐，不显式居中就没有抬头观感，与文档型标题观感也不一致。
+    """
+    p = doc.add_heading(text or "", 0)
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    return p
+
+def add_clause_title(doc, text):
+    p = doc.add_paragraph(text or "")
+    for r in p.runs:
+        r.bold = True
+    return apply_role(p, "clause")
+
+def apply_text(doc, text, first=False):
+    """按角色生成正文段落（原文照录版/脱敏版逐行调用）。"""
+    return apply_role(doc.add_paragraph(text or ""), para_role(text, first))
+
+def esc(s): return (s or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+def now(): return datetime.datetime.now().isoformat(timespec="seconds")
+def _rid(): return str(random.randint(100000, 999999))
+
+def sanitize(name):
+    s = re.sub(r"[\s]+", "-", (name or "contract").strip())
+    s = re.sub(r"[\\/:*?\"<>|（）()【】\[\]·、,，]+", "", s)
+    return s[:40] or "contract"
+
+def outname(slug, ext="docx"):
+    return f"{SOURCE}_{SLUGS[slug]}_{REVIEWER}_r{ROUND}_{TS}.{ext}"
+
+def tracked_ins(p, text):
+    p._p.append(parse_xml(f'<w:ins {nsdecls("w")} w:id="{_rid()}" w:author="{esc(REVIEWER)}" w:date="{now()}"><w:r><w:t xml:space="preserve">{esc(text)}</w:t></w:r></w:ins>'))
+
+def tracked_del(p, text):
+    p._p.append(parse_xml(f'<w:del {nsdecls("w")} w:id="{_rid()}" w:author="{esc(REVIEWER)}" w:date="{now()}"><w:r><w:delText xml:space="preserve">{esc(text)}</w:delText></w:r></w:del>'))
+
+# ---------- 细粒度修订：句读对齐 ＋ 块内字符级细分 ----------
+_SUB_SPLIT = re.compile(r"([。；！？：，、\n])")
+
+
+def _units(text):
+    """按句读切成片段（标点保留在前一片末尾）——中文无词边界，句读是修订的自然粒度。"""
+    parts = _SUB_SPLIT.split(text or "")
+    us = []
+    for i in range(0, len(parts) - 1, 2):
+        piece, sep = parts[i], parts[i + 1]
+        if piece or sep:
+            us.append(piece + sep)
+    if parts and parts[-1]:
+        us.append(parts[-1])
+    return us
+
+
+def _char_ops(a, b):
+    """字符级 diff：把一段「整体改写」拆到改动的最小范围。"""
+    ops = []
+    for tag, i1, i2, j1, j2 in difflib.SequenceMatcher(None, a, b, autojunk=False).get_opcodes():
+        if tag == "equal":
+            ops.append(("equal", a[i1:i2]))
+        elif tag == "delete":
+            ops.append(("delete", a[i1:i2]))
+        elif tag == "insert":
+            ops.append(("insert", b[j1:j2]))
+        else:
+            if a[i1:i2]:
+                ops.append(("delete", a[i1:i2]))
+            if b[j1:j2]:
+                ops.append(("insert", b[j1:j2]))
+    return ops
+
+
+def _merge_ops(ops):
+    out = []
+    for tag, txt in ops:
+        if not txt:
+            continue
+        if out and out[-1][0] == tag:
+            out[-1] = (tag, out[-1][1] + txt)
+        else:
+            out.append((tag, txt))
+    return out
+
+
+def inline_diff(old, new, thr=0.4, max_ops=80):
+    """原文→修改后 的差异序列 [(equal|delete|insert, text)]，供修订版与红线版渲染。
+
+    两级比对：先按句读对齐（改动往往只在一两处，其余须原样保留），
+    再对"整句被替换"的块降到字符级——这是"只改了某处却整段显示为改动"的根因：
+    旧实现一旦发现条款文本不同就整段 del＋ins。
+    差异过大（相似度 < thr）或碎片过多（> max_ops，审阅时会难以逐条处理）时
+    退化为整段替换，保证可读性优先于极细粒度。
+    """
+    old, new = old or "", new or ""
+    if not old:
+        return [("insert", new)] if new else []
+    if not new:
+        return [("delete", old)]
+    if old == new:
+        return [("equal", old)]
+    if difflib.SequenceMatcher(None, old, new, autojunk=False).ratio() < thr:
+        return [("delete", old), ("insert", new)]
+    ao, bo = _units(old), _units(new)
+    ops = []
+    for tag, i1, i2, j1, j2 in difflib.SequenceMatcher(None, ao, bo, autojunk=False).get_opcodes():
+        if tag == "equal":
+            ops.append(("equal", "".join(ao[i1:i2])))
+        elif tag == "delete":
+            ops.append(("delete", "".join(ao[i1:i2])))
+        elif tag == "insert":
+            ops.append(("insert", "".join(bo[j1:j2])))
+        else:
+            A, B = "".join(ao[i1:i2]), "".join(bo[j1:j2])
+            if not A:
+                ops.append(("insert", B))
+            elif not B:
+                ops.append(("delete", A))
+            elif difflib.SequenceMatcher(None, A, B, autojunk=False).ratio() < thr:
+                ops.append(("delete", A)); ops.append(("insert", B))
+            else:
+                ops.extend(_char_ops(A, B))
+    ops = _merge_ops(ops)
+    if len(ops) > max_ops:
+        return [("delete", old), ("insert", new)]
+    return ops
+
+
+# ---------- 交付物说明：写进文档属性／批注，不占正文版面 ----------
+def set_meta(doc, spec, slug):
+    """类型／审查人／轮次／时间 → docx 核心属性（资源管理器右键属性即见，正文不留痕）。
+
+    10 类一律写入（报告类的标准 applicable 对象不同，但同样不该在正文里重复元数据）。
+    """
+    try:
+        cp = doc.core_properties
+        if slug in ("report", "reportc"):
+            t = spec.get("report_title") or "文档合规审查意见报告"
+        elif slug == "template":
+            t = template_spec(spec).get("name") or (title(spec) + "（模板版）")
+        elif slug in ("compare", "diff"):
+            t = "%s（%s）" % (title(spec), SLUGS.get(slug, slug))
+        else:
+            t = title(spec)
+        cp.title = t
+        cp.author = REVIEWER or "AI 文档合规审查助手"
+        cp.category = SLUGS.get(slug, slug)
+        cp.keywords = "%s; %s; r%s" % (SLUGS.get(slug, slug), REVIEWER, ROUND)
+        cp.comments = ("交付物类型：%s ｜ 审查人：%s ｜ 轮次：r%s ｜ 生成时间：%s"
+                       % (SLUGS.get(slug, slug), REVIEWER, ROUND, TS))
+    except Exception:
+        pass
+    return doc
+
+
+DELIVERY_NOTE = {
+    "tracked": "本文件为《{t}》的修订版：删除线是原文、下划线是修改后文本，可在 Word/WPS「审阅」中逐条接受或拒绝。",
+    "redline": "本文件为《{t}》的红线修订格式版：灰色删除线是原文、红色下划线是修改后文本，不依赖 Word 修订功能。",
+    "template": "本文件为《{t}》的模板版：{{ }} 占位符须逐项填写，可选条款区按本次交易情形取舍；"
+                "占位符一旦填实即成为具体合同，须经执业律师复核后方可使用。",
+}
+
+
+def can_comment(doc):
+    return hasattr(doc, "add_comment") and hasattr(doc, "comments")
+
+
+def add_delivery_note(doc, runs, slug, spec=None):
+    """标题上挂 1 条「这是什么文件」批注；批注不可用则静默跳过（不落到正文）。"""
+    tpl = DELIVERY_NOTE.get(slug)
+    if not tpl or not runs or not can_comment(doc):
+        return False
+    txt = tpl.format(t=title(spec)) + "\n审查人：%s ｜ 轮次：r%s" % (REVIEWER, ROUND)
+    try:
+        doc.add_comment(runs, text=txt, author=REVIEWER or "AI 文档合规审查助手",
+                        initials=(REVIEWER or "AI")[:3])
+        return True
+    except Exception:
+        return False
+
+
+def add_clause_note(doc, runs, c):
+    """条款标题上挂 1 条审查意见批注；无实质意见时不挂。
+
+    锚点只能取条款标题：修订版的正文文字都在 w:ins／w:del 里，取不到可锚定的 run。
+    """
+    if not runs or not can_comment(doc):
+        return False
+    if not (c.get("rating") or c.get("comment") or c.get("basis") or c.get("revised")):
+        return False
+    txt = ("【%s】%s\n法律依据：%s\n修改建议：%s"
+           % (c.get("rating") or "—", c.get("comment") or "—",
+              c.get("basis") or "—", c.get("revised") or "—"))
+    try:
+        doc.add_comment(runs, text=txt, author=REVIEWER or "AI 文档合规审查助手",
+                        initials=(REVIEWER or "AI")[:3])
+        return True
+    except Exception:
+        return False
+
+
+def render_diff_runs(p, o, v, kind):
+    """把差异序列渲到一个段落：tracked=Word 原生修订，redline=删除线/下划线。"""
+    for tag, txt in inline_diff(o, v):
+        if tag == "equal":
+            p.add_run(txt)
+        elif tag == "delete":
+            if kind == "tracked":
+                tracked_del(p, txt)
+            else:
+                r = p.add_run(txt); r.font.strike = True; r.font.color.rgb = RGBColor(0x80, 0x80, 0x80)
+        else:
+            if kind == "tracked":
+                tracked_ins(p, txt)
+            else:
+                r = p.add_run(txt); r.font.underline = True; r.font.color.rgb = RGBColor(0xC0, 0x00, 0x00)
+    return p
+
+DISCLAIMER_REPORT = ("本报告仅基于所提供文档之文本字面表述和当事人表述以及需求，进行理解与风险提示，"
+                     "不代表对交易背景、履约事实或商业安排的确认，所引法条、判例、法院名称、标准号、示范文本及链接"
+                     "请以现行有效版本为准，使用者应自行核验其真实性与现行有效性。")
+DISCLAIMER_USAGE = ("免责声明：AI不能替代人工，人工不能依赖AI，个人仅限研究、学习、交流、体验自用，商业使用须获作者书面授权；本技能仅作为辅助法律工作，不构成法律意见，不可直接作为决策依据；"
+                    "输出内容须经执业律师复核后方可使用；使用风险与后果由使用者自行承担。"
+                    "使用即为已知晓后果并免责作者，否则，请勿使用！")
+
+
+def add_disclaimer(doc, spec):
+    """报告头部固定免责声明：**报告专属段 ＋ 使用免责声明全文**（两段并存，缺一不可）。
+
+    报告段可用 spec.disclaimer 覆盖；使用免责声明为固定全文，不可按调用方覆盖。
+    """
+    d = spec.get("disclaimer") or DISCLAIMER_REPORT
+    r = doc.add_paragraph().add_run("免责声明：" + d); r.italic = True; r.font.size = Pt(9)
+    r2 = doc.add_paragraph().add_run(DISCLAIMER_USAGE); r2.italic = True; r2.font.size = Pt(9)
+
+def clauses(spec): return spec.get("clauses", [])
+def title(spec): return spec.get("name", "合同")
+
+# ---------- 第 10 类「模板版」：撰写合同模板（见 drafting-guide.md）与 转模板（第十七节）两条链路共用 ----------
+# spec.template 结构（全部可选，缺哪一项就少哪一节，不会报错）：
+#   {"name": "模板名称",
+#    "placeholders": [{"name": "{{甲方全称}}", "meaning": "…", "example": "…", "required": true}],
+#    "body": "模板正文全文（含占位符）",
+#    "optional": [{"name": "竞业限制", "scene": "…", "advice": "…"}],
+#    "notes": "使用须知"}
+def template_spec(spec):
+    """读 spec.template；缺省时退化为「用条款拼一份骨架」，保证任何 spec 都能出件。"""
+    t = spec.get("template")
+    t = t if isinstance(t, dict) else {}
+    body = (t.get("body") or "").strip()
+    if not body and clauses(spec):
+        parts = []
+        for c in clauses(spec):
+            h = (c.get("heading") or "").strip()
+            b = (c.get("revised") or c.get("original") or "").strip()
+            parts.append((h + "\n" + b) if h else b)
+        body = "\n\n".join([p for p in parts if p.strip()])
+    return {"name": (t.get("name") or "").strip(),
+            "placeholders": [p for p in (t.get("placeholders") or []) if isinstance(p, dict)],
+            "body": body,
+            "optional": [o for o in (t.get("optional") or []) if isinstance(o, dict)],
+            "notes": (t.get("notes") or "").strip()}
+
+
+def template_name(spec):
+    return template_spec(spec)["name"] or (title(spec) + "（模板版）")
+
+
+def add_template_note(doc, runs, text):
+    """模板版专用批注：可选条款上挂「适用场景／取舍建议」，正文不留痕。"""
+    if not runs or not can_comment(doc):
+        return False
+    try:
+        doc.add_comment(runs, text=text, author=REVIEWER or "AI 文档合规审查助手",
+                        initials=(REVIEWER or "AI")[:3])
+        return True
+    except Exception:
+        return False
+
+# ---------- docx 生成 ----------
+def doc_trackchanges(spec):
+    """1 修订版：标题保持原文标题，说明进文档属性＋批注，修订只标到改动的最小范围。"""
+    doc = Document(); h0 = add_title(doc, title(spec))
+    set_meta(doc, spec, "tracked"); add_delivery_note(doc, h0.runs[:1], "tracked", spec)
+    for c in clauses(spec):
+        h = add_clause_title(doc, c.get("heading", ""))
+        o = c.get("original", ""); v = c.get("revised", "")
+        changed = bool(v) and v != o
+        p = apply_role(doc.add_paragraph(), "body")
+        if changed:
+            render_diff_runs(p, o, v, "tracked")
+        else:
+            p.add_run(o or v)
+        add_clause_note(doc, h.runs, c)
+    return doc
+
+def doc_redline(spec):
+    """4 红线修订格式版：同 tracked 的呈现口径，痕迹用删除线/下划线而非 Word 修订。"""
+    doc = Document(); h0 = add_title(doc, title(spec))
+    set_meta(doc, spec, "redline"); add_delivery_note(doc, h0.runs[:1], "redline", spec)
+    for c in clauses(spec):
+        h = add_clause_title(doc, c.get("heading", ""))
+        o = c.get("original", ""); v = c.get("revised", "")
+        changed = bool(v) and v != o
+        p = apply_role(doc.add_paragraph(), "body")
+        if changed:
+            render_diff_runs(p, o, v, "redline")
+        else:
+            p.add_run(o or v)
+        add_clause_note(doc, h.runs, c)
+    return doc
+
+def doc_clean(spec):
+    """3 修改后清洁版：零批注（可能发对方），类型信息只进文档属性与文件名。"""
+    _sd = from_source_docx(spec, "clean")
+    if _sd is not None:
+        return set_meta(_sd, spec, "clean")
+    doc = Document(); add_title(doc, title(spec))
+    set_meta(doc, spec, "clean")
+    for c in clauses(spec):
+        add_clause_title(doc, c.get("heading", ""))
+        apply_role(doc.add_paragraph(c.get("revised") or c.get("original") or ""), "body")
+    return doc
+
+def doc_report(spec):
+    doc = Document(); add_report_title(doc, spec.get("report_title", "文档合规审查意见报告"))
+    set_meta(doc, spec, "report")
+    add_disclaimer(doc, spec); doc.add_paragraph("源文件：" + title(spec) + "　审查人：" + REVIEWER + "　轮次：r" + ROUND)
+    for i, c in enumerate(clauses(spec), 1):
+        h = doc.add_heading(f"{i}. {c.get('heading','')}", level=2)
+        rt = c.get("rating", "")
+        if rt:
+            r = h.add_run("  " + rt); r.font.color.rgb = RGBColor(0xFF, 0x00, 0x00)  # 星级红色
+        doc.add_paragraph("风险描述：" + (c.get("comment", "") or "—"))
+        doc.add_paragraph("法律依据：" + (c.get("basis", "") or "—"))
+        doc.add_paragraph("修改建议（可直接采用的条款文本）：" + (c.get("revised", "") or "—"))
+    return doc
+
+def doc_report_comments(spec):
+    """审查意见报告·批注版：正文保持原条款，意见以 Word 批注锚定到对应条款（需 python-docx>=1.2）。"""
+    doc = Document()
+    add_report_title(doc, spec.get("report_title", "文档合规审查意见报告") + "（批注版）")
+    set_meta(doc, spec, "reportc")
+    add_disclaimer(doc, spec)
+    doc.add_paragraph("源文件：" + title(spec) + "　审查人：" + REVIEWER + "　轮次：r" + ROUND)
+    _ok_cm = can_comment(doc)   # 注意：局部变量不得叫 can_comment（会遮蔽同名函数）
+    if not _ok_cm:
+        doc.add_paragraph("提示：当前 python-docx 版本不支持批注（需 >=1.2），已降级为「意见附于条款之后」的呈现方式。")
+    for i, c in enumerate(clauses(spec), 1):
+        # 条款标题（批注锚点）
+        h = doc.add_heading(f"{i}. {c.get('heading','')}", level=2)
+        if c.get("rating"):
+            r = h.add_run("  " + c.get("rating")); r.font.color.rgb = RGBColor(0xFF, 0x00, 0x00)
+        if c.get("original"):
+            p = doc.add_paragraph(); p.add_run("原文：").bold = True; p.add_run(c.get("original", ""))
+        if c.get("revised"):
+            p = doc.add_paragraph(); p.add_run("修改后：").bold = True; p.add_run(c.get("revised", ""))
+        note = (f"【评级】{c.get('rating') or '—'}\n"
+                f"【风险描述】{c.get('comment') or '—'}\n"
+                f"【法律依据】{c.get('basis') or '—'}\n"
+                f"【修改建议】{c.get('revised') or '—'}")
+        if _ok_cm:
+            try:
+                doc.add_comment(h.runs, text=note, author=REVIEWER or "AI 文档合规审查助手",
+                                initials=(REVIEWER or "AI")[:3])
+            except Exception:
+                doc.add_paragraph("批注内容：" + note.replace("\n", " "))
+        else:
+            doc.add_paragraph("批注内容：" + note.replace("\n", " "))
+    return doc
+
+
+def doc_compare(spec):
+    doc = Document(); add_report_title(doc, title(spec) + "（新旧比对）")
+    set_meta(doc, spec, "compare")
+    t = doc.add_table(rows=1, cols=3); t.style = "Table Grid"
+    h = t.rows[0].cells; h[0].text = "条款"; h[1].text = "原文"; h[2].text = "修改后"
+    for c in clauses(spec):
+        r = t.add_row().cells; r[0].text = c.get("heading", ""); r[1].text = c.get("original", ""); r[2].text = c.get("revised", "")
+    return doc
+
+# ---------- 文件比对报告（两份文件 / 两个版本的差异台账） ----------
+def _cmp_texts(spec):
+    c = spec.get("compare") or {}
+    a = c.get("a_text") or spec.get("compare_a_text") or ""
+    b = c.get("b_text") or spec.get("compare_b_text") or ""
+    la = c.get("a_label") or spec.get("compare_a_label") or "旧版"
+    lb = c.get("b_label") or spec.get("compare_b_label") or "新版"
+    return a, b, la, lb
+
+def _diff_hint(text):
+    hits = [k for k in DIFF_KEY_TERMS if k in (text or "")]
+    return ("涉实质条款（%s），建议复核" % "、".join(hits[:4])) if hits else "建议核对上下文"
+
+def _sim(a, b):
+    if not a or not b:
+        return ""
+    return "%.0f%%" % (difflib.SequenceMatcher(None, a, b).ratio() * 100)
+
+def _drow(no, kind, loc, old, new):
+    old = (old or "").strip(); new = (new or "").strip()
+    return {"no": str(no), "loc": loc, "kind": kind, "sim": _sim(old, new),
+            "old": old or "—", "new": new or "—", "hint": _diff_hint(old + new)}
+
+def _pair_replace(al, bl, i1, i2, j1, j2, thr=0.55):
+    """替换块内按相似度配对：≥阈值视为「修改」，配不上的分别记为「删除」/「新增」。
+
+    解决逐行比对把整段无完全相同行的文本并成一条「修改」的问题——
+    合同文本常整段改写，需拆成可逐条核对的差异项。
+    """
+    news = list(range(j1, j2)); used = set(); pairs = []
+    for oi in range(i1, i2):
+        best, br = None, thr
+        for nj in news:
+            if nj in used:
+                continue
+            r = difflib.SequenceMatcher(None, al[oi], bl[nj]).ratio()
+            if r >= br:
+                best, br = nj, r
+        if best is None:
+            pairs.append((oi, None))
+        else:
+            used.add(best); pairs.append((oi, best))
+    for nj in news:
+        if nj not in used:
+            pairs.append((None, nj))
+    pairs.sort(key=lambda p: (p[0] if p[0] is not None else 10 ** 9,
+                              p[1] if p[1] is not None else 10 ** 9))
+    return pairs
+
+def diff_rows(spec):
+    """差异台账。返回 (rows, note)；rows 项含 no/loc/kind/sim/old/new/hint。
+
+    优先按两份全文（spec.compare.a_text/b_text）逐行比对；
+    未提供全文时降级为条款级变更台账（原文 ↔ 修改后），保证该类型始终可产出。
+    """
+    a, b, la, lb = _cmp_texts(spec)
+    rows = []
+    if a.strip() or b.strip():
+        al, bl = a.splitlines(), b.splitlines()
+        sm = difflib.SequenceMatcher(None, al, bl)
+        n = 0
+        for tag, i1, i2, j1, j2 in sm.get_opcodes():
+            if tag == "equal":
+                continue
+            if tag == "insert":
+                for j in range(j1, j2):
+                    n += 1; rows.append(_drow(n, "新增", f"{lb} 第 {j + 1} 行", "", bl[j]))
+            elif tag == "delete":
+                for i in range(i1, i2):
+                    n += 1; rows.append(_drow(n, "删除", f"{la} 第 {i + 1} 行", al[i], ""))
+            else:
+                for oi, nj in _pair_replace(al, bl, i1, i2, j1, j2):
+                    n += 1
+                    if oi is None:
+                        rows.append(_drow(n, "新增", f"{lb} 第 {nj + 1} 行", "", bl[nj]))
+                    elif nj is None:
+                        rows.append(_drow(n, "删除", f"{la} 第 {oi + 1} 行", al[oi], ""))
+                    else:
+                        rows.append(_drow(n, "修改",
+                                          f"{la} 第 {oi + 1} 行 → {lb} 第 {nj + 1} 行",
+                                          al[oi], bl[nj]))
+        note = "数据来源：%s ↔ %s 全文逐行比对（difflib），共 %d 处差异。" % (la, lb, len(rows))
+        if not rows:
+            note += "两版文本经逐行比对无差异。"
+        return rows, note
+    for i, c in enumerate(clauses(spec), 1):
+        o = (c.get("original") or "").strip(); v = (c.get("revised") or "").strip()
+        if not o and not v:
+            continue
+        kind = "新增" if not o else ("删除" if not v else ("未变更" if o == v else "修改"))
+        row = _drow(i, kind, c.get("heading") or "第 %d 条" % i, o, v)
+        if kind == "未变更":
+            row["hint"] = "无需处理"
+        rows.append(row)
+    return rows, "数据来源：未提供两份全文，已按条款级（原文 ↔ 修改后）生成变更台账。"
+
+DIFF_HEADERS = ["序号", "差异定位", "变更类型", "相似度", "旧版内容", "新版内容", "影响提示"]
+DIFF_KEYS = ("no", "loc", "kind", "sim", "old", "new", "hint")
+
+def doc_diff(spec):
+    rows, note = diff_rows(spec)
+    doc = Document(); add_report_title(doc, title(spec) + "（文件比对报告）")
+    set_meta(doc, spec, "diff")
+    doc.add_paragraph(note)   # 数据来源与差异计数（实质信息；类型解释由文件名承担）
+    t = doc.add_table(rows=1, cols=len(DIFF_HEADERS)); t.style = "Table Grid"
+    for i, h in enumerate(DIFF_HEADERS):
+        t.rows[0].cells[i].text = h
+    for r in rows:
+        cells = t.add_row().cells
+        for i, k in enumerate(DIFF_KEYS):
+            cells[i].text = r[k]
+    return doc
+
+def _original_text(spec):
+    t = spec.get("original_text") or ""
+    if not t and clauses(spec):
+        t = "\n".join((c.get("heading", "") + "\n" + (c.get("original") or "")).strip() for c in clauses(spec))
+    return t
+
+# ---------- 半档 C：以原稿 docx 做底 ＋ 段落级替换（排版保真） ----------
+# 只换文字、不增删段落：字体/字号/对齐/缩进/行距/页边距/页眉页脚/表格/图片全部沿用原稿。
+# 适用于"不改段落数、只换文字"的三类：3清洁版 / 6脱敏版 / 7照录版。
+SOURCE_DOCX = ""   # 由 --source-docx 或 spec.source_docx 注入；为空时走 B 档（样式档位重建）
+
+
+def _has_drawing(run):
+    """run 内是否含图形（图片/对象）——含图形的 run 不参与文字替换，避免丢图。"""
+    try:
+        from docx.oxml.ns import qn as _qn
+        el = run._element
+        for t in ("w:drawing", "w:pict", "w:object"):
+            if el.findall(".//" + _qn(t)):
+                return True
+    except Exception:
+        return False
+    return False
+
+
+def _replace_para_text(p, text):
+    """替换段落文字但保留版式：段落属性不动，首个纯文本 run 的字符格式沿用。"""
+    runs = [r for r in p.runs if not _has_drawing(r)]
+    if not runs:
+        p.add_run(text or "")
+        return
+    head = runs[0]
+    for r in runs[1:]:
+        r.text = ""
+    head.text = text or ""
+
+
+def _source_lines(spec, kind):
+    """三类交付物的目标文本行：clean=改后条文、original=原文、masked=原文脱敏。"""
+    if kind == "clean":
+        lines = []
+        for c in clauses(spec):
+            h = (c.get("heading") or "").strip()
+            if h:
+                lines.append(h)
+            lines.append((c.get("revised") or c.get("original") or "").strip())
+        lines = [x for x in lines if x]
+        return lines or [x for x in _original_text(spec).splitlines() if x.strip()]
+    text = _original_text(spec)
+    if kind == "masked" and _d is not None:
+        text, _, _ = _d.mask_text(text, MASK_TYPES, True)
+    return [x for x in text.splitlines() if x.strip()]
+
+
+def from_source_docx(spec, kind):
+    """以原稿 docx 为底产出三类交付物；不可用（无原稿/非 docx/打开失败）时返回 None 走 B 档。"""
+    path = SOURCE_DOCX or (spec.get("source_docx") or "")
+    if not path or not str(path).lower().endswith(".docx") or not os.path.exists(path):
+        return None
+    try:
+        doc = Document(path)
+    except Exception as e:
+        print("[make-docx] 半档C 回退：原稿打开失败（%s）" % e)
+        return None
+    lines = _source_lines(spec, kind)
+    targets = list(doc.paragraphs)
+    if not targets or not lines:
+        return None
+    n = min(len(lines), len(targets))
+    for i in range(n):
+        _replace_para_text(targets[i], lines[i])
+    if len(lines) > len(targets):
+        # 文本行多于原稿段落：余下并入末段（不新增段落 XML）
+        tail = "\n".join(lines[len(targets):])
+        _replace_para_text(targets[-1], lines[len(targets) - 1] + "\n" + tail)
+    else:
+        # 原稿段落多于文本行：多出的段落清空文字，保留结构
+        for i in range(len(lines), len(targets)):
+            _replace_para_text(targets[i], "")
+        if len(lines) * 3 < len(targets):
+            print("[make-docx] 半档C 提示：文本 %d 行远少于原稿 %d 段，末段起已留空——"
+                  "请确认 spec 含全文条款（clauses）或 original_text，否则请去掉 --source-docx 走样式档位。"
+                  % (len(lines), len(targets)))
+    print("[make-docx] 半档C：以原稿做底替换 %d 段（文本 %d 行），版式沿用原稿 [%s]"
+          % (len(targets), len(lines), os.path.basename(path)))
+    return doc
+
+
+# ---------- 半档 C 结束 ----------
+
+def doc_original(spec):
+    """7 原文照录版：零批注，标题保持原文标题；"内部留存、勿对外"由文件名与文档属性承担。"""
+    _sd = from_source_docx(spec, "original")
+    if _sd is not None:
+        return set_meta(_sd, spec, "original")
+    doc = Document(); add_title(doc, title(spec))
+    set_meta(doc, spec, "original")
+    first = True
+    for line in _original_text(spec).splitlines():
+        role = para_role(line, first)
+        if line.strip():
+            first = False
+        apply_role(doc.add_paragraph(line), role)
+    return doc
+
+def doc_masked(spec):
+    """6 原文脱敏版：零批注（可能对外或上传平台），脱敏口径由文档属性与文件名承担。"""
+    _sd = from_source_docx(spec, "masked")
+    if _sd is not None:
+        return set_meta(_sd, spec, "masked")
+    doc = Document(); add_title(doc, title(spec))
+    set_meta(doc, spec, "masked")
+    text = _original_text(spec)
+    if _d is not None:
+        text, _, _ = _d.mask_text(text, MASK_TYPES, True)
+    first = True
+    for line in text.splitlines():
+        role = para_role(line, first)
+        if line.strip():
+            first = False
+        apply_role(doc.add_paragraph(line), role)
+    return doc
+
+def doc_template(spec):
+    """10 模板版：占位符说明表 ＋ 模板正文 ＋ 可选条款区 ＋ 使用须知。
+
+    报告型文书（本技能新写），故标题居中并带报告免责声明；可选条款逐条挂批注（正文不留痕）。
+    """
+    t = template_spec(spec)
+    doc = Document()
+    h0 = add_report_title(doc, template_name(spec))
+    set_meta(doc, spec, "template")
+    add_disclaimer(doc, spec)
+    doc.add_paragraph("来源：" + title(spec) + "　审查人：" + REVIEWER + "　轮次：r" + ROUND)
+    add_delivery_note(doc, h0.runs[:1], "template", spec)
+    if t["placeholders"]:
+        doc.add_heading("一、占位符说明表", level=2)
+        for i, p in enumerate(t["placeholders"], 1):
+            doc.add_paragraph("%d. %s　含义：%s｜填写示例：%s｜%s"
+                              % (i, p.get("name") or "—", p.get("meaning") or "—",
+                                 p.get("example") or "—", "必填" if p.get("required") else "选填"))
+    if t["body"]:
+        doc.add_heading("二、模板正文", level=2)
+        for line in t["body"].splitlines():
+            doc.add_paragraph(line)
+    if t["optional"]:
+        doc.add_heading("三、可选条款区", level=2)
+        _ok_cm = can_comment(doc)   # 局部变量不得叫 can_comment（会遮蔽同名函数）
+        for o in t["optional"]:
+            p = doc.add_paragraph()
+            r = p.add_run(o.get("name") or "可选条款"); r.bold = True
+            doc.add_paragraph("适用场景：" + (o.get("scene") or "—")
+                              + "　取舍建议：" + (o.get("advice") or "—"))
+            if _ok_cm:
+                add_template_note(doc, [r], "【可选条款】%s\n适用场景：%s\n取舍建议：%s"
+                                  % (o.get("name") or "—", o.get("scene") or "—", o.get("advice") or "—"))
+    if t["notes"]:
+        doc.add_heading("四、使用须知", level=2)
+        for line in t["notes"].splitlines():
+            doc.add_paragraph(line)
+    return doc
+
+
+DOC_GEN = {
+    "tracked": doc_trackchanges, "redline": doc_redline, "clean": doc_clean,
+    "report": doc_report, "reportc": doc_report_comments, "compare": doc_compare,
+    "original": doc_original, "masked": doc_masked, "diff": doc_diff,
+    "template": doc_template,
+}
+
+# ---------- excel 生成（openpyxl） ----------
+def _new_sheet(title, headers):
+    """返回 (workbook, worksheet)；openpyxl 缺失时返回 (None, None)。"""
+    try:
+        from openpyxl import Workbook
+        from openpyxl.styles import Font
+    except Exception:
+        return None, None
+    wb = Workbook(); ws = wb.active; ws.title = (title or "sheet")[:28]
+    ws.append(headers)
+    for cell in ws[1]:
+        cell.font = Font(bold=True)
+    return wb, ws
+
+def _widths(ws, widths):
+    try:
+        from openpyxl.utils import get_column_letter
+        for i, w in enumerate(widths, 1):
+            ws.column_dimensions[get_column_letter(i)].width = w
+    except Exception:
+        pass
+
+def xl_compare(spec):
+    wb, ws = _new_sheet("新旧比对", ["序号", "条款定位", "原文", "修改后", "评级", "法律依据"])
+    if wb is None: return None
+    for i, c in enumerate(clauses(spec), 1):
+        ws.append([i, c.get("heading", ""), c.get("original", ""), c.get("revised", ""), c.get("rating", ""), c.get("basis", "")])
+    _widths(ws, [6, 34, 60, 60, 12, 34])
+    return wb
+
+def xl_report(spec):
+    wb, ws = _new_sheet("审查意见", ["序号", "条款定位", "评级", "风险描述", "法律依据", "修改建议"])
+    if wb is None: return None
+    for i, c in enumerate(clauses(spec), 1):
+        ws.append([i, c.get("heading", ""), c.get("rating", ""), c.get("comment", ""), c.get("basis", ""), c.get("revised", "")])
+    _widths(ws, [6, 34, 12, 60, 34, 60])
+    return wb
+
+def xl_clause_table(spec):
+    wb, ws = _new_sheet("条款清单", ["序号", "条款定位", "原文", "修订后文本", "评级"])
+    if wb is None: return None
+    for i, c in enumerate(clauses(spec), 1):
+        ws.append([i, c.get("heading", ""), c.get("original", ""), c.get("revised", ""), c.get("rating", "")])
+    _widths(ws, [6, 34, 60, 60, 12])
+    return wb
+
+def xl_text(spec, masked=False):
+    wb, ws = _new_sheet("原文脱敏版" if masked else "原文照录版", ["行号", "文本"])
+    if wb is None: return None
+    text = _original_text(spec)
+    if masked and _d is not None:
+        text, _, _ = _d.mask_text(text, MASK_TYPES, True)
+    for i, line in enumerate(text.splitlines(), 1):
+        ws.append([i, line])
+    _widths(ws, [6, 120])
+    return wb
+
+def xl_diff(spec):
+    wb, ws = _new_sheet("文件比对", DIFF_HEADERS)
+    if wb is None: return None
+    rows, _ = diff_rows(spec)
+    for r in rows:
+        ws.append([r[k] for k in DIFF_KEYS])
+    _widths(ws, [6, 30, 10, 10, 55, 55, 26])
+    return wb
+
+def xl_template(spec):
+    """模板版的 Excel 呈现：有占位符出《占位符说明表》，无占位符出《模板正文》逐行表。"""
+    t = template_spec(spec)
+    if t["placeholders"]:
+        wb, ws = _new_sheet("占位符说明表", ["序号", "占位符", "含义", "填写示例", "是否必填"])
+        if wb is None: return None
+        for i, p in enumerate(t["placeholders"], 1):
+            ws.append([i, p.get("name", ""), p.get("meaning", ""), p.get("example", ""),
+                       "必填" if p.get("required") else "选填"])
+        _widths(ws, [6, 26, 40, 40, 10])
+        return wb
+    wb, ws = _new_sheet("模板正文", ["行号", "文本"])
+    if wb is None: return None
+    for i, line in enumerate(t["body"].splitlines(), 1):
+        ws.append([i, line])
+    _widths(ws, [6, 120])
+    return wb
+
+
+EXCEL_GEN = {
+    "tracked": xl_clause_table, "redline": xl_clause_table, "clean": xl_clause_table,
+    "report": xl_report, "reportc": xl_report, "compare": xl_compare,
+    "original": lambda s: xl_text(s, False), "masked": lambda s: xl_text(s, True),
+    "diff": xl_diff, "template": xl_template,
+}
+
+def export_pdf(docx_paths, outdir):
+    """用 LibreOffice 无头模式把 docx 转 PDF；不可用时返回空列表（不阻断主流程）。"""
+    if not docx_paths:
+        return []
+    if not PDF_EXPORT:
+        print("[make-docx] 提示：config.render.pdf_export=false，跳过 PDF 导出。")
+        return []
+    if _cfgmod and not _cfgmod.tool_available(_CFG, "soffice"):
+        print("[make-docx] 提示：未检测到 LibreOffice，跳过 PDF 导出（装好 LibreOffice 或改 config.json 后可重跑）。")
+        return []
+    import subprocess
+    try:
+        r = subprocess.run([SOFFICE, "--headless", "--convert-to", "pdf", "--outdir", outdir] + docx_paths,
+                           capture_output=True, text=True, encoding="utf-8", errors="ignore",
+                           timeout=PDF_TIMEOUT)
+        if r.returncode != 0:
+            print("[make-docx] PDF 导出返回码非 0：", (r.stderr or r.stdout or "")[:200])
+    except Exception as e:
+        print("[make-docx] PDF 导出失败（不影响其它交付物）：", e)
+        return []
+    outs = [os.path.splitext(os.path.basename(p))[0] + ".pdf" for p in docx_paths]
+    return [o for o in outs if os.path.exists(os.path.join(outdir, o))]
+
+# ---------- md 生成 ----------
+def md_diff_text(o, v, kind):
+    """Markdown 的细粒度差异文本（与 docx 同一套 inline_diff，粒度一致）。"""
+    if not (v and v != o):
+        return o or v
+    if not o:
+        return ("<ins>%s</ins>" if kind == "tracked" else "**%s**") % v
+    if not v:
+        return ("<del>%s</del>" if kind == "tracked" else "~~%s~~") % o
+    dm = ("<del>%s</del>" if kind == "tracked" else "~~%s~~")
+    im = ("<ins>%s</ins>" if kind == "tracked" else "**%s**")
+    parts, prev = [], None
+    for tag, txt in inline_diff(o, v):
+        if prev and prev != tag and tag != "equal" and prev != "equal":
+            parts.append(" ")          # 删除段与插入段之间留一个空格，避免渲染粘连
+        parts.append(txt if tag == "equal" else ((dm % txt) if tag == "delete" else (im % txt)))
+        prev = tag
+    return "".join(parts)
+
+
+def md_meta_line(slug):
+    return "> %s ｜ 审查人：%s ｜ 轮次：r%s" % (SLUGS.get(slug, slug), REVIEWER, ROUND)
+
+
+def md_trackchanges(spec):
+    out = ["# " + title(spec), "", md_meta_line("tracked") + "　图例：`<del>`=删除、`<ins>`=新增。"]
+    for c in clauses(spec):
+        o, v = c.get("original", ""), c.get("revised", "")
+        out.append(f"\n**{c.get('heading','')}**\n\n" + md_diff_text(o, v, "tracked"))
+    return "\n".join(out) + "\n"
+
+def md_redline(spec):
+    out = ["# " + title(spec), "", md_meta_line("redline") + "　图例：`~~删除~~`、`**新增**`。"]
+    for c in clauses(spec):
+        o, v = c.get("original", ""), c.get("revised", "")
+        out.append(f"\n**{c.get('heading','')}**\n\n" + md_diff_text(o, v, "redline"))
+    return "\n".join(out) + "\n"
+
+def md_clean(spec):
+    out = ["# " + title(spec), "", md_meta_line("clean")]
+    for c in clauses(spec):
+        out.append(f"\n**{c.get('heading','')}**\n\n{c.get('revised') or c.get('original') or ''}")
+    return "\n".join(out) + "\n"
+
+def md_report(spec):
+    out = ["# " + (spec.get("report_title", "文档合规审查意见报告")), "",
+           "> 源文件：" + title(spec) + "｜审查人：" + REVIEWER + "｜轮次：r" + ROUND, ""]
+    for i, c in enumerate(clauses(spec), 1):
+        out.append(f"## {i}. {c.get('heading','')}  {c.get('rating','')}")
+        out.append(f"- 风险描述：{c.get('comment') or '—'}")
+        out.append(f"- 法律依据：{c.get('basis') or '—'}")
+        out.append(f"- 修改建议：{c.get('revised') or '—'}")
+    return "\n".join(out) + "\n"
+
+def md_compare(spec):
+    out = ["# " + title(spec) + "（新旧比对）", "", "| 条款 | 原文 | 修改后 |", "|---|---|---|"]
+    for c in clauses(spec):
+        out.append(f"| {c.get('heading','')} | {(c.get('original') or '').replace(chr(10),'<br>')} | {(c.get('revised') or '').replace(chr(10),'<br>')} |")
+    return "\n".join(out) + "\n"
+
+def md_original(spec):
+    return "# " + title(spec) + "\n\n" + md_meta_line("original") + \
+           "　内部留存，勿对外。\n\n" + _original_text(spec) + "\n"
+
+def md_masked(spec):
+    text = _original_text(spec)
+    if _d is not None:
+        text, _, _ = _d.mask_text(text, MASK_TYPES, True)
+    return "# " + title(spec) + "\n\n" + md_meta_line("masked") + \
+           "　已脱敏（信用代码/金额/地址/人名；比例不脱）。\n\n" + text + "\n"
+
+def md_diff(spec):
+    rows, note = diff_rows(spec)
+    out = ["# " + title(spec) + "（文件比对报告）", "", "> " + note, "",
+           "| " + " | ".join(DIFF_HEADERS) + " |",
+           "|" + "---|" * len(DIFF_HEADERS)]
+    for r in rows:
+        cells = [r[k].replace("|", "\\|").replace("\n", "<br>") for k in DIFF_KEYS]
+        out.append("| " + " | ".join(cells) + " |")
+    return "\n".join(out) + "\n"
+
+def md_reportc(spec):
+    """批注版的 Markdown 等效呈现（Markdown 无批注锚定能力，正文即意见清单）。"""
+    return md_report(spec) + "\n> 说明：Markdown 不支持 Word 批注；本文件为该类型的等效文本呈现，" \
+                             "需逐条批注锚定请选 WORD 格式。\n"
+
+def md_template(spec):
+    t = template_spec(spec)
+    out = ["# " + template_name(spec), "", md_meta_line("template"), ""]
+    if t["placeholders"]:
+        out += ["## 一、占位符说明表", "",
+                "| 占位符 | 含义 | 填写示例 | 是否必填 |", "|---|---|---|---|"]
+        for p in t["placeholders"]:
+            out.append("| %s | %s | %s | %s |" % (p.get("name", ""), p.get("meaning", ""),
+                                                  p.get("example", ""),
+                                                  "必填" if p.get("required") else "选填"))
+        out.append("")
+    if t["body"]:
+        out += ["## 二、模板正文", "", t["body"], ""]
+    if t["optional"]:
+        out += ["## 三、可选条款区", ""]
+        for o in t["optional"]:
+            out += ["**%s**" % (o.get("name") or "可选条款"),
+                    "- 适用场景：%s" % (o.get("scene") or "—"),
+                    "- 取舍建议：%s" % (o.get("advice") or "—"), ""]
+    if t["notes"]:
+        out += ["## 四、使用须知", "", t["notes"], ""]
+    return "\n".join(out) + "\n"
+
+
+MD_GEN = {
+    "tracked": md_trackchanges, "redline": md_redline, "clean": md_clean,
+    "report": md_report, "reportc": md_reportc, "compare": md_compare,
+    "original": md_original, "masked": md_masked, "diff": md_diff,
+    "template": md_template,
+}
+
+def main():
+    global REVIEWER, ROUND, TS, SOURCE, SOURCE_DOCX
+    ap = argparse.ArgumentParser(description="文档合规审查交付物产出（10 类型，审查人必填；类型以勾选框多选、一次全部显示供用户勾选）")
+    ap.add_argument("spec")
+    ap.add_argument("--out", default=None, help="输出目录（默认 D:\\文档合规审查报告\\输出）")
+    ap.add_argument("--subdir", default=None, help="输出目录下再建子文件夹（按合同归档用）")
+    ap.add_argument("--reviewer", default=None, help="审查人名称（必填；未提供时交互追问或报错退出）")
+    ap.add_argument("--round", default=None); ap.add_argument("--ts", default=None)
+    ap.add_argument("--types", default=None,
+                    help="逗号分隔：tracked,reportc,clean,redline,report,masked,original,diff,compare,template（默认 1、2、3 三类；全部 10 类请显式列出；亦可写中文类型名）")
+    ap.add_argument("--formats", default="docx", help="逗号分隔：docx,md,excel,pdf（PDF 由 docx 转换）")
+    ap.add_argument("--comments", action="store_true", help="兼容保留：等价于在 --types 中追加 reportc（审查意见批注版）")
+    ap.add_argument("--style", default=None,
+                    help="排版样式档位：default（不改动）/contract（合同风，默认）/official（公文风）；亦可写 spec.style 或 config.json 的 render.style；只对 1、3、4、6、7 五类生效")
+    ap.add_argument("--source-docx", default=None,
+                    help="半档C 排版保真：原稿 .docx 路径。指定后 3清洁版/6脱敏版/7照录版 以原稿为底、"
+                         "只替换段落文字（保留字体/对齐/缩进/页边距/页眉页脚/表格），不可用则自动回退样式档位")
+    ap.add_argument("--cmp-a", default=None, help="文件比对报告：旧版文本文件（.txt/.md；亦可用 spec.compare.a_text）")
+    ap.add_argument("--cmp-b", default=None, help="文件比对报告：新版文本文件（.txt/.md；亦可用 spec.compare.b_text）")
+    a = ap.parse_args()
+    if _cfgmod and bool(_cfgmod.privacy_opt(_CFG, "warn_before_context")):
+        print("[make-docx] 数据出域提示：审查模式需将文档全文读入模型上下文。涉密/敏感文档请改用 "
+              "`python local-only.py <文件>`（纯本地提取+脱敏，全程不联网、不进模型）。")
+    spec = json.load(open(a.spec, encoding="utf-8-sig"))
+    if a.cmp_a or a.cmp_b:
+        # 文件比对报告：允许直接用两个文本文件覆盖/补充 spec.compare.*
+        cmpmap = dict(spec.get("compare") or {})
+        if a.cmp_a:
+            cmpmap["a_text"] = open(a.cmp_a, encoding="utf-8-sig", errors="ignore").read()
+            cmpmap.setdefault("a_label", os.path.basename(a.cmp_a))
+        if a.cmp_b:
+            cmpmap["b_text"] = open(a.cmp_b, encoding="utf-8-sig", errors="ignore").read()
+            cmpmap.setdefault("b_label", os.path.basename(a.cmp_b))
+        spec["compare"] = cmpmap
+        print("[make-docx] 文件比对报告：已读取比对文本（%s ↔ %s）"
+              % (cmpmap.get("a_label") or "旧版", cmpmap.get("b_label") or "新版"))
+    REVIEWER = (a.reviewer or spec.get("reviewer") or os.environ.get("REVIEWER") or "").strip()
+    if not REVIEWER and sys.stdin.isatty() and sys.stdout.isatty():
+        try:
+            REVIEWER = input("请输入审查人名称（必填，将写入文件名与 Word 修订者）：").strip()
+        except (EOFError, KeyboardInterrupt):
+            REVIEWER = ""
+    if not REVIEWER:
+        print("[make-docx] 已停止：审查人名称必填，未提供不产出交付物。")
+        print("  提供方式：--reviewer、spec.reviewer 或环境变量 REVIEWER（纯自动化可用 --reviewer \"AI 文档合规审查助手\"）。")
+        sys.exit(2)
+    ROUND = str(a.round or spec.get("round") or "1")
+    if a.ts:
+        TS = a.ts
+    else:
+        TS = datetime.datetime.now().strftime("%Y%m%d-%H%M")
+        print("[make-docx] 提示：未提供 --ts，时间戳取本机时钟（可能不准确）；建议由 AI 传入准确时间 --ts YYYYMMDD-HHMM。")
+    SOURCE = sanitize(spec.get("source") or spec.get("name") or "contract")
+    SOURCE_DOCX = (a.source_docx or spec.get("source_docx") or "")
+    if SOURCE_DOCX and not os.path.exists(SOURCE_DOCX):
+        print("[make-docx] 提示：--source-docx 路径不存在，3、6、7 回退样式档位：%s" % SOURCE_DOCX)
+        SOURCE_DOCX = ""
+    set_style(a.style or spec.get("style")
+              or (_cfgmod.render_opt(_CFG, "style") if _cfgmod else None) or "contract")
+    if STYLE != "default":
+        print("[make-docx] 排版档位：%s（--style default 可关闭；仅对 1、3、4、6、7 五类生效）" % STYLE)
+    outdir = a.out or OUT_DIR
+    if a.subdir:
+        outdir = os.path.join(outdir, a.subdir)
+    elif not a.out and _cfgmod and bool(_cfgmod.output_opt(_CFG, "per_source_subdir")):
+        # 低危-2：未显式指定 --out/--subdir 时，自动按文档名建子目录，
+        # 避免多客户文档在输出目录平铺混放、被整体打包外泄。
+        outdir = os.path.join(outdir, SOURCE)
+        print("[make-docx] 输出隔离：已自动建立文档专属子目录 %s（可用 --out/--subdir 覆盖，config.json output.per_source_subdir=false 可关闭）" % SOURCE)
+    try:
+        os.makedirs(outdir, exist_ok=True)
+        os.makedirs(IN_DIR, exist_ok=True)
+    except Exception:
+        outdir = os.path.join(os.getcwd(), "文档合规审查报告", "输出")
+        os.makedirs(outdir, exist_ok=True)
+        print("[make-docx] 提示：默认目录不可用，已改用", outdir)
+    a.out = outdir
+    NAME2SLUG = {v: k for k, v in SLUGS.items()}
+    raw = [t.strip() for t in (a.types or ",".join(DEFAULT_TYPES)).split(",") if t.strip()]
+    types, unknown = [], []
+    for t in raw:
+        s = t if t in SLUGS else NAME2SLUG.get(t)
+        (types if s else unknown).append(s or t)
+    if unknown:
+        print("[make-docx] 提示：忽略无法识别的类型名 %s（可用 slug：%s）" % (",".join(unknown), ",".join(TYPE_ORDER)))
+    if not types:
+        print("[make-docx] 错误：--types 未包含任何有效类型。"); sys.exit(2)
+    fmts = [f.strip().lower() for f in a.formats.split(",") if f.strip()]
+    if not fmts:
+        print("[make-docx] 错误：--formats 至少包含 docx / md / excel / pdf 之一。"); sys.exit(2)
+    # 兼容：--comments 等价于选中 reportc（批注版＝正式交付物类型 5）
+    if a.comments and "reportc" not in types:
+        types.append("reportc")
+    made, docx_paths = [], []
+    for t in types:
+        if t in ("original", "masked") and not _original_text(spec):
+            print(f"[make-docx] 跳过 {SLUGS[t]}：spec 缺少 original_text。"); continue
+        if "docx" in fmts:
+            name = outname(t, "docx"); p = os.path.join(a.out, name)
+            DOC_GEN[t](spec).save(p); made.append(name); docx_paths.append(p)
+        if "md" in fmts and t in MD_GEN:
+            name = outname(t, "md")
+            open(os.path.join(a.out, name), "w", encoding="utf-8").write(MD_GEN[t](spec)); made.append(name)
+        if "excel" in fmts:
+            wb = EXCEL_GEN[t](spec)
+            if wb is None:
+                print("[make-docx] 提示：未安装 openpyxl，跳过 Excel 导出（pip install openpyxl 后重跑）。")
+            else:
+                name = outname(t, "xlsx"); wb.save(os.path.join(a.out, name)); made.append(name)
+    if "pdf" in fmts:
+        if "docx" not in fmts:
+            print("[make-docx] 提示：PDF 由 docx 转换，请在 --formats 中一并包含 docx；本次跳过 PDF。")
+        else:
+            made += export_pdf(docx_paths, a.out)
+    print(f"[make-docx] 审查人={REVIEWER} 轮次=r{ROUND} 产出 {len(made)} 个文件于", os.path.abspath(a.out))
+    for m in made: print("  -", m)
+
+if __name__ == "__main__":
+    main()
