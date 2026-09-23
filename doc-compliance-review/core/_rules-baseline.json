@@ -1,6 +1,6 @@
 {
   "_说明": "规则库回归基线（rule-baseline.py 生成）。rules＝通用库条目（ID/名称/评级★数/所属节）；files＝行业库文件指纹（行数/节数/sha256）；meta＝生效日与最近修订（版本/生效日/最近修订/内容sha256）。改动后跑 python scripts/rule-baseline.py 比对，差异交人工确认后再 --update。",
-  "generated": "2026-09-22 16:09:46",
+  "generated": "2026-09-24 00:48:25",
   "total": 134,
   "rules": {
     "core/01-general-risk-rules.md": [
@@ -850,6 +850,11 @@
       "lines": 74,
       "sections": 8,
       "sha256": "94ac887c780538c0"
+    },
+    "industries/realestate-rules.md": {
+      "lines": 64,
+      "sections": 8,
+      "sha256": "d9e28ceb6895174f"
     }
   },
   "meta": {
@@ -920,6 +925,13 @@
       "last_revised": "2026-09-20",
       "history_rows": 2,
       "sha256": "98e1cf27b8934c4c"
+    },
+    "industries/realestate-meta.md": {
+      "version": "3.0.0",
+      "effective_date": "2026-09-24",
+      "last_revised": "2026-09-24",
+      "history_rows": 1,
+      "sha256": "8e6d2be5f4380143"
     }
   }
 }
