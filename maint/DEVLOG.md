@@ -77,4 +77,6 @@
 - [x] 2026-09-24 新增**建筑地产行业库**（`realestate`，V1.0.0，自建库先行）：建设工程／商品房／物业三线合一；异议期分档（建工隐蔽工程前查验＋商品房 30 日外观/法定保修期）；覆盖 `P3@realestate`（形象进度付款）、`V2@realestate`（保修期主张）、`Q3@realestate`（资质细化）；规则基线已刷新（行业库 9 文件）；git `781278e`。**转正内置**（SEED_INDUSTRIES＋SKILL.md 清单＋各文档"8→9"字样）待自测确认后随 V3.8.0 一并做。
 - [ ] 诉讼文书专项：起诉状/答辩状/律师函审查清单＋F 组增量规则（core），落地后再把三个词铺进 description
 - [ ] 尽调语境词评估（"主体尽调"已有子步骤，独立"尽调"是否开放待定）
-- [ ] config.json 工具路径在本沙箱指向 PATH 回退；如需 OCR/PDF 转换，安装 LibreOffice/poppler/tesseract 后用 detect-tools.py 自检
+- [x] 2026-09-24 **沙箱依赖补齐＋冒烟全绿**：安装 LibreOffice Writer（只装 writer，不装整套 Office）＋ tesseract-ocr 及 chi_sim/chi_tra 语言包，poppler 系统已预装；用 `detect-tools.py --write` 探测并把 `/usr/bin/soffice`、`/usr/bin/tesseract`、`/usr/share/tesseract-ocr/5/tessdata` 等 **5 项写回运行实例 config.json**。冒烟：**89 通过 / 0 失败 / 0 跳过**（此前 77/4/4）。此前从未走通的链路一并验证通过：半档 C 排版保真（`--source-docx`：以原稿做底 20 段一致、页边距沿用未重建）、修订粒度（10 处痕迹、最短改动 1 字）、扫描型 PDF 与图片合同的 OCR 提取、产出 PDF。
+  - **隔离说明**：`detect-tools.py --write` 只改**运行实例**的 config.json；开发侧/分发包仍保持 Windows 默认路径（`D:\Program Files\...`），未被沙箱路径污染——下次 publish 会用开发侧覆盖回去。
+  - **不升版本号**：本次属环境层操作，技能本体零改动。
