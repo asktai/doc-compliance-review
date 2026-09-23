@@ -54,7 +54,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 
 # 与 check.py 一致的通用库规则 ID 形态
-CORE_ID_RE = re.compile(r"\|\s*([PVLGICDHEQWMNJSTF]\d+)\s*\|")
+CORE_ID_RE = re.compile(r"\|\s*([PVLGICDHEQWMNKJSTF]\d+)\s*\|")
 BASELINE = os.path.join(ROOT, "core", "_rules-baseline.json")
 
 

@@ -7,7 +7,7 @@ description_zh: "对合同、协议及授权书、承诺函、告知书、声明
 description_en: "Desensitize, review clause by clause, grade risks in three colors and produce redline revisions, comparison ledgers and opinion reports for contracts, agreements and business documents (authorization letters, commitment letters, notices, policies, NDAs, SLAs, DPAs and more); coverage includes payment and liquidated damages, delivery and acceptance, IP, confidentiality and non-compete, jurisdiction clauses, arbitration, dispute resolution, limitation of action, contract validity, standard terms and personal information protection; accepts background materials (files, images, photos or plain text) to sharpen the review, and adapts the review stance to a strong or weak bargaining position; drafts contracts and reusable templates, and converts existing documents into templates. Eight industry rule sets included; handles Word, PDF, images and scanned files. Advisory only, not legal advice; review by a licensed lawyer is required."
 category: writing
 argument-hint: "<文档路径或文本> [版本/角色/尺度] | 审查 | 起草 | 比对 | 背景资料 | 脱敏 | 向导 | 撰写合同 | 撰写模板 | 文档转模板 | 合同转模板 | 技能版本 | 技能更新 | 技能升级 | 立查得 | 小查 | 帮助|help|? | 教程 | 私有库维护/备份/回溯/导入/导出 | 行业库维护/备份/回溯/导入/导出"
-version: 3.7.1
+version: 3.8.0
 license: 个人使用授权 · 商业使用须取得书面授权（见 `LICENSE.md`）
 author: 胡皓
 examples_zh:
@@ -26,7 +26,7 @@ examples_en:
 
 ![文档合规审查助手AI合同审核全能版 · 合同与商务文档逐条审查 · 风险三色分级](assets/banner-dark.png)
 
-**V3.7.1** ｜ 作者：胡皓 ｜ 许可：个人使用授权 · 商业使用须取得书面授权（详见 `LICENSE.md`）
+**V3.8.0** ｜ 作者：胡皓 ｜ 许可：个人使用授权 · 商业使用须取得书面授权（详见 `LICENSE.md`）
 
 > **免责声明**：本技能仅作辅助法律工作，**不构成法律意见**，输出内容须经**执业律师复核**；**每次使用由技能先输出全文**——见**步骤 0.0**，全文亦见 `LICENSE.md`。
 
@@ -306,7 +306,7 @@ examples_en:
 
 ## 五、审查清单（文档通用 + 合同类 + 非合同类）
 
-**A. 通用（所有文档都查，合同类与非合同类一律适用）**：定义术语、主体与签署（或发布）、语言与文字（**core W 组**：错别字/标点/病句/笔误/称谓/编号/占位符）、逻辑一致性（**core X 组**：条款或段落矛盾/条件↔后果/时间轴/交叉引用/术语定义一致）、保密、数据与个人信息、通知与送达、维权费用、金钱条款合法性与互斥、争议解决、效力与失效、附件完整性。
+**A. 通用（所有文档都查，合同类与非合同类一律适用）**：定义术语、主体与签署（或发布）、语言与文字（**core W 组**：错别字/标点/病句/笔误/称谓/编号/占位符）、逻辑一致性（**core X 组**：条款或段落矛盾/条件↔后果/时间轴/交叉引用/术语定义一致）、保密、数据与个人信息、通知与送达、维权费用、金钱条款合法性与互斥、发票税务与付款方式合规（**core K 组**：发票条款/含税与税率/三流一致与对公收付/票据结算/红字冲红/虚开与偷逃税红线）、争议解决、效力与失效、附件完整性。
 
 > **W（语言严谨性与文字校对）与 X（逻辑与一致性）两组不是合同专属**：对授权书、承诺函、告知书、声明、制度、政策、通知、保密协议、数据处理协议、服务协议等**非合同类文档同等适用**。实操顺序：**先按 C 类清单与 core F 组定位实质风险 → 再按 W 组清文字 → 按 X 组验自洽**，三者结论一并写进审查意见，不得因"不是合同"就只出实质意见、不校文字与逻辑。
 
@@ -557,7 +557,7 @@ python scripts/version.py --check              # 与登记源比对（也可 --c
 python scripts/version.py --changelog <源>      # 看从这个版本到那个版本之间改了什么
 python scripts/version.py --upgrade <源> --target <安装目录>            # **预演**（不改任何文件）
 python scripts/version.py --upgrade <源> --target <安装目录> --apply    # 真正升级（先整目录备份）
-python scripts/version.py --dismiss 3.7.1      # 忽略某版本的提醒（本机随时能手动再查）
+python scripts/version.py --dismiss 3.8.0      # 忽略某版本的提醒（本机随时能手动再查）
 ```
 
 **四条规矩（写死）**：

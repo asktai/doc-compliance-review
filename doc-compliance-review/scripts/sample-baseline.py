@@ -48,7 +48,7 @@ ROOT = os.path.dirname(HERE)
 LEDGER = os.path.join(ROOT, "core", "_sample-baseline.json")
 CORE = os.path.join(ROOT, "core", "01-general-risk-rules.md")
 
-CORE_ID_RE = re.compile(r"\|\s*([PVLGICDHEQWMNJSTFXB]\d+)\s*\|")
+CORE_ID_RE = re.compile(r"\|\s*([PVLGICDHEQWMNKJSTFXB]\d+)\s*\|")
 # 报告章节标题：「## 1. 第一条 标的  ★★★ 高风险」
 RE_HEAD = re.compile(r"^##\s+\d+\.\s*(.+?)\s+(★+)\s*(\S*)", re.M)
 # 报告里可能标注的规则 ID：「（P1）」「[P1]」「规则 P1」

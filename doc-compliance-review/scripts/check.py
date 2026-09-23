@@ -78,7 +78,7 @@ REQUIRED_FILES = [
 ]
 
 INDUSTRY_KEYS = ["industry", "slug", "display_name", "common_roles", "inherits", "core_version"]
-CORE_ID_RE = re.compile(r"\|\s*([PVLGICDHEQWMNJSTF]\d+)\s*\|")
+CORE_ID_RE = re.compile(r"\|\s*([PVLGICDHEQWMNKJSTF]\d+)\s*\|")
 ASSET_REF_RE = re.compile(r"!\[[^\]]*\]\((?:\./)?(assets/[^)\s\"']+)\)")
 
 
