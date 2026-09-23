@@ -80,3 +80,70 @@
 - [x] 2026-09-24 **沙箱依赖补齐＋冒烟全绿**：安装 LibreOffice Writer（只装 writer，不装整套 Office）＋ tesseract-ocr 及 chi_sim/chi_tra 语言包，poppler 系统已预装；用 `detect-tools.py --write` 探测并把 `/usr/bin/soffice`、`/usr/bin/tesseract`、`/usr/share/tesseract-ocr/5/tessdata` 等 **5 项写回运行实例 config.json**。冒烟：**89 通过 / 0 失败 / 0 跳过**（此前 77/4/4）。此前从未走通的链路一并验证通过：半档 C 排版保真（`--source-docx`：以原稿做底 20 段一致、页边距沿用未重建）、修订粒度（10 处痕迹、最短改动 1 字）、扫描型 PDF 与图片合同的 OCR 提取、产出 PDF。
   - **隔离说明**：`detect-tools.py --write` 只改**运行实例**的 config.json；开发侧/分发包仍保持 Windows 默认路径（`D:\Program Files\...`），未被沙箱路径污染——下次 publish 会用开发侧覆盖回去。
   - **不升版本号**：本次属环境层操作，技能本体零改动。
+
+---
+
+## 2026-09-24 · V3.8.2 规则计数口径统一 ＋ 生成物污染根治（已发布、已出包）
+
+**起因**：评估技能现状时发现对外宣称的通用库条数与实扫值对不上。深挖后发现不是"漏写 6 条"，而是三脚本的 ID 正则长期漏管整组规则。
+
+**核心缺陷 1：规则 ID 白名单漏组（口径失真）**
+
+| 脚本 | 修复前白名单 | 漏掉 |
+|---|---|---|
+| `check.py` | `PVLGICDHEQWMNKJSTF` | A(3) B(11) X(5) |
+| `rule-baseline.py` | 同上 | 同上 |
+| `sample-baseline.py` `CORE_ID_RE` | `…JSTFXB` | A(3) |
+| `sample-baseline.py` `RE_RULE` | `…JSTFXB` | A(3) **K(6)** |
+
+即 V3.8.0 才加上去的 K 组，在样例台账识别里从未生效过；A/B/X 三组则从来没被任何一处统计过。
+
+**佐证（不是有意排除）**：`core/01` 第 13 行「规则 ID 约定」早就写明 A 标的与定义、B 通用/杂项、X 逻辑与一致性、K 发票/税务/付款方式——文档承认这些组是真规则，纯属脚本侧漏管。
+
+修复：三脚本各自保留常量但统一为 `CORE_ID_GROUPS = "PVLGICDHEQWMNKJSTFXBA"`（21 组全覆盖）。**真实分布**：A3·B11·C6·D4·E7·F29·G8·H2·I5·J6·K6·L5·M8·N7·P9·Q7·S13·T5·V5·W8·X5 ＝ **159**（文件内 159 行规则、159 个唯一 ID、零重复）。对外口径 **140 → 159**（＝漏的 19 条；规则文本本身一字未改，只纠正计数）。
+
+**核心缺陷 2：白名单无守卫，漂移不可见**
+
+新增一项常驻校验 `check_id_group_whitelist()`：① 三脚本 `CORE_ID_GROUPS` 是否彼此一致；② 是否覆盖 `core/01` 实际用到的全部组字母（双向比对，多退少补都报错）。
+另给 `check_rule_metadata()` 补了缺失的一环——原本只校验「生效日/最近修订」两个日期，**不校验规则数**，这正是 140 能长期挂在那里没人发现的原因；现在 `core/01` 元数据写的条数、`README` 对外宣称的条数，都必须等于实扫值，否则 error。
+
+新增后先不修文档，确认它真能抓到错误（**必须先报错、修完文档再转绿**，不能反过来只信写完就绿）：
+```
+[E] 规则元数据（生效日/最近修订/规则数）缺失或失准：core/01-general-risk-rules.md(缺:规则数写140实为159)
+[E] README 宣称通用库 140 条，实际 159 条（两处口径须一致）
+```
+
+**核心缺陷 3：生成物污染（与 V3.8.0 修的 `.integrity.json` 同源）**
+
+`core/_rules-baseline.json` 残留在开发侧且被 git 跟踪（total 134 的陈旧版），而 `publish.py` 同步是 **rmtree 后镜像重建**，所以每次发布都把陈旧台账覆盖回运行实例。
+
+诊断中还发现一个此前没意识到的机制：因为先 `rmtree(RUN)` 再 `copytree`，**运行实例原有的生成物会被一并删除**。所以正确的治理不是"排除某个文件名"了事，而是固定流程：
+
+> sync（整目录重建，生成物必然清空）→ **当场重建生成物** → verify → pack
+
+`publish.py` 新增 `refresh_generated()`，用刚同步过去的代码当场跑 `rule-baseline.py --update` 与 `check.py --sign`。这样 DEV 永不留存生成物、RUN 拿到的永远是当前代码所生，从机制上消灭"陈旧副本反向污染"这一类事故。
+
+配套：`_rules-baseline.json` 移出 git 跟踪、删除开发侧副本并写进 `.gitignore`；`publish.py` 的 `EXCLUDE` 也一并加上该文件名作为二次防御（即便哪天在开发侧不小心跑出了副本，也不允许它随镜像同步流过去）。
+
+**一处纠偏（差点删错）**：一度误以为 `core/_sample-baseline.json` 也是同类生成物、打算一并加排除。实际它是 **`--add/--confirm` 人工登记台账**，含 S1–S5 五个 confirmed 用例，`by=` 字段记录是谁、按哪版规则确认的，**代码无法重建**。删除即永久丢失人工资产。已予保留、继续 git 跟踪、随包分发，并在 `.gitignore` 写死注释警示后人。
+（另记：这 5 个用例的预期风险项**均为 0**，回归价值有限——属另一回事，记入 V3.9.0 待办。）
+
+**其他修复**
+
+- `publish.py --pack` 漏传 `pack.py` 必需的位置参数 `base`（`arguments are required: base`）——该分支此前从未真正跑通。
+- `VERSION.md` 写的 `python scripts/version.py --show` 是**失效命令**（脚本无此参数），按文档照抄会报错；`version.py` 不带参数即输出版本身份证。已修正，并补 `--source` 用法。
+
+**验证（全绿）**
+
+- 发布流水线：同步 65 文件 → 重建基线（159 条 / 行业库 9 文件 / 元数据 11 处）→ `check.py` 通过 → `check.py --verify` 通过。
+- 重绘 5 张 PNG 内嵌版本串（banner 明暗／icon 明暗／skill-card）：版本一处不同步就会露馅，`check_header_version` 抓到过一次（`头标版本串过期：5 张图仍嵌 V3.8.1`），重绘后转绿。**教训：** 头图必须在开发侧重绘，若在实例侧重绘，开发侧没更新，下次发布又会被覆盖回去。
+- **分发包离线验证**（`/tmp/pkgtest` 模拟用户首次使用）：解压即跑，`check.py` 无错误、16 个脚本指纹一致、规则基线 159 条零差异、样例台账 5 用例通过、`version.py` 自动显示「脚本 16 个／通用规则 159 条／行业库 9 个」——口径已在链路各处自动同步，无需手工维护。
+
+**产物**：`/workspace/dist/doc-compliance-review-V3.8.2.zip`（67 条目，1.29 MB；已排除 `private/`，五项出包自检全过）。git `2abf359`。
+
+**下一步（V3.9.0）**
+
+- [ ] `realestate` 转正内置（SEED_INDUSTRIES ＋ SKILL.md 加载清单 ＋ 各文档"8→9"）——**仍须先做真实文档自测**，这一环从评估到现在一直欠着
+- [ ] 诉讼文书专项（F 组增量 ＋ 三词入 description）
+- [ ] 样例台账补真实用例（现有 5 例预期风险项全为 0，等于没挡住任何回归）
+- [ ] 卡通形象定稿（待 API key 或改走 PIL 手绘矢量）
