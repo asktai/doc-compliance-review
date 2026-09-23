@@ -635,6 +635,61 @@ def check_rule_metadata():
                 % ("/".join(sorted(hits)), real))
 
 
+def check_smoke_count():
+    """冒烟项数：文档所写的「N 项」须等于实测总数。
+
+    实测值来自 `core/_smoke-baseline.json`（`smoke-test.py` 跑完自动记账，运行侧生成物）。
+    背景：冒烟项数会随链路扩充而增加，手写在文档里的数字极易漂（本次即发现文档写 66、
+    实为 89）。跑过一次冒烟后此项即生效，未跑过时只提示不报错。
+    两档项数守恒（全量拆分 OCR 两步、快档合并，总数一致），故只比 total。
+    """
+    led = os.path.join(ROOT, "core", "_smoke-baseline.json")
+    if not os.path.exists(led):
+        info("冒烟项数：未跑过 smoke-test，跳过校验（跑一次后此项自动生效）")
+        return
+    try:
+        d = json.load(open(led, encoding="utf-8"))
+    except Exception as e:
+        warn("冒烟台账解析失败：%s" % e)
+        return
+    # 只有在冒烟全通过时，total 才是「完整项数」：依赖不全的机器上会有若干项根本跑不到
+    # （实测：OCR 不可用时总数由 89 掉到 87），此时拿它当基准会误判文档，故跳过校验。
+    if d.get("failed"):
+        info("冒烟项数：上次冒烟有 %d 项失败，项数不作基准（请先排除失败再校验文档口径）"
+             % d["failed"])
+        return
+    real = d.get("total")
+    if not isinstance(real, int) or not real:
+        return
+    # 只扫与冒烟/自检同一行的数字。须排除两类干扰，否则会把别的脚本的项数当成冒烟项数：
+    # ① 其他脚本所在行（check.py 的 12 项、pack.py 的 5 项都不是冒烟项数）
+    # ② 列表式表述「N 项：结构／字段／…」——那是分项的枚举，不是总数
+    kw = ("smoke-test", "冒烟", "自检")
+    other_scripts = ("check.py", "pack.py", "sample-baseline", "guard.py", "rule-baseline")
+    bad, seen = [], 0
+    for rel in ("README.md", "安装使用教程.md"):
+        p = os.path.join(ROOT, rel)
+        if not os.path.exists(p):
+            continue
+        for ln, line in enumerate(_read(p).splitlines(), 1):
+            if not any(k in line for k in kw):
+                continue
+            if any(k in line for k in other_scripts):
+                continue
+            for m in re.finditer(r"(\d{2,3})\s*\**\s*项(?!\s*[:：])", line):
+                seg = line[max(0, m.start() - 8):m.end() + 14]
+                if "SKIP" in seg or "跳过" in seg or "预期" in seg:
+                    continue
+                n = int(m.group(1))
+                seen += 1
+                if n != real:
+                    bad.append("%s:%d 写 %d 项" % (rel, ln, n))
+    if bad:
+        err("冒烟项数失准（文档所写 ≠ 实测总数 %d 项）：%s" % (real, "；".join(bad)))
+    elif seen:
+        info("冒烟项数：文档 %d 处口径与实测一致（%d 项）" % (seen, real))
+
+
 def check_version_consistency():
     """版本号一致性：SKILL.md frontmatter 为准，正文标题与各文档里的版本串都要跟上。
 
@@ -782,6 +837,7 @@ def main():
         check_md_fences()
         check_header_version()
         check_rule_metadata()
+        check_smoke_count()
         check_sample_baseline()
         check_version_consistency()
         check_config()

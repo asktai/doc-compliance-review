@@ -20,6 +20,7 @@ doc-compliance-review · 云端开发侧发布脚本
     下列文件是**运行侧生成物**，开发侧一律不留存（已在 .gitignore 登记并移出 git）：
       - scripts/.integrity.json        check.py --sign 生成的脚本指纹台账
       - core/_rules-baseline.json      rule-baseline.py --update 生成的规则回归基线条账
+      - core/_smoke-baseline.json      smoke-test.py 跑完自动记账的冒烟结果台账
     因为 sync 是「先 rmtree 清干净再镜像重建」，运行实例原有的生成物会被一并删除，
     故发布流程固定为：sync → **当场重建生成物** → verify → pack。
     任何「把生成物复制回开发侧」的操作都会让陈旧副本随镜像同步反向污染，务必避免。
@@ -38,7 +39,7 @@ DIST = "/workspace/dist"
 # 发布时排除的文件：只应存在于开发侧的，或不该由开发侧带入的
 # （生成物即使在开发侧残留，也不允许随镜像同步覆盖运行实例的 fresh 版本）
 EXCLUDE = {".git", "__pycache__", ".DS_Store",
-           ".integrity.json", "_rules-baseline.json"}
+           ".integrity.json", "_rules-baseline.json", "_smoke-baseline.json"}
 
 
 def sync():

@@ -35,6 +35,8 @@ import time
 import re
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+# 冒烟结果台账（运行侧生成物，不随开发侧留存；供 check.py 校验文档所写项数是否为真）
+SMOKE_LEDGER = os.path.join(os.path.dirname(HERE), "core", "_smoke-baseline.json")
 sys.path.insert(0, HERE)
 
 PY = sys.executable
@@ -527,6 +529,19 @@ def main():
     # --- 4. 汇总 ---
     print("\n" + "=" * 62)
     print(f"结果：通过 {len(PASSES)} 项，失败 {len(FAILS)} 项，跳过 {len(SKIPS)} 项")
+    # 记账：把本次真实项数落盘，供 check.py 校验「文档里写的项数」是否属实。
+    # 两档项数守恒（全量把 OCR 两步拆开，快档合并为一步，总数一致），故只记 total。
+    try:
+        with open(SMOKE_LEDGER, "w", encoding="utf-8") as f:
+            json.dump({"_说明": "冒烟结果台账（smoke-test.py 自动生成，运行侧生成物不随开发侧留存）；"
+                               "供 check.py 校验 README/教程所写项数是否为真。",
+                       "generated": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                       "mode": "fast" if a.fast else "full",
+                       "total": len(PASSES) + len(FAILS) + len(SKIPS),
+                       "passed": len(PASSES), "failed": len(FAILS), "skipped": len(SKIPS)},
+                      f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print("提示：冒烟台账写入失败（不影响本次结果）：", repr(e))
     if SKIPS:
         print("跳过项（可选依赖缺失，不计入失败）：")
         for s in SKIPS:
