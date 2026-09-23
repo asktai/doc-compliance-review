@@ -25,8 +25,10 @@ DEV = "/workspace/dev/doc-compliance-review"
 RUN = os.path.expanduser("~/.codebuddy/skills/doc-compliance-review")
 MAINT = "/workspace/dev/maint"
 DIST = "/workspace/dist"
-# 发布时排除的维护侧文件（只存在于开发侧，不进运行实例）
-EXCLUDE = {".git", "__pycache__", ".DS_Store"}
+# 发布时排除的维护侧/生成物文件（只存在于开发侧，不进运行实例；
+# .integrity.json 是运行实例 --sign 生成的指纹台账，属运行侧生成物，
+# 同步会以开发侧旧版覆盖新指纹导致 --verify 误报）
+EXCLUDE = {".git", "__pycache__", ".DS_Store", ".integrity.json"}
 
 
 def sync():
