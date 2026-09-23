@@ -6,15 +6,25 @@ doc-compliance-review · 云端开发侧发布脚本
 职责：把开发侧改动发布到 WorkBuddy 技能运行目录，并自动跑结构校验与指纹校验。
 
 用法：
-    python3 /workspace/dev/publish.py            # 同步 + 校验
+    python3 /workspace/dev/publish.py            # 同步 + 重建生成物 + 校验
     python3 /workspace/dev/publish.py --check    # 只校验，不同步
-    python3 /workspace/dev/publish.py --pack     # 发布后另跑 pack.py 出分发包（到 /workspace/dist）
+    python3 /workspace/dev/publish.py --pack     # 以上全绿后再出分发包（到 /workspace/dist）
 
 约定（写死）：
     - 开发主目录   /workspace/dev/doc-compliance-review/   （git 管理，改动在这里做）
     - 运行实例     /root/.codebuddy/skills/doc-compliance-review/
     - 维护侧目录   /workspace/dev/maint/                    （开发日志等，永不进技能包、永不发布）
     - 分发包产出   /workspace/dist/                         （pack.py 自动排除 private/）
+
+生成物治理（V3.8.2 定型，勿退化）：
+    下列文件是**运行侧生成物**，开发侧一律不留存（已在 .gitignore 登记并移出 git）：
+      - scripts/.integrity.json        check.py --sign 生成的脚本指纹台账
+      - core/_rules-baseline.json      rule-baseline.py --update 生成的规则回归基线条账
+    因为 sync 是「先 rmtree 清干净再镜像重建」，运行实例原有的生成物会被一并删除，
+    故发布流程固定为：sync → **当场重建生成物** → verify → pack。
+    任何「把生成物复制回开发侧」的操作都会让陈旧副本随镜像同步反向污染，务必避免。
+    例外：core/_sample-baseline.json 是**人工登记**台账（--add/--confirm 逐例录入），
+    不可由代码重建，属开发资产，正常纳入 git 并随包分发。
 """
 import os
 import shutil
@@ -25,10 +35,10 @@ DEV = "/workspace/dev/doc-compliance-review"
 RUN = os.path.expanduser("~/.codebuddy/skills/doc-compliance-review")
 MAINT = "/workspace/dev/maint"
 DIST = "/workspace/dist"
-# 发布时排除的维护侧/生成物文件（只存在于开发侧，不进运行实例；
-# .integrity.json 是运行实例 --sign 生成的指纹台账，属运行侧生成物，
-# 同步会以开发侧旧版覆盖新指纹导致 --verify 误报）
-EXCLUDE = {".git", "__pycache__", ".DS_Store", ".integrity.json"}
+# 发布时排除的文件：只应存在于开发侧的，或不该由开发侧带入的
+# （生成物即使在开发侧残留，也不允许随镜像同步覆盖运行实例的 fresh 版本）
+EXCLUDE = {".git", "__pycache__", ".DS_Store",
+           ".integrity.json", "_rules-baseline.json"}
 
 
 def sync():
@@ -41,6 +51,22 @@ def sync():
     n = sum(len(f) for _, _, f in os.walk(RUN))
     print("[publish] 已同步 %d 个文件 → %s" % (n, RUN))
     return 0
+
+
+def refresh_generated():
+    """用当前代码当场重建运行侧生成物（rmtree 已把它连同旧实例一起删掉）。
+    放在 verify 之前，保证 check.py 的「规则基线比对」与「指纹校验」比的是 fresh 台账。"""
+    steps = [("规则基线条账", ["rule-baseline.py", "--update"]),
+             ("脚本指纹台账", ["check.py", "--sign"])]
+    ok = True
+    for label, args in steps:
+        r = subprocess.run([sys.executable, os.path.join(RUN, "scripts", args[0])] + args[1:],
+                           capture_output=True, text=True)
+        tail = (r.stdout or r.stderr).strip().splitlines()[-1:] or ["(无输出)"]
+        print("[publish] 重建 %-12s → %s" % (label, tail[0]))
+        if r.returncode != 0:
+            ok = False
+    return 0 if ok else 1
 
 
 def verify():
@@ -68,6 +94,8 @@ def main():
     if "--check" in a:
         return verify()
     if sync() != 0:
+        return 2
+    if refresh_generated() != 0:
         return 2
     rc = verify()
     if "--pack" in a and rc == 0:

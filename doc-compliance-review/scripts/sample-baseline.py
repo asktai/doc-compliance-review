@@ -48,11 +48,14 @@ ROOT = os.path.dirname(HERE)
 LEDGER = os.path.join(ROOT, "core", "_sample-baseline.json")
 CORE = os.path.join(ROOT, "core", "01-general-risk-rules.md")
 
-CORE_ID_RE = re.compile(r"\|\s*([PVLGICDHEQWMNKJSTFXB]\d+)\s*\|")
+# 与 check.py 一致的通用库规则 ID 形态（覆盖全部 21 个组，含 A/B/K/X；勿只改此处）
+CORE_ID_GROUPS = "PVLGICDHEQWMNKJSTFXBA"
+CORE_ID_RE = re.compile(r"\|\s*([%s]\d+)\s*\|" % CORE_ID_GROUPS)
 # 报告章节标题：「## 1. 第一条 标的  ★★★ 高风险」
 RE_HEAD = re.compile(r"^##\s+\d+\.\s*(.+?)\s+(★+)\s*(\S*)", re.M)
 # 报告里可能标注的规则 ID：「（P1）」「[P1]」「规则 P1」
-RE_RULE = re.compile(r"[（(\[]\s*([PVLGICDHEQWMNJSTFXB]\d+)\s*[)）\]]|规则\s*([PVLGICDHEQWMNJSTFXB]\d+)")
+RE_RULE = re.compile(r"[（(\[]\s*([%s]\d+)\s*[)）\]]|规则\s*([%s]\d+)"
+                     % (CORE_ID_GROUPS, CORE_ID_GROUPS))
 RE_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 

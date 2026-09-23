@@ -53,8 +53,9 @@ except Exception:
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 
-# 与 check.py 一致的通用库规则 ID 形态
-CORE_ID_RE = re.compile(r"\|\s*([PVLGICDHEQWMNKJSTF]\d+)\s*\|")
+# 与 check.py 一致的通用库规则 ID 形态（覆盖全部 21 个组，含 A/B/K/X；勿只改此处）
+CORE_ID_GROUPS = "PVLGICDHEQWMNKJSTFXBA"
+CORE_ID_RE = re.compile(r"\|\s*([%s]\d+)\s*\|" % CORE_ID_GROUPS)
 BASELINE = os.path.join(ROOT, "core", "_rules-baseline.json")
 
 

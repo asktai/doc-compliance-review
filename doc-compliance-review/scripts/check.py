@@ -78,7 +78,12 @@ REQUIRED_FILES = [
 ]
 
 INDUSTRY_KEYS = ["industry", "slug", "display_name", "common_roles", "inherits", "core_version"]
-CORE_ID_RE = re.compile(r"\|\s*([PVLGICDHEQWMNKJSTF]\d+)\s*\|")
+# 通用库规则 ID 形态。组字母须覆盖 core/01 当前全部 21 个组：
+# A(标的与定义) B(通用条款完备性) C D E F G H I J K(发票税务付款) L M N P Q S T V W X(逻辑一致性)
+# 口径必须与 rule-baseline.py、sample-baseline.py 完全一致（check.py 的
+# 「三脚本白名单一致性」项会常驻校验，防止新增组后某一处漏改导致计数漂移）。
+CORE_ID_GROUPS = "PVLGICDHEQWMNKJSTFXBA"
+CORE_ID_RE = re.compile(r"\|\s*([%s]\d+)\s*\|" % CORE_ID_GROUPS)
 ASSET_REF_RE = re.compile(r"!\[[^\]]*\]\((?:\./)?(assets/[^)\s\"']+)\)")
 
 
@@ -204,6 +209,42 @@ def check_rule_ids():
                 total += n
         if total:
             info("行业规则条目: %d" % total)
+
+
+def check_id_group_whitelist():
+    """规则ID组字母白名单：①三脚本彼此一致 ②覆盖 core/01 实际用到的全部组。
+    背景：新增规则组（如 V3.8.0 的 K 组、既有但漏管的 A/B/X 组）若某脚本漏改，
+    会导致规则计数与基线条账静默缺项。此处常驻校验，堵住该漂移面。"""
+    scripts = ["check.py", "rule-baseline.py", "sample-baseline.py"]
+    found = {}
+    for s in scripts:
+        p = os.path.join(ROOT, "scripts", s)
+        if not os.path.exists(p):
+            continue
+        m = re.search(r'^CORE_ID_GROUPS\s*=\s*"([A-Z]+)"', _read(p), re.M)
+        if not m:
+            err("%s 未定义 CORE_ID_GROUPS（三脚本须统一同一口径）" % s)
+            continue
+        found[s] = "".join(sorted(m.group(1)))
+    if not found:
+        return
+    if len(set(found.values())) > 1:
+        for s in sorted(found):
+            err("规则ID组字母白名单不一致：%s = %s" % (s, found[s]))
+        return
+    wl = set(next(iter(found.values())))
+    core = os.path.join(ROOT, "core", "01-general-risk-rules.md")
+    if not os.path.exists(core):
+        return
+    real = set(re.findall(r"\|\s*([A-Z])\d+\s*\|", _read(core)))
+    if real - wl:
+        err("core/01 使用了白名单外的组字母：%s（须补进 CORE_ID_GROUPS）"
+            % ",".join(sorted(real - wl)))
+    elif wl - real:
+        info("规则ID组字母白名单：三脚本一致（%d 组），预留未用组 %s"
+             % (len(wl), ",".join(sorted(wl - real))))
+    else:
+        info("规则ID组字母白名单：三脚本一致，%d 组覆盖完整" % len(wl))
 
 
 def check_rule_baseline():
@@ -540,6 +581,15 @@ def check_rule_metadata():
             lack.append("生效日")
         if not re.search(r"最近修订\s*\**\s*\d{4}-\d{2}-\d{2}", head):
             lack.append("最近修订")
+        # 01 声明的「规则数」须与实际扫描一致（历史教训：写 140 而实为 159，
+        # 因 A/B/X 组长期漏出正则白名单且无人校验，对外口径一路失真）
+        if name == "01-general-risk-rules.md":
+            real = len(CORE_ID_RE.findall(_read(p)))
+            mn = re.search(r"规则数\s*\**\s*(\d+)\s*\**", head)
+            if not mn:
+                lack.append("规则数")
+            elif int(mn.group(1)) != real:
+                lack.append("规则数写%s实为%d" % (mn.group(1), real))
         for m in re.finditer(r"(?:生效日|最近修订)\s*\**\s*(\d{4}-\d{2}-\d{2})", head):
             if m.group(1) > today:
                 lack.append("日期晚于今天(%s)" % m.group(1))
@@ -571,9 +621,18 @@ def check_rule_metadata():
             else:
                 ok += 1
     if bad:
-        err("规则元数据（生效日/最近修订）缺失：%s" % "、".join(bad))
+        err("规则元数据（生效日/最近修订/规则数）缺失或失准：%s" % "、".join(bad))
     else:
-        info("规则元数据: %d 处齐全（生效日 / 最近修订）" % ok)
+        info("规则元数据: %d 处齐全（生效日 / 最近修订 / 规则数）" % ok)
+    # README 对外宣称的通用库条数，须与 core/01 同一口径
+    rp = os.path.join(ROOT, "README.md")
+    core01 = os.path.join(ROOT, "core", "01-general-risk-rules.md")
+    if os.path.exists(rp) and os.path.exists(core01):
+        real = len(CORE_ID_RE.findall(_read(core01)))
+        hits = set(re.findall(r"通用库[^0-9]{0,24}?(\d{2,4})\s*\**\s*条", _read(rp)))
+        if hits and str(real) not in hits:
+            err("README 宣称通用库 %s 条，实际 %d 条（两处口径须一致）"
+                % ("/".join(sorted(hits)), real))
 
 
 def check_version_consistency():
@@ -716,6 +775,7 @@ def main():
         check_industries()
         check_deenterprise()
         check_rule_ids()
+        check_id_group_whitelist()
         check_rule_baseline()
         check_disclaimer()
         check_batch_guidance()

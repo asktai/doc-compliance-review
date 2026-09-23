@@ -1,4 +1,8 @@
 __pycache__/
 *.pyc
 .DS_Store
-.integrity.json
+# 运行侧生成物：开发侧一律不留存，否则 publish 的镜像同步会把陈旧副本覆盖回运行实例
+.integrity.json                     # scripts/ - check.py --sign 生成的脚本指纹台账
+core/_rules-baseline.json           # rule-baseline.py --update 生成的规则回归基线条账
+# 注：core/_sample-baseline.json 是**人工登记**台账（--add/--confirm 逐例录入），
+#     不可由代码重建，属开发资产，须正常纳入 git 跟踪，切勿加入此文件。
