@@ -55,19 +55,17 @@ BLOCKS = [
         "逐条合规审查，按条款给标准立场与话术",
         "风险三色分级（高/中/低）＋ 红线修订建议",
         "审查意见报告 · 新旧版本比对台账",
-        "起草合同与可复用合同模板",
-        "好文档/好合同一键转为自用模板",
+        "起草合同与可复用模板 · 好文档好合同一键转自用模板",
     ]),
     ("三层规则库（可叠加）", [
-        "通用库 core：140 条跨行业规则（含 K 组发票税务）",
+        "通用库 core：159 条跨行业规则（含 K 组发票税务）",
         "行业库：8 个内置 ＋ 可自建/导入导出",
         "私有库：企业内控规则，优先级最高",
         "冲突消解：私有 ＞ 行业 ＞ 通用；消解不了标 ★★★ 交人工",
     ]),
-    ("V3.8.0 新增 · K 组", [
-        "发票、税务与付款方式合规 6 条",
-        "开票条款 · 含税与税率调整 · 三流一致",
-        "银行承兑与支票结算 · 红字发票冲红",
+    ("K 组 · 发票税务与付款", [
+        "发票条款与开票衔接 · 含税与税率调整",
+        "三流一致 · 银行承兑与支票 · 红字发票冲红",
         "虚开发票与偷逃税红线（★★★）",
     ]),
 ]
@@ -273,14 +271,14 @@ def render_card(version, f_serif, f_sans, f_sansb, f_seal, ss=2):
     y = 96 * U
     d.text((PAD, y), TITLE_MAIN, font=font(f_serif, 60 * U), fill=FG, anchor="la")
 
-    y = 182 * U                        # 副标：AI 胶囊 ＋ 小字
+    y = 200 * U                        # 副标：AI 胶囊 ＋ 小字（主标题 60px 自 96 排到约 168，须留出间距防堆叠）
     cap_w, cap_h, cap_r = 66 * U, 40 * U, 13 * U
     d.rounded_rectangle([PAD, y - cap_h / 2, PAD + cap_w, y + cap_h / 2],
                         radius=cap_r, fill=GOLD_LT + (255,))
     d.text((PAD + cap_w / 2, y), "AI", font=font(f_sansb, 22 * U), fill=BG_TOP + (255,), anchor="mm")
     d.text((PAD + cap_w + 16 * U, y), SUB_TEXT, font=font(f_serif, 34 * U), fill=GOLD_LT, anchor="lm")
 
-    y = 244 * U                        # 版本徽章 ＋ 作者
+    y = 260 * U                        # 版本徽章 ＋ 作者
     badge = "V" + version.lstrip("Vv") if not version.upper().startswith("V") else version
     f_badge = font(f_sansb, 21 * U)
     bw = d.textlength(badge, font=f_badge) + 40 * U
@@ -290,7 +288,7 @@ def render_card(version, f_serif, f_sans, f_sansb, f_seal, ss=2):
     d.text((PAD + bw + 20 * U, y), "作者：胡皓 ｜ 2026-09-24", font=font(f_sans, 18 * U),
            fill=FG3, anchor="lm")
 
-    y = 292 * U                        # 一句话定位
+    y = 306 * U                        # 一句话定位
     f_tag = font(f_sans, 19 * U)
     for ln in wrap_text(d, TAGLINE.replace("\n", ""), f_tag, CW):
         d.text((PAD, y), ln, font=f_tag, fill=FG2, anchor="la")
@@ -298,28 +296,31 @@ def render_card(version, f_serif, f_sans, f_sansb, f_seal, ss=2):
 
     # ============ 主体 blocks ============
     def block(ytop, title, items):
-        """圆角卡片：标题 + 项目列表。高度先按实际行数精确计算，杜绝溢出。"""
+        """圆角卡片：标题 + 项目列表。高度先按实际行数精确计算，杜绝溢出。
+        行距 30；条目间另加 4px 透气（否则连续条目视觉上粘成一团）。"""
         f_h = font(f_serif, 24 * U)
         f_b = font(f_sans, 17.5 * U)
-        LH = 28 * U                       # 列表行高
+        LH = 30 * U                       # 列表行高
+        GAP = 4 * U                       # 条目间距
         wrapped = [wrap_text(d, it, f_b, CW - 92 * U) for it in items]
         nlines = sum(len(ws) for ws in wrapped)
-        bh = 74 * U + nlines * LH + 16 * U   # 标题区 74 + 列表 + 底留白
+        bh = 82 * U + nlines * LH + (len(items) - 1) * GAP + 16 * U   # 标题区 82 + 列表 + 条目间距 + 底留白
         d.rounded_rectangle([PAD, ytop, W - PAD, ytop + bh], radius=18 * U,
                             fill=(255, 255, 255, 10), outline=GOLD + (46,), width=max(1, int(1.4 * U)))
         ty = ytop + 20 * U
         d.text((PAD + 26 * U, ty), title, font=f_h, fill=GOLD_LT, anchor="la")
-        d.rectangle([PAD + 26 * U, ty + 32 * U, W - PAD - 26 * U, ty + 33 * U],
+        d.rectangle([PAD + 26 * U, ty + 36 * U, W - PAD - 26 * U, ty + 37 * U],
                     fill=GOLD + (60,))
-        yy = ty + 54 * U
+        yy = ty + 60 * U
         for ws in wrapped:
-            d.ellipse([PAD + 28 * U, yy + 7 * U, PAD + 35 * U, yy + 14 * U], fill=GOLD + (200,))
+            d.ellipse([PAD + 28 * U, yy + 8 * U, PAD + 35 * U, yy + 15 * U], fill=GOLD + (200,))
             for ln in ws:
                 d.text((PAD + 50 * U, yy), ln, font=f_b, fill=FG2, anchor="la")
                 yy += LH
+            yy += GAP
         return ytop + bh
 
-    y = 348 * U
+    y = 356 * U
     y = block(y, BLOCKS[0][0], BLOCKS[0][1]) + 18 * U
     y = block(y, BLOCKS[1][0], BLOCKS[1][1]) + 18 * U
     y = block(y, BLOCKS[2][0], BLOCKS[2][1]) + 18 * U
@@ -340,12 +341,12 @@ def render_card(version, f_serif, f_sans, f_sansb, f_seal, ss=2):
         cur_w += t + 10 * U
     if cur:
         lns.append((cur, cur_w))
-    bh = 34 * U + len(lns) * 44 * U + 22 * U
+    bh = 34 * U + len(lns) * 46 * U + 22 * U
     d.rounded_rectangle([PAD, y, W - PAD, y + bh], radius=18 * U,
                         fill=(255, 255, 255, 10), outline=GOLD + (46,), width=max(1, int(1.4 * U)))
     d.text((PAD + 26 * U, y + 24 * U), "覆盖风险维度", font=f_h2, fill=GOLD_LT, anchor="la")
-    d.rectangle([PAD + 26 * U, y + 54 * U, W - PAD - 26 * U, y + 55 * U], fill=GOLD + (60,))
-    cyoodle = y + 78 * U
+    d.rectangle([PAD + 26 * U, y + 56 * U, W - PAD - 26 * U, y + 57 * U], fill=GOLD + (60,))
+    cyoodle = y + 82 * U
     for row, rw in lns:
         cx = PAD + 26 * U
         for c, t in row:
@@ -353,7 +354,7 @@ def render_card(version, f_serif, f_sans, f_sansb, f_seal, ss=2):
                                 fill=GOLD + (34,), outline=GOLD + (70,), width=max(1, int(1.2 * U)))
             d.text((cx + t / 2, cyoodle + 18 * U), c, font=f_chip, fill=FG2, anchor="mm")
             cx += t + 10 * U
-        cyoodle += 44 * U
+        cyoodle += 46 * U
     y += bh + 16 * U
 
     # ============ 页脚（锚定底部） ============
@@ -361,6 +362,11 @@ def render_card(version, f_serif, f_sans, f_sansb, f_seal, ss=2):
     dis_lines = wrap_text(d, DISCLAIM, f_dis, CW - 190 * U)
     foot_h = 24 * U + len(dis_lines) * 24 * U + 34 * U + 50 * U
     fy = H - foot_h - 16 * U
+    # 溢出守卫：内容底若压到页脚顶，说明文案加多/行距加大后放不下了，宁可报错也不出重叠的图
+    if y > fy:
+        print("[make-card] 排版溢出：内容底 %d 已越过页脚顶 %d（差 %dpx 设计单位）；"
+              "请精简文案或收紧行距。" % (y / U, fy / U, (y - fy) / U), file=sys.stderr)
+        return None
     d.rectangle([PAD, fy, W - PAD, fy + 2 * U], fill=GOLD + (70,))
     yy = fy + 20 * U
     for ln in dis_lines:
@@ -390,6 +396,28 @@ def read_version():
     return None
 
 
+def verify_numbers_in_copy():
+    """卡片文案数字守卫：卡片文字烧进 PNG 像素，check.py 扫 .md 永远扫不到，
+    是校验盲区（V3.8.2 统一口径时就漏了卡片，"140 条"多挂了两版）。故在**源头**
+    ——每次重绘时——拿文案里写的规则数与 core/01 实扫值核对，不一致即拒绝出图。"""
+    core = os.path.join(SKILL_ROOT, "core", "01-general-risk-rules.md")
+    if not os.path.exists(core):
+        print("[make-card] 找不到 core/01，跳过文案数字核对", file=sys.stderr)
+        return True
+    real = len(re.findall(r"(?m)^\|\s*[A-Z]\d+\s*\|", open(core, encoding="utf-8").read()))
+    written = 0
+    for _, items in BLOCKS:
+        for it in items:
+            m = re.search(r"(\d+)\s*条跨行业规则", it)
+            if m:
+                written = int(m.group(1))
+    if written and written != real:
+        print("[make-card] 卡片文案数字失准：写 %d 条，core/01 实为 %d 条；"
+              "请改 BLOCKS 后重绘。" % (written, real), file=sys.stderr)
+        return False
+    return True
+
+
 def main():
     ap = argparse.ArgumentParser(description="竖版技能介绍卡（1080×1440）生成")
     ap.add_argument("--out", default=DEFAULT_OUT, help="输出文件路径")
@@ -403,6 +431,8 @@ def main():
     if not ver:
         print("无法从 SKILL.md 读取版本号；请用 --version 显式指定。", file=sys.stderr)
         return 2
+    if not verify_numbers_in_copy():
+        return 2
     f_serif = pick_font("serif_bold", a.font_serif)
     f_sans = pick_font("sans_reg", a.font_sans)
     f_sansb = pick_font("sans_bold")
@@ -412,6 +442,8 @@ def main():
         return 2
 
     im = render_card(ver, f_serif, f_sans, f_sansb, f_seal, ss=a.ss)
+    if im is None:                     # 排版溢出，render_card 已在 stderr 说明
+        return 2
     os.makedirs(os.path.dirname(a.out), exist_ok=True)
     info = PngInfo()
     info.add_text("Skill-Version", ver)
