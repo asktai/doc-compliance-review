@@ -374,23 +374,41 @@ def changelog(src, limit=40):
         print("[version] 更新源里没有 SKILL.md：%s" % src)
         return 2
     tgt = vkey(sver)
+    # 优先项目侧 CHANGELOG.md（含实现细节，**不随发布包**）；源里没有则回退包内
+    # VERSION.md 的用户视角摘要——否则终端使用者升级时永远只能看到"无沿革"。
     _, txt = source_text(src, "CHANGELOG.md")
+    src_of_rows = "CHANGELOG.md（项目侧明细）"
     if not txt:
-        print("[version] 更新源里没有 CHANGELOG.md（%s）——沿革随项目维护，不随发布包。"
+        _, txt = source_text(src, "VERSION.md")
+        src_of_rows = "VERSION.md（包内用户摘要）"
+    if not txt:
+        print("[version] 更新源里既无 CHANGELOG.md 也无 VERSION.md（%s）——无法列出沿革。"
               % (kind or src))
         print("[version] 新旧差异请以两侧 SKILL.md / README.md 为准。")
         return 0
     rows = []
     for line in txt.splitlines():
-        m = re.match(r"^(#{2,6})\s*V?(\d+\.\d+\.\d+)\s*(.*)$", line.strip())
-        if m:
-            rows.append((vkey(m.group(2)), m.group(2), m.group(3).strip()))
+        st = line.strip()
+        m = re.match(r"^(#{2,6})\s*V?(\d+\.\d+\.\d+)\s*(.*)$", st)
+        if not m:                      # 回退：VERSION.md 的表格行「| **V3.8.5** | 日期 | 摘要 |」
+            m = re.match(r"^\|\s*\**\s*V?(\d+(?:\.\d+){1,2})\s*\**\s*\|(.*)$", st)
+            if m:
+                ver = m.group(1)
+                if ver.count(".") == 1:      # 「V3.1」这类两位号补齐成三位，便于比较
+                    ver += ".0"
+                cells = [c.strip() for c in m.group(2).split("|")]
+                # 行尾的「|」会切出一个空串，摘要要取**最后一个非空单元格**
+                tail = next((c for c in reversed(cells) if c), "")
+                rows.append((vkey(ver), ver, tail.strip().strip("*")))
+            continue
+        rows.append((vkey(m.group(2)), m.group(2), m.group(3).strip()))
     lo, hi = (cur, tgt) if tgt >= cur else (tgt, cur)
     hit = [r for r in rows if lo < r[0] <= hi]
     if not hit and tgt == cur:
         print("[version] 当前 V%s 与源版本相同，无区间沿革。" % i["version"])
         return 0
-    print("[version] 区间沿革 V%s → V%s（%d 个版本条目）：" % (vstr(lo), vstr(hi), len(hit)))
+    print("[version] 区间沿革 V%s → V%s（%d 个版本条目，取自 %s）："
+          % (vstr(lo), vstr(hi), len(hit), src_of_rows))
     if not hit:
         print("    （CHANGELOG 中未找到该区间的版本标题，可能两侧版本同属于一个大版本块）")
     for _, v, tail in hit[:limit]:

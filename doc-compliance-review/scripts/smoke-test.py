@@ -7,13 +7,15 @@
       （9 类型 × docx/excel/pdf）→ 结果自检，逐项打印 PASS/FAIL 并以退出码反映结果。
 
 用法：
-    python smoke-test.py [--base <工作根目录，默认取 config.json>] [--keep] [--in-base] [--fast]
-    --keep     保留测试产物（默认测试完成后清理临时目录）
-    --in-base  把测试产物写入 <base>/输出（默认写入**系统临时目录**，不污染正式输出区）
-    --fast     快速档：跳过 PDF 导出与 OCR / 老格式转换等耗时项（**项数不变**，这些项记 SKIP），
-               保留链路与内容断言，**项数不变**；实测耗时约为全量档的一半（约 40 秒 vs 90 秒），
-               适合日常改动后验证；
-               **装机验收与发版前请跑全量档**（不加 --fast）。
+    python smoke-test.py [--base <工作根目录，默认取 config.json>] [--keep] [--in-base] [--full] [--fast]
+
+    （默认）快速档：跳过 PDF 导出与 OCR 等耗时项，这些项记 SKIP、**项数不变**，
+            保留链路与内容断言；实测耗时约为全量档的一半（约 40 秒 vs 90 秒）。
+            **日常改动后跑这个即可**，省时省资源。
+    --full    全量档：含 PDF 导出与 OCR，**装机验收与发版前请跑这一档**。
+    --fast    （兼容旧用法）即快速档；因快速档已设为默认，此参数可省略、保留只为不打断旧脚本。
+    --keep    保留测试产物（默认测试完成后清理临时目录）
+    --in-base 把测试产物写入 <base>/输出（默认写入**系统临时目录**，不污染正式输出区）
 
 产物隔离说明：测试产物默认落在系统临时目录（如 %TEMP%\\dcr-smoke\\_smoke-*），
 即使清理被安全策略拦住，也不会混入 base/输出 这一客户文档集中区。
@@ -145,9 +147,13 @@ def main():
     ap.add_argument("--keep", action="store_true", help="保留测试产物")
     ap.add_argument("--in-base", action="store_true",
                     help="把测试产物写入 <base>/输出（默认写入系统临时目录，避免污染正式输出区）")
+    ap.add_argument("--full", action="store_true",
+                    help="全量档：含 PDF 导出与 OCR（默认快速档，跳过这些耗时项）")
     ap.add_argument("--fast", action="store_true",
-                    help="快速档：跳过 PDF 导出与 OCR/老格式转换等耗时项（记为 SKIP，项数不变）")
+                    help="（兼容旧用法）快速档；已设为默认，可省略")
     a = ap.parse_args()
+    # 默认即快速档（日常省资源），--full 才是全量；--fast 保留以便旧脚本/文档不失效
+    a.fast = not a.full
 
     try:
         import _config as _cfgmod
@@ -167,7 +173,8 @@ def main():
     os.makedirs(work, exist_ok=True)
     print("=" * 62)
     print("文档合规审查助手AI合同审核全能版 · 端到端冒烟测试")
-    print("模式：", "快速档 --fast（PDF/OCR/老格式转换 记为 SKIP）" if a.fast else "全量档")
+    print("模式：", "快速档（PDF/OCR/老格式转换 记为 SKIP，项数不变）；跑全量档请加 --full"
+          if a.fast else "全量档（含 PDF 导出与 OCR）")
     print("工作目录：", work)
     print("=" * 62)
 
@@ -229,7 +236,7 @@ def main():
             tip = "（需 Poppler + Tesseract）" if need_ocr else "（需 LibreOffice 转换 .doc）"
             if a.fast and need_ocr:   # 只跳 OCR（耗时大头）；.doc 转换保留，以保住 A/B 比对链路
                 for sub in ("提取并可审" + tip, "取出可审文本", "内容可识别（关键词命中）"):
-                    skip(f"{label} {sub}", "--fast 快速档已跳过（耗时项）")
+                    skip(f"{label} {sub}", "快速档已跳过（耗时项；跑全量档加 --full）")
                 continue
             if need_ocr and not ocr_ok:
                 skip(f"{label} 提取并可审（需 Poppler + Tesseract）", "可选依赖缺失，补齐后重跑")
@@ -343,7 +350,7 @@ def main():
           any("批注版" in f and f.endswith(".docx") for f in produced))
     check("产出 Excel（.xlsx）", any(f.endswith(".xlsx") for f in produced))
     if a.fast:
-        skip("产出 PDF（.pdf，依赖 LibreOffice）", "--fast 快速档已跳过")
+        skip("产出 PDF（.pdf，依赖 LibreOffice）", "快速档已跳过（跑全量档加 --full）")
     else:
         check("产出 PDF（.pdf，依赖 LibreOffice）", any(f.endswith(".pdf") for f in produced))
 

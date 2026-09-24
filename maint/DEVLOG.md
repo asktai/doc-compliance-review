@@ -211,3 +211,68 @@ README 与教程共 **5 处**写"66 项"，实测 **89 项**。与规则数 140�
 **教训**：V3.8.2 修口径时列了"README/VERSION/教程"的清单，唯独没想到卡片——**凡是烧进像素的文案都不在 check.py 的射程内，必须在生成端自查**。这条已写进 make-card.py 的注释。
 
 **产物**：`/workspace/dist/doc-compliance-review-V3.8.4.zip`（67 条目）。离线验证通过；5 张 PNG（banner×2 / icon×2 / skill-card）版本串 V3.8.4。
+
+---
+
+## 2026-09-24 · V3.8.5 冒烟默认改为快速档 ＋ 变更记录分离出包（效能优化，已发布、已出包）
+
+**起因**：用户两条效能要求——① `CHANGELOG.md` 变更记录只在开发端、不入技能包；② 冒烟测试没有专门指令就别跑全量，一般按快速档走，减少资源开销。
+
+### 一、冒烟档位默认化（`smoke-test.py`）
+
+旧形态：裸跑＝全量档（含 PDF 导出与 OCR，约 1 分钟），快速档要显式加 `--fast`。这与"日常随手跑一下"的实际用法相反——**省资源的那档反而要额外记一个参数**。
+
+改为：
+
+```python
+ap.add_argument("--full", action="store_true", help="全量档：含 PDF 导出与 OCR（默认快速档…）")
+ap.add_argument("--fast", action="store_true", help="（兼容旧用法）快速档；已设为默认，可省略")
+a = ap.parse_args()
+a.fast = not a.full
+```
+
+- **裸跑 ＝ 快速档**：82 PASS / 0 FAIL / 7 SKIP（＝89 项，项数不变），约 40 秒；
+- `--full` ＝ 全量档：89 PASS / 0 FAIL / 0 SKIP，约 1 分钟；
+- `--fast` 保留（与裸跑等价），文档与旧脚本不失效。
+
+**顺带修的文案**：SKIP 理由原文写"`--fast` 快速档已跳过"，裸跑时也显示这句会让人以为自己加了参数。改为「快速档已跳过（耗时项；跑全量档加 --full）」。
+
+文档同步 6 处（README 第 1 章／第七章第 5 层／FAQ 第 6 条，教程 3.2／3.3／五／七）：其中教程「五、装机自检」的示例把裸跑标成了"全量档"（旧口径残留，改档位后即为错误说明），一并改正。
+
+### 二、变更记录分离出包
+
+**关键发现**：`version.py --changelog` 一直就是**先找 CHANGELOG.md、找不到再回退 VERSION.md** 的设计，脚本里甚至自带"沿革随项目维护、不随发布包"的降级提示——**口子早就留好了，只是 CHANGELOG.md 这个文件从来没建**。所以这不是改设计，是把缺的那半边补上。
+
+- 新建 `/workspace/dev/CHANGELOG.md`（**项目侧**：位于技能目录之外，天然不入包），按 `## Vx.y.z 标题` 格式，含实现细节与踩坑；
+- `VERSION.md` **不能删**（被 check.py／pack.py／guard.py／permissions／LICENSE／README 六处硬依赖），重写为**用户视角一句话摘要**，并注明实现细节见项目侧 CHANGELOG；
+- `version.py --changelog` 输出会标注来源：「取自 CHANGELOG.md（项目侧明细）」或「取自 VERSION.md（包内用户摘要）」。
+
+**踩坑**：回退分支首版解析出 **0 个版本条目**。排查结果不是正则没命中（实测命中 13 行），而是 `cells[-1]` 取错了单元格——表格行以 `|` 结尾，`split("|")` 会切出一个**空串**，摘要被取成空。改为取**最后一个非空单元格**；顺带兼容 `V3.1` 这类两位版本号（补 `.0` 再比较）。
+
+**双向验证**（monkeypatch `identity()` 伪装成 V3.8.2 再取源）：
+
+- 源内无 CHANGELOG.md → 「V3.8.2 → V3.8.5，3 个条目，取自 VERSION.md（包内用户摘要）」，三条摘要**有内容**；
+- 源内有 CHANGELOG.md → 「3 个条目，取自 CHANGELOG.md（项目侧明细）」，优先明细；
+- 两侧同版 → 「无区间沿革」。
+
+### 三、出包与验证
+
+`/workspace/dist/doc-compliance-review-V3.8.5.zip`（67 条目）。/tmp 解包离线验证：
+
+- **包内确认无 CHANGELOG.md** —— 变更记录不入包达成；
+- `core/_sample-baseline.json`（人工登记台账，5 例 31 项）**仍在包内**；
+- 生成物只有"当轮重建的新鲜副本"（`_rules-baseline.json`、`.integrity.json`），`_smoke-baseline.json` 未入库也未入包；
+- `check.py` 无错误、`check.py --verify` 无错误、裸跑冒烟 82/0/7、`version.py` 报「脚本 16 个（指纹已签 16）／通用规则 159 条／行业库 9 个」。
+
+5 张 PNG 已重绘至 V3.8.5（头标版本戳校验通过）。
+
+### 四、本轮暴露的下一个问题（未处置，待定）
+
+出包时 `config.json` 带着**作者本机的 Windows 绝对路径**（`D:\Program Files\LibreOffice\...`、`D:\Tools\tesseract\...`）随包分发。后果：
+
+- 新装用户一跑 `check.py` 就吃一条警告「工具路径在本机不存在（将回退 PATH）」；
+- 跑全量档冒烟时 OCR/PDF 相关项会因路径不存在而失败（需先 `detect-tools.py --write`）。
+
+而 `config.json` 自己的说明写着"留空的项按内置默认值或 PATH 回退"——**发布包里工具路径理应留空**，由使用者首次跑 `detect-tools.py --write` 写入本机路径。处置方式（改包内 config 为留空 ／ 维持现状）涉及发布形态变更，本轮按历史一致照旧出包，**待用户确认后再决定是否 V3.8.6**。
+
+**遗留（延续）**：`realestate` 转正仍须先做真实文档自测；样例台账 5 例 31 项**仍未见 `--check` 实际比对跑通的记录**。
