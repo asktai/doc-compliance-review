@@ -1,6 +1,6 @@
 # 变更记录（项目侧 · 不随发布包分发）
 
-**文档合规审查助手AI合同审核全能版** ｜ 当前 **V3.8.6**
+**文档合规审查助手AI合同审核全能版** ｜ 当前 **V3.8.7**
 
 > 本文件属**开发端资产**，位于技能目录之外（`dev/CHANGELOG.md`），**不进技能包、不随分发包外流**。
 > `scripts/version.py --changelog <更新源>` 会读取本文件（按 `## Vx.y.z 标题` 解析版本行）来
@@ -11,6 +11,32 @@
 > 开发过程记录另见 `maint/DEVLOG.md`（时间日志流水）。
 
 ---
+
+## V3.8.7 输出编码统一 UTF-8 ＋ 4 个脚本行尾改 LF
+
+（编码体检发现的缺陷，用户拍板：强制 UTF-8 输出 ＋ 转 LF）
+
+**输出编码保护（12 个脚本）**
+- 问题：16 个技能脚本里只有 5 个有 stdout 编码保护。GBK 环境下实测崩溃——
+  `PYTHONIOENCODING=cp936 python3 scripts/smoke-test.py` →
+  `UnicodeEncodeError: 'gbk' codec can't encode character '\u013c'`。
+- 崩溃是**连环的**：子进程无保护 → 按 GBK 吐字节 → 父进程用 UTF-8 解这些字节
+  （`errors="ignore"`）→ 造出垃圾字符 `\u013c` → 父进程再往 GBK 输出 → 崩。
+  另 `make-docx.py` 里的 `↔`（U+2194）GBK 本就装不下。
+- 处置：每个脚本在 `import sys as _sys` 后统一加保护块，stdout **与 stderr 都设**：
+  `reconfigure(encoding="utf-8", errors="replace")`。
+  `version.py` 原有的旧块（只设 stdout、`errors="ignore"`）一并替换为统一版——
+  `ignore` 会静默吞字符，`replace` 才看得出有字符没出去。
+- 验证：GBK 环境跑冒烟**不再崩**、中文正常输出；16 个脚本 `py_compile` 全通过。
+
+**行尾：4 个 .py 由 CRLF 转 LF**
+- `desensitize.py` / `make-docx.py` / `make-header.py` / `preprocess.py` 的 shebang 行带 `\r`，
+  Linux 下直接执行报 `/usr/bin/env: 'python3\r': No such file or directory`。
+- 转 LF 后实测 `./preprocess.py --help` 正常。
+- 只动这 4 个 .py（其余 CRLF 的 .md 不动）——Python 源码 LF 是标准，且 shebang 必须 LF。
+
+**体检结论**：UTF-8 解码 56 文件全过、BOM 0、行尾混用 0、编码声明 18/18、
+zip 内 9 个中文文件名全部带 UTF-8 标记（Windows 解压不乱码）、外文字符混入 0。
 
 ## V3.8.6 作者本机路径不出包 ＋ 样例比对不再假漏报
 

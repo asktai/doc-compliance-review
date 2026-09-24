@@ -369,3 +369,72 @@ a.fast = not a.full
 
 **遗留（延续）**：`realestate` 转正仍须先用真实文档自测（缺真实文档，无法推进）；
 吉祥物定稿缺图像 API key。
+
+---
+
+## 2026-09-24 · V3.8.7 输出编码统一 UTF-8 ＋ 4 个脚本行尾改 LF（用户拍板，已发布、已出包）
+
+**起因**：用户让做一次 UTF-8 编码体检。查完把发现的三个问题摆出来，用户拍板：
+输出**强制 UTF-8**（而非保守的 `errors=replace` 保底），行尾**4 个 py 转 LF**。
+
+### 一、编码体检结论（先说干净的）
+
+| 检查项 | 结果 |
+|---|---|
+| UTF-8 能否解码 | 56 个文件全过，0 失败 |
+| BOM | 0 个 |
+| 行尾混用 | 0 个（CRLF 17 / LF 39，各自统一） |
+| .py 编码声明 | 18/18 全有 |
+| 乱码/替换字符/控制符 | 0 处（`desensitize.py` 的 `××` 是有意占位符） |
+| zip 内中文文件名 | 9 个中文条目**全部带 UTF-8 标记**（flag 0x800），Windows 解压不乱码 |
+| 外文字符混入 | 52 个文件全书扫描 0 处 |
+
+### 二、查出的真问题
+
+**① 【严重】11/16 脚本无输出编码保护，GBK 下直接崩**
+
+实测复现：`PYTHONIOENCODING=cp936 python3 scripts/smoke-test.py` →
+`UnicodeEncodeError: 'gbk' codec can't encode character '\u013c' in position 70`。
+
+崩法是**连环的**，值得记下：子进程（如 `make-docx.py`）无保护 → 按 GBK 吐字节 →
+父进程用 `encoding="utf-8", errors="ignore"` 解这些 GBK 字节 → 造出垃圾字符 `\u013c` →
+父进程再往 GBK stdout 输出 → 崩。另 `make-docx.py` 里的 `↔`（U+2194）GBK 本就装不下。
+
+作者本人在 Windows 上跑没崩，是因为终端多半走了 UTF-8；**一旦输出重定向到文件
+（`> out.txt`）或换台机器就中招**——这类"在我机器上好好的"最该由脚本自己兜住。
+
+处置：12 个脚本（11 个新增 ＋ `version.py` 替换旧块）在 `import sys as _sys` 后统一加：
+
+```python
+try:
+    _sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    _sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
+```
+
+`version.py` 原有旧块只设 stdout、且用 `errors="ignore"`——`ignore` 会静默吞字符，
+`replace` 才看得出有字符没出去，故一并替换为统一版。stderr 也设：报错信息同样含中文。
+
+**② 【中】4 个 .py 的 shebang 带 CR**
+
+`desensitize.py` / `make-docx.py` / `make-header.py` / `preprocess.py` 是 CRLF，
+shebang 行实为 `#!/usr/bin/env python3\r`。Linux 下直接执行实测：
+`/usr/bin/env: 'python3\r': No such file or directory`。
+（`python3 scripts/xxx.py` 这种调用法不受影响，故一直没暴露。）
+转 LF 后 `./preprocess.py --help` 正常。只动这 4 个 .py，其余 CRLF 的 .md 不动。
+
+**③ 【低】CRLF/LF 不统一**（17 vs 39）—— 无混用，纯风格，未动。
+
+### 三、验证
+
+`/workspace/dist/doc-compliance-review-V3.8.7.zip`（67 条目）解包实测：
+
+- GBK 环境冒烟 **82/0/7 无 Error**（此前崩）；
+- GBK 环境 `check.py` **零警告**；
+- `./scripts/preprocess.py` shebang 直执**正常**；
+- `PYTHONIOENCODING=cp936 python3 version.py > out.txt` 重定向**正常输出中文**；
+- zip 中文条目 9 个，未带 UTF-8 标记 0 个；
+- 16 个脚本 `py_compile` 全通过；5 张 PNG 重绘至 V3.8.7。
+
+**遗留（延续）**：`realestate` 转正仍须真实文档自测；吉祥物缺图像 API key。

@@ -53,8 +53,11 @@ import argparse
 import datetime
 import tempfile
 
+# 输出编码保护：非 UTF-8 终端（Windows GBK 控制台、重定向到文件时）print 中文会抛
+# UnicodeEncodeError 直接崩；统一按 UTF-8 输出，无法编码的字符替换而非崩溃。
 try:
-    _sys.stdout.reconfigure(encoding="utf-8", errors="ignore")
+    _sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    _sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 except Exception:
     pass
 

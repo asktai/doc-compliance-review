@@ -62,6 +62,14 @@ spec.json 关键字段：
 依赖：python-docx（>=1.2，支持批注）；openpyxl（Excel 导出）；LibreOffice（PDF 导出，可选）。
 """
 import sys as _sys
+
+# 输出编码保护：非 UTF-8 终端（Windows GBK 控制台、重定向到文件时）print 中文会抛
+# UnicodeEncodeError 直接崩；统一按 UTF-8 输出，无法编码的字符替换而非崩溃。
+try:
+    _sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    _sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
 _sys.dont_write_bytecode = True   # 不在技能目录留下 __pycache__（避免缓存残留）
 import os, re, sys, json, argparse, datetime, random, difflib
 from docx import Document

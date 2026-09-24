@@ -1,0 +1,9 @@
+{
+  "_说明": "冒烟结果台账（smoke-test.py 自动生成，运行侧生成物不随开发侧留存）；供 check.py 校验 README/教程所写项数是否为真。",
+  "generated": "2026-09-24 15:02:19",
+  "mode": "fast",
+  "total": 89,
+  "passed": 82,
+  "failed": 0,
+  "skipped": 7
+}
