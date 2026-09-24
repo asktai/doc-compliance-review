@@ -6,8 +6,12 @@
 用途：把"工具路径 / 默认工作目录 / 渲染开关"从脚本中剥离到 `scripts/config.json`，
       使技能可跨机器、跨盘符部署而无需修改源码。
 
-优先级：命令行参数 > 环境变量 DOC_REVIEW_BASE > config.json > 内置默认值（auto 探测链）；
-        工具路径若配置项不存在，自动回退到 PATH 中的命令名。
+优先级：命令行参数 > 环境变量 DOC_REVIEW_BASE > config.local.json（本机覆盖，不进 git／不随包）
+        > config.json（随包，不含本机路径）> 内置默认值（tools 一律留空＝按 PATH 自动探测）。
+
+工具路径**允许自定义、但从不强制**：留空时按 PATH 中的命令名自动探测；填了绝对路径则优先用之，
+路径不存在时自动回退 PATH，不作为错误——只有 PATH 里也找不到才算工具未安装。
+想固定路径就用 `detect-tools.py --write`（写入 config.local.json）。
 
 用法：
     import _config
@@ -32,6 +36,9 @@ import tempfile
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(_HERE, "config.json")
+# 本机覆盖层：**不进 git、不随发布包**，只承载当前这台机器的工具路径。
+# 想自定义就写这里（detect-tools.py --write 默认写它），从不修改随包的 config.json。
+LOCAL_PATH = os.path.join(_HERE, "config.local.json")
 
 # ---- 工作根目录解析（不写死盘符）-------------------------------------------
 # base_dir 三种取值：
@@ -43,12 +50,15 @@ ENV_BASE = "DOC_REVIEW_BASE"       # 临时覆盖工作根目录的环境变量�
 AUTO_TOKENS = ("", "auto", "autodetect", "自动")   # 视为"自动探测"的取值
 
 DEFAULTS = {
+    # 工具路径**一律留空**＝按 PATH 自动探测，不写死任何盘符与安装位置。
+    # 需要固定到某个安装位置时，跑 `detect-tools.py --write` 写入本机覆盖层
+    # config.local.json（不进 git、不随包）；随包配置保持"零本机痕迹"。
     "tools": {
-        "soffice": r"D:\Program Files\LibreOffice\program\soffice.exe",
-        "pdftotext": r"D:\Tools\poppler\poppler-26.07.0\Library\bin\pdftotext.exe",
-        "pdftoppm": r"D:\Tools\poppler\poppler-26.07.0\Library\bin\pdftoppm.exe",
-        "tesseract": r"D:\Tools\tesseract\tesseract.exe",
-        "tessdata": r"D:\Tools\tesseract\tessdata",
+        "soffice": "",
+        "pdftotext": "",
+        "pdftoppm": "",
+        "tesseract": "",
+        "tessdata": "",
     },
     "workdir": {
         "base_dir": "auto",
@@ -84,13 +94,23 @@ def _deepcopy(d):
 
 
 def load():
-    """读取 config.json（存在则合并到默认值之上），任何异常都退回内置默认值。"""
+    """按「内置默认值 → config.json → config.local.json」三层叠加读出配置。
+
+    后一层覆盖前一层。内置默认值与随包 config.json **不写死任何本机路径**，
+    本机专属设定一律落在 `config.local.json`（不进 git、不随包）。
+    任何一层解析异常都跳过它继续用上一层，绝不阻断主流程。
+    """
     cfg = _deepcopy(DEFAULTS)
-    if not os.path.exists(CONFIG_PATH):
-        return cfg
-    try:
-        with open(CONFIG_PATH, encoding="utf-8-sig") as f:
-            user = json.load(f)
+    for path in (CONFIG_PATH, LOCAL_PATH):
+        if not os.path.exists(path):
+            continue
+        try:
+            with open(path, encoding="utf-8-sig") as f:
+                user = json.load(f)
+        except Exception as e:  # 配置损坏不应阻断主流程
+            print("[config] %s 解析失败，跳过该层用上一层：%s"
+                  % (os.path.basename(path), e))
+            continue
         for k, v in (user or {}).items():
             if k.startswith("_"):
                 continue
@@ -98,8 +118,6 @@ def load():
                 cfg[k].update({kk: vv for kk, vv in v.items()})
             else:
                 cfg[k] = v
-    except Exception as e:  # 配置损坏不应阻断主流程
-        print("[config] config.json 解析失败，改用内置默认值：", e)
     return cfg
 
 

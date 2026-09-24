@@ -51,7 +51,7 @@ _sys.dont_write_bytecode = True
 
 **文件名四段式**：`中文产品名-技能ID-版本号-日期.封装格式`，例如
 
-    文档合规审查助手AI合同审核全能版-doc-compliance-review-V3.8.9-2026-09-24.skill
+    文档合规审查助手AI合同审核全能版-doc-compliance-review-V3.9.0-2026-09-24.skill
 
 产品名取 `SKILL.md` frontmatter 的 `display_name`、技能 ID 取 `name`、版本号取 `version`、
 日期为**打包当天**。四段各自自动读取，不靠手填，避免"版本升了文件名还写着旧号"。
@@ -99,7 +99,10 @@ EXCLUDE_FILES = {"regression-report-V2.0.0.md",
                  # check.py 的 check_smoke_count() 读到的是别人的基线，判自己机器的项数必错。
                  # 注：`_rules-baseline.json`（规则台账）与 `.integrity.json`（脚本指纹）**有意随包**，
                  # 前者供 rule-baseline.py 比对改动，后者供 check.py --verify 校验脚本未被改。
-                 "_smoke-baseline.json"}
+                 "_smoke-baseline.json",
+                 # 本机工具路径覆盖层：由 detect-tools.py --write 生成，只对当前这台机器有意义，
+                 # 随包会把作者的本机路径带给使用者，在新机器上必然失效并触发 PATH 回退告警。
+                 "config.local.json"}
 
 # 技能目录名 —— 必须与 SKILL.md frontmatter 的 name 一致，平台据此识别技能；
 # 上架版要求解压后第一层就是它。

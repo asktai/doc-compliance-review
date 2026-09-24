@@ -292,16 +292,34 @@ def check_config():
     except Exception as e:
         err("config.json 解析失败: %s" % e)
         return
-    tools = data.get("tools") or {}
-    missing = []
+    try:
+        import _config as _cm
+    except Exception:
+        _cm = None
+    # 工具路径：留空＝按 PATH 探测（不是问题）；填了不在本机但 PATH 能兜住＝只提示；
+    # 两者都没有＝才算缺失。这里反映 config.json ＋ config.local.json 叠加后的结果。
+    tools = ((_cm.load() if _cm else {}) or {}).get("tools") or {}
+    custom, via_path, absent = [], [], []
     for k, v in tools.items():
         v = (v or "").strip()
-        if v and not os.path.exists(v):
-            missing.append("%s=%s" % (k, v))
-    if missing:
-        warn("config.json 中工具路径在本机不存在（将回退 PATH）: " + "; ".join(missing))
-    else:
-        info("config.json: 工具路径全部可用")
+        if not v:
+            continue
+        if os.path.exists(v):
+            custom.append(k)
+        elif _cm and _cm.tool_available(_cm.load(), k):
+            via_path.append(k)
+        else:
+            absent.append("%s=%s" % (k, v))
+    if custom:
+        info("工具路径: %d 项按自定义路径生效（%s）" % (len(custom), "、".join(sorted(custom))))
+    if via_path:
+        info("工具路径: %d 项配置路径在本机不存在，已按 PATH 自动探测（%s）——功能不受影响"
+             % (len(via_path), "、".join(sorted(via_path))))
+    if absent:
+        warn("以下工具既无有效路径、PATH 中也找不到（相应文档类型将无法解析）: %s —— 跑"
+             " detect-tools.py --install-guide 查看安装命令" % "; ".join(sorted(absent)))
+    if not (custom or via_path or absent):
+        info("工具路径: 全部留空，按 PATH 自动探测（自定义可选，不作强制）")
     base = ((data.get("workdir") or {}).get("base_dir") or "").strip()
     if base and base.lower() not in ("auto", "autodetect", "自动"):
         parent = os.path.dirname(base)
@@ -318,10 +336,15 @@ def check_config():
 
 
 def check_hardcoded_paths():
-    """回归检查：D 盘硬编码是否已外置到 config.json（_config.py 的 DEFAULTS 除外）。"""
+    """回归检查：脚本内是否残留盘符字面量。
+
+    V3.9.0 起不再豁免 `_config.py`——其 DEFAULTS 的 tools 已全部留空（改为按 PATH 探测），
+    本机路径只允许出现在 `config.local.json`（不进 git、不随包），故任何 .py 里都不该有盘符字面量。
+    `check.py` 自身仍豁免：本函数的检测正则自指，无法自检。
+    """
     bad = []
     for p in _walk(HERE, exts=(".py",)):
-        if os.path.basename(p) in ("_config.py", "check.py"):
+        if os.path.basename(p) == "check.py":
             continue
         txt = _read(p)
         # 统计盘符字面量；排除系统字体目录（跨平台字体候选，属正常硬编码）

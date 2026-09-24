@@ -1,31 +1,31 @@
 {
-  "_说明": "本文件用于外置配置：工具路径、默认工作目录、隐私与输出策略。留空的项按内置默认值或 PATH 回退。命令行参数（--base/--in/--out/--ts 等）优先级高于本文件。修改后无需改脚本。",
-  "tools": {
-    "soffice": "D:\\Program Files\\LibreOffice\\program\\soffice.exe",
-    "pdftotext": "D:\\Tools\\poppler\\poppler-26.07.0\\Library\\bin\\pdftotext.exe",
-    "pdftoppm": "D:\\Tools\\poppler\\poppler-26.07.0\\Library\\bin\\pdftoppm.exe",
-    "tesseract": "D:\\Tools\\tesseract\\tesseract.exe",
-    "tessdata": "D:\\Tools\\tesseract\\tessdata"
-  },
-  "_workdir_说明": "工作根目录。base_dir 填绝对路径＝自定义（最高优先）；填 auto 或留空＝按候选链自动探测：推荐盘 D:\\文档合规审查报告 → 文档库 → 用户目录 → 临时目录，前一个不可用自动顺延，因此无 D 盘的机器也能直接跑。临时覆盖用环境变量 DOC_REVIEW_BASE。查看/切换：python scripts/set-workdir.py [--set <路径>|--auto]。",
-  "workdir": {
-    "base_dir": "auto",
-    "in_dir": "",
-    "out_dir": ""
-  },
-  "render": {
-    "pdf_export": true,
-    "pdf_timeout_sec": 180
-  },
-  "_privacy_说明": "隐私与数据出域策略（低危-1）。fulltext_gate=true 时，读取全文进模型前必须先确认文档密级；涉密文档应走 local_only.py 的纯本地脱敏链路，全文不进模型上下文。",
-  "privacy": {
-    "fulltext_gate": true,
-    "on_confidential": "local_only",
-    "warn_before_context": true
-  },
-  "_output_说明": "输出隔离策略（低危-2）。per_source_subdir=true 时，未显式指定 --subdir 的交付物自动落到「以文档名命名的子目录」，避免多客户文档在输出目录混放、被整体打包外泄。harden_acl=true 时（需显式运行 harden-dir.py 生效）只授权当前用户访问输出目录。",
-  "output": {
-    "per_source_subdir": true,
-    "harden_acl": false
-  }
+ "_说明": "本文件用于外置配置：工具路径、默认工作目录、隐私与输出策略。**留空即自动**——tools 各项留空时按 PATH 自动探测命令位置，不必手工填写；想把工具固定到某个安装位置，跑 `python scripts/detect-tools.py --write`，结果写入本机覆盖层 `scripts/config.local.json`（不进 git、不随发布包），不会污染本文件。命令行参数（--base/--in/--out/--ts 等）优先级高于本文件。修改后无需改脚本。",
+ "tools": {
+  "soffice": "",
+  "pdftotext": "",
+  "pdftoppm": "",
+  "tesseract": "",
+  "tessdata": ""
+ },
+ "_workdir_说明": "工作根目录。base_dir 填绝对路径＝自定义（最高优先）；填 auto 或留空＝按候选链自动探测：推荐盘 D:\\文档合规审查报告 → 文档库 → 用户目录 → 临时目录，前一个不可用自动顺延，因此无 D 盘的机器也能直接跑。临时覆盖用环境变量 DOC_REVIEW_BASE。查看/切换：python scripts/set-workdir.py [--set <路径>|--auto]。",
+ "workdir": {
+  "base_dir": "auto",
+  "in_dir": "",
+  "out_dir": ""
+ },
+ "render": {
+  "pdf_export": true,
+  "pdf_timeout_sec": 180
+ },
+ "_privacy_说明": "隐私与数据出域策略（低危-1）。fulltext_gate=true 时，读取全文进模型前必须先确认文档密级；涉密文档应走 local_only.py 的纯本地脱敏链路，全文不进模型上下文。",
+ "privacy": {
+  "fulltext_gate": true,
+  "on_confidential": "local_only",
+  "warn_before_context": true
+ },
+ "_output_说明": "输出隔离策略（低危-2）。per_source_subdir=true 时，未显式指定 --subdir 的交付物自动落到「以文档名命名的子目录」，避免多客户文档在输出目录混放、被整体打包外泄。harden_acl=true 时（需显式运行 harden-dir.py 生效）只授权当前用户访问输出目录。",
+ "output": {
+  "per_source_subdir": true,
+  "harden_acl": false
+ }
 }

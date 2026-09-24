@@ -4,12 +4,23 @@
 外部依赖自动探测与写回（scripts/detect-tools.py）
 =================================================
 用途：装机最大的摩擦是"手工填 LibreOffice / Poppler / Tesseract 的路径"。
-      本脚本按**常见安装位置 → PATH** 的顺序探测，找到即可一键写回 `config.json`，
-      不必再手抄路径；找不到会给出该工具的用途与"缺了会怎样"，便于决定装不装。
+      本脚本按**常见安装位置 → PATH** 的顺序探测，找到即可一键写回，不必再手抄路径；
+      找不到会给出该工具的用途与"缺了会怎样"，便于决定装不装。
+
+工具路径**允许自定义，但不强制**——不配也能用：留空时按 PATH 自动探测，填了绝对路径则优先用之，
+路径失效时自动回退 PATH，不算错误。
+
+配置分三层（后者覆盖前者）：
+    内置默认值      tools 全空＝按 PATH 探测，**不含任何本机路径**
+    config.json     随发布包分发，同样保持零本机痕迹
+    config.local.json  **本机覆盖层**——`--write` 默认写这里，不进 git、不随包
+
+故 `--write` 不会污染随包配置；把 config.local.json 删掉即彻底回到自动探测。
 
 用法：
     python detect-tools.py              查看探测结果（外部工具 ＋ Python 环境，不改动任何文件）
-    python detect-tools.py --write      把探测到的路径写回 config.json（探测不到的项**保持原值不动**）
+    python detect-tools.py --write      把探测到的路径写入**本机覆盖层** config.local.json（推荐）
+    python detect-tools.py --write-config   写回随包的 config.json（要把整包拷到别的机器时才用）
     python detect-tools.py --path <键>  只打印某项的解析结果（soffice/pdftotext/pdftoppm/tesseract/tessdata）
     python detect-tools.py --install-guide       打印**缺失项**的分平台安装命令
     python detect-tools.py --install-guide --out install-deps.bat
@@ -40,6 +51,7 @@ _sys.path.insert(0, HERE)
 import _config as _cfgmod
 
 CFG_PATH = _cfgmod.CONFIG_PATH
+LOCAL_PATH = _cfgmod.LOCAL_PATH   # 本机覆盖层（不进 git、不随包）
 
 # 各工具用途与缺失影响（写给人看：决定装不装）
 USAGE = {
@@ -249,7 +261,10 @@ def install_guide(miss_tools, miss_pips, plat, out_file=None):
 
 def main():
     ap = argparse.ArgumentParser(description="外部依赖自动探测与写回")
-    ap.add_argument("--write", action="store_true", help="把探测到的路径写回 config.json")
+    ap.add_argument("--write", action="store_true",
+                    help="把探测到的路径写入本机覆盖层 config.local.json（推荐；不进 git、不随包）")
+    ap.add_argument("--write-config", action="store_true",
+                    help="写回随包的 config.json（仅当要把整包拷到别的机器；会把本机路径写进随包配置）")
     ap.add_argument("--path", metavar="键", help="只打印某项解析结果（soffice/pdftotext/pdftoppm/tesseract/tessdata）")
     ap.add_argument("--install-guide", action="store_true", help="打印**缺失项**的分平台安装命令（不执行、不联网）")
     ap.add_argument("--out", metavar="文件", help="配合 --install-guide：把命令写成 .bat/.sh 供核对后运行")
@@ -260,7 +275,7 @@ def main():
     for k in ("soffice", "pdftotext", "pdftoppm", "tesseract", "tessdata"):
         cur = ((cfg.get("tools") or {}).get(k) or "").strip()
         if cur and os.path.exists(cur):
-            found[k] = (cur, "config.json（已填且存在）")
+            found[k] = (cur, "（已填且存在）")
         else:
             found[k] = probe(k)
 
@@ -268,7 +283,9 @@ def main():
         print(found.get(a.path, ("", ""))[0])
         return 0
 
-    print("[detect-tools] 配置文件：%s" % CFG_PATH)
+    print("[detect-tools] 配置层：config.json（随包）＋ %s"
+          % ("config.local.json（本机覆盖，已存在）" if os.path.exists(LOCAL_PATH)
+             else "config.local.json（本机覆盖，尚未生成）"))
     print("[detect-tools] 探测结果：")
     for k, (p, src) in found.items():
         usage, level = USAGE[k]
@@ -298,28 +315,37 @@ def main():
             install_guide(miss_tools, miss_pips, platform_key(), a.out)
         return 0
 
-    if a.write:
+    if a.write or a.write_config:
+        target = LOCAL_PATH if a.write else CFG_PATH
+        tname = os.path.basename(target)
         data = {}
-        if os.path.exists(CFG_PATH):
+        if os.path.exists(target):
             try:
-                with open(CFG_PATH, encoding="utf-8-sig") as f:
+                with open(target, encoding="utf-8-sig") as f:
                     data = json.load(f) or {}
             except Exception as e:
-                print("[detect-tools] config.json 解析失败，将重建：%s" % e)
+                print("[detect-tools] %s 解析失败，将重建：%s" % (tname, e))
                 data = {}
         tools = data.get("tools") or {}
         written = []
         for k, (p, src) in found.items():
-            if p and src != "config.json（已填且存在）":
+            if p and src != "（已填且存在）":
                 tools[k] = p
                 written.append(k)
         data["tools"] = tools
-        with open(CFG_PATH, "w", encoding="utf-8") as f:
+        if target == LOCAL_PATH:
+            data["_说明"] = ("本机工具路径覆盖层：由 detect-tools.py --write 生成，"
+                            "**不进 git、不随发布包**；留空或删除本文件即回到按 PATH 自动探测。")
+        with open(target, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
-        print("[detect-tools] 已写回 %d 项：%s" % (len(written), "、".join(written) or "（无新增，原配置已可用）"))
+        print("[detect-tools] 已写回 %s：%d 项（%s）"
+              % (tname, len(written), "、".join(written) or "无新增，原配置已可用"))
         print("[detect-tools] 未探测到的项保持原值，未清空。")
+        if target == LOCAL_PATH:
+            print("[detect-tools] 该文件只在本机生效，不进发布包；删除它即彻底回到自动探测。")
     else:
-        print("[detect-tools] 提示：加 --write 可把上述路径写入 config.json。")
+        print("[detect-tools] 提示：加 --write 写入本机覆盖层（不污染随包配置）；"
+              "--write-config 写回 config.json。")
 
     miss = [k for k, (p, _) in found.items() if not p]
     need_pip = [pip for _m, pip, _u, lv, ok in py if not ok and lv == "必需"]
