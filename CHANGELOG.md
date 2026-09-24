@@ -1,6 +1,6 @@
 # 变更记录（项目侧 · 不随发布包分发）
 
-**文档合规审查助手AI合同审核全能版** ｜ 当前 **V3.8.7**
+**文档合规审查助手AI合同审核全能版** ｜ 当前 **V3.8.8**
 
 > 本文件属**开发端资产**，位于技能目录之外（`dev/CHANGELOG.md`），**不进技能包、不随分发包外流**。
 > `scripts/version.py --changelog <更新源>` 会读取本文件（按 `## Vx.y.z 标题` 解析版本行）来
@@ -11,6 +11,43 @@
 > 开发过程记录另见 `maint/DEVLOG.md`（时间日志流水）。
 
 ---
+
+## V3.8.8 四段式命名 ＋ `.skill` 封装（默认格式）
+
+**文件名四段式**：`中文产品名-技能ID-版本号-日期.封装格式`
+
+    文档合规审查助手AI合同审核全能版-doc-compliance-review-V3.8.8-2026-09-24.skill
+
+产品名取 `SKILL.md` frontmatter 的 `display_name`、技能 ID 取 `name`、版本取 `version`、
+日期取**打包当天**——四段全部自动读取，杜绝"版本升了文件名还写着旧号"。
+（原 `doc-compliance-review-<版本>.zip` 命名作废。）
+
+**`.skill` 封装（自定义，非平台规范）**：头部 ＋ zip 负载，负载字节与同名 `.zip` **完全一致**。
+
+```
+0    4B   magic = b"SKLP"
+4    1B   头部格式版本 = 1
+5    4B   meta_len（little-endian）
+9    nB   元数据 JSON（UTF-8）：product/id/version/date/payload/bytes/sha256/entries
+9+n  32B  负载的 SHA-256
+41+n …    负载：标准 ZIP
+```
+
+- 自描述：头部带产品名／技能 ID／版本／日期／条目数／负载 SHA-256，归档与对账不用拆包就知道装的什么；
+- 兼容性实测：Python `zipfile` 直接打开 67 条目无警告；`unzip` 能解开但提示
+  "240 extra bytes at beginning"、**退出码 1**（自动化脚本会判失败）。
+- `--format skill|zip|both`，默认 `both`（两种都出，主格式 .skill）。
+- **风险已写明**：这是自定义封装，平台未必认。`pack.py` 文档串与教程都注明
+  "上传开放平台用 `.zip`"（平台官方口径：收 zip、≤3 MB）。
+
+**顺带修掉一个真问题**：`core/_smoke-baseline.json`（本机跑冒烟的产物）**会被打进包**。
+后果：使用者跑 `check.py` 时 `check_smoke_count()` 读到的是**作者机器**的冒烟结果，
+拿来判自己机器的项数必错。已加入 `EXCLUDE_FILES`（`_rules-baseline.json` 与 `.integrity.json`
+**有意随包**，不在此列——前者供规则比对，后者供脚本指纹校验）。
+此前从实例侧出包时该文件不存在，故一直没暴露；从开发侧直接打包就会混进去。
+
+**踩坑**：元数据最初从文件名 `rsplit("-", 3)` 反解，日期段自带两个 `-`，把字段切成了
+`version="09" / date="24"`。改为由 `package_stem()` 直接返回四段，不再反解。
 
 ## V3.8.7 输出编码统一 UTF-8 ＋ 4 个脚本行尾改 LF
 

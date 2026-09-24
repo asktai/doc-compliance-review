@@ -438,3 +438,74 @@ shebang 行实为 `#!/usr/bin/env python3\r`。Linux 下直接执行实测：
 - 16 个脚本 `py_compile` 全通过；5 张 PNG 重绘至 V3.8.7。
 
 **遗留（延续）**：`realestate` 转正仍须真实文档自测；吉祥物缺图像 API key。
+
+---
+
+## 2026-09-24 · V3.8.8 发布包四段式命名 ＋ `.skill` 封装（默认格式）
+
+**起因**：用户要求"按 中文产品名-技能ID-版本号-日期.封装格式（SKILL/ZIP）四段式规范重新打包，
+默认为 SKILL 格式"。
+
+**先确认再动手**：`.skill` 是什么内部结构，我查不到权威规范（WorkBuddy 开放平台官方口径是
+**收 zip、≤3 MB**；`.skill` 只在教程里 Kimi 那条出现过一句"也可提交 .skill 二进制包"）。
+按规矩不敢凭猜写，故先提问。用户拍板：① 带自定义头部/元数据；② 两种都出、默认 .skill；
+③ 四段式用**产品名全称**、版本号带 V、日期带横杠。
+
+### 一、四段式命名
+
+`中文产品名-技能ID-版本号-日期.封装格式`，实例：
+
+    文档合规审查助手AI合同审核全能版-doc-compliance-review-V3.8.8-2026-09-24.skill
+
+四段**全部自动读取**，不靠手填：产品名←frontmatter `display_name`，技能 ID←`name`，
+版本←`version`，日期←打包当天。原 `doc-compliance-review-<版本>.zip` 命名作废。
+
+### 二、`.skill` 封装（自定义格式，已写进 pack.py 文档串）
+
+```
+0    4B   magic = b"SKLP"
+4    1B   头部格式版本 = 1
+5    4B   meta_len（little-endian）
+9    nB   元数据 JSON（UTF-8）
+9+n  32B  负载的 SHA-256
+41+n …    负载：标准 ZIP（与同名 .zip 字节完全一致）
+```
+
+元数据：product / id / version / date / payload / payload_bytes / payload_sha256 / entries。
+**兼容性实测**：Python `zipfile` 直接打开 67 条目、零警告；`unzip` 能解开但提示
+"240 extra bytes at beginning" 且**退出码 1**（自动化脚本会判失败）——这条已写进文档串与教程。
+
+**风险已明写**：这是自定义封装，平台未必认。`pack.py` 文档串与教程都注明
+"上传开放平台用 `.zip`"。`--format skill|zip|both`，默认 `both`。
+
+### 三、顺带挖出一个真问题
+
+`core/_smoke-baseline.json`（本机跑冒烟的产物）**会被打进包**。后果不小：使用者跑
+`check.py` 时 `check_smoke_count()` 读到的是**作者机器**的冒烟结果，拿来判自己机器的项数必错。
+已加进 `EXCLUDE_FILES`；并删掉开发侧那份残留（本就不该在开发侧留存，`.gitignore` 早有覆盖）。
+
+此前一直没暴露，是因为正式流程打的是**实例侧**（publish 的 rmtree 重建会清空生成物）；
+这次为了验证格式直接从开发侧打了一次，它就冒出来了。
+
+注意区分：`_rules-baseline.json` 与 `.integrity.json` **有意随包**（前者供规则比对、
+后者供脚本指纹校验），不在此列。
+
+### 四、踩坑
+
+元数据最初从文件名 `rsplit("-", 3)` 反解——日期段自带两个 `-`，把字段切成
+`version="09" / date="24"`。改为 `package_stem()` 直接返回四段，不再反解。
+
+### 五、验证
+
+`/workspace/dist/` 下两种格式各一份（67 条目 / 1.29 MB）：
+
+- 头部逐字段解析：magic `SKLP`、fmt_ver 1、meta_len 326、元数据 JSON 正确；
+- 负载 SHA-256 与头部一致、与同名 `.zip` **字节完全相同**；
+- `zipfile` 打开 67 条目 = 元数据所写；`extractall` 落盘 67 文件，解出 `version: 3.8.8`；
+- 解包后 `check.py` 零警告、`--verify` 通过、冒烟 82/0/7；
+- 三种 `--format` 行为正确：默认两种都出、`skill` 只留 .skill、`zip` 只留 .zip；
+- 包内确认**无** `_smoke-baseline.json`。
+
+5 张 PNG 重绘至 V3.8.8。
+
+**遗留（延续）**：`realestate` 转正须真实文档自测；吉祥物缺图像 API key。

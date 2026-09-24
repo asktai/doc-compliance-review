@@ -49,12 +49,27 @@ _sys.dont_write_bytecode = True
 回退——使用者要固化本机路径，跑一次 `detect-tools.py --write` 即可。
 确需带本机路径出包（如给自己的另一台机器留档）时用 `--keep-tools`。
 
+**文件名四段式**：`中文产品名-技能ID-版本号-日期.封装格式`，例如
+
+    文档合规审查助手AI合同审核全能版-doc-compliance-review-V3.8.8-2026-09-24.skill
+
+产品名取 `SKILL.md` frontmatter 的 `display_name`、技能 ID 取 `name`、版本号取 `version`、
+日期为**打包当天**。四段各自自动读取，不靠手填，避免"版本升了文件名还写着旧号"。
+
+**两种封装格式**：
+
+- `.skill`（**默认主格式**）＝自定义头部 ＋ zip 负载的自描述封装，头部带产品名／技能 ID／
+  版本／日期／条目数／负载 SHA-256，便于归档与对账。负载是裸 zip，Python `zipfile` 与
+  `unzip` 都能直接取内容（后者会提示"前面多了若干字节"但仍能解开）。
+  **注意**：这是本技能自定义的封装，非平台公开规范；上传到开放平台若被拒，改用 `.zip`。
+- `.zip` ＝纯 ZIP，与开放平台（open.workbuddy.cn）实测口径一致（**平台官方收 zip、≤3 MB**）。
+
 用法：
   python pack.py <技能根目录> [--out <发布包目录，默认 <根>/_发布包>]
                              [--include-private] [--tag <版本标签，默认读 SKILL.md>]
-                             [--keep-tools]
+                             [--keep-tools] [--format skill|zip|both]
 """
-import os, re, sys, json, zipfile, argparse
+import os, re, sys, json, hashlib, zipfile, argparse, datetime
 
 # SECURITY.md 必须随包：README 目录树、SKILL 第十二节、提示词版边界条款均指向它，
 # 漏掉会变成「包内文档指向包外不存在的文件」。
@@ -79,7 +94,12 @@ FULL_DIRS = ["assets", "core", "industries", "scripts", SELFTEST_DIR]
 NONREC_DIRS = {"samples"}   # 只带该目录下的文件，不递归其子目录（子目录为开发侧素材）
 PRIVATE_DIR = "private"
 EXCLUDE_DIRS = {"_归档", "_分发包", "_发布包", "测试合同", "__pycache__"}
-EXCLUDE_FILES = {"regression-report-V2.0.0.md"}
+EXCLUDE_FILES = {"regression-report-V2.0.0.md",
+                 # 本机跑冒烟的产物：随包会把**作者机器**的冒烟结果带给使用者，
+                 # check.py 的 check_smoke_count() 读到的是别人的基线，判自己机器的项数必错。
+                 # 注：`_rules-baseline.json`（规则台账）与 `.integrity.json`（脚本指纹）**有意随包**，
+                 # 前者供 rule-baseline.py 比对改动，后者供 check.py --verify 校验脚本未被改。
+                 "_smoke-baseline.json"}
 
 # 技能目录名 —— 必须与 SKILL.md frontmatter 的 name 一致，平台据此识别技能；
 # 上架版要求解压后第一层就是它。
@@ -171,13 +191,81 @@ def verify_zip(zp):
     return bad
 
 
-def build(base, outdir, include_private=False, tag="V3.0.0", keep_tools=False):
+# ------------------------------------------------------------------ 封装格式与四段式命名
+# `.skill`＝自定义头部 ＋ zip 负载（**自描述格式**，非平台公开规范）。
+# 头部布局（小端）：
+#   0   4B   magic = b"SKLP"
+#   4   1B   头部格式版本（当前 1）
+#   5   4B   meta_len：元数据 JSON 字节数
+#   9   nB   元数据 JSON（UTF-8）
+#   9+n 32B  负载（zip 字节）的 SHA-256
+#   41+n …   负载：标准 ZIP 数据，与同名 `.zip` **字节完全一致**
+# 这样安排的好处：负载是裸 zip，Python zipfile 与 unzip 都能直接解开
+# （unzip 会提示"前面多了若干字节"但仍能处理），不需要专用工具也能取内容。
+SKILL_MAGIC = b"SKLP"
+SKILL_FMT_VER = 1
+# 文件名四段式：中文产品名-技能ID-版本号-日期.封装格式
+FMT_EXT = {"zip": "zip", "skill": "skill"}
+
+
+def _fm_field(base, key):
+    """从 SKILL.md frontmatter 取一个标量字段（够用即可，不引第三方 yaml）。"""
+    try:
+        with open(os.path.join(base, "SKILL.md"), encoding="utf-8-sig", errors="ignore") as f:
+            head = f.read(4000)
+    except OSError:
+        return ""
+    m = re.search(r"(?m)^%s:\s*(.+)$" % re.escape(key), head)
+    return m.group(1).strip().strip('"').strip("'") if m else ""
+
+
+def package_stem(base, tag):
+    """四段式文件名主干：**中文产品名-技能ID-版本号-日期**。返回 (主干, 产品名, 技能ID, 日期)。
+
+    产品名取 frontmatter 的 display_name（去引号、去文件名非法字符），
+    技能 ID 取 name，版本号即 tag，日期为**打包当天**。
+    四段一并返回，供 .skill 头部元数据复用——**不要从文件名反解**：
+    日期段自带两个 `-`，按 `-` 切会把字段切错位。
+    """
+    product = _fm_field(base, "display_name") or _fm_field(base, "name") or SKILL_DIR
+    sid = _fm_field(base, "name") or SKILL_DIR
+    product = re.sub(r'[\\/:*?"<>|]+', "", product).strip() or SKILL_DIR
+    date = datetime.date.today().isoformat()
+    return "%s-%s-%s-%s" % (product, sid, tag, date), product, sid, date
+
+
+def write_skill(zp, out, product, sid, version, date):
+    """把打好的 zip 封装成 .skill（头部 ＋ zip 负载）。返回 (元数据, 头部字节数)。"""
+    raw = open(zp, "rb").read()
+    with zipfile.ZipFile(zp) as zf:
+        n_entry = len([n for n in zf.namelist() if not n.endswith("/")])
+    meta = {
+        "format": "dcr-skill-package/%d" % SKILL_FMT_VER,
+        "product": product,
+        "id": sid,
+        "version": version,
+        "date": date,
+        "payload": "application/zip",
+        "payload_bytes": len(raw),
+        "payload_sha256": hashlib.sha256(raw).hexdigest(),
+        "entries": n_entry,
+    }
+    mj = json.dumps(meta, ensure_ascii=False).encode("utf-8")
+    head = (SKILL_MAGIC + bytes([SKILL_FMT_VER]) + len(mj).to_bytes(4, "little")
+            + mj + hashlib.sha256(raw).digest())
+    with open(out, "wb") as f:
+        f.write(head + raw)
+    return meta, len(head)
+
+
+def build(base, outdir, include_private=False, tag="V3.0.0", keep_tools=False, fmt="both"):
     os.makedirs(outdir, exist_ok=True)
     priv_path = os.path.join(base, PRIVATE_DIR)
     prefix = SKILL_DIR + "/"   # 上架版结构：所有条目都套一层技能目录
     blanked = []               # 本次包内被清空工具路径的配置文件（用于收尾提示）
+    stem, product, sid, _date = package_stem(base, tag)
     for files, dirs, name in [
-        (FULL_FILES, list(FULL_DIRS), f"{SKILL_DIR}-{tag}.zip"),
+        (FULL_FILES, list(FULL_DIRS), "%s.zip" % stem),
     ]:
         dirs = list(dirs)
         with_private = include_private and os.path.isdir(priv_path)
@@ -219,6 +307,24 @@ def build(base, outdir, include_private=False, tag="V3.0.0", keep_tools=False):
             return False
         print("  [OK] 出包自检通过：顶层／SKILL.md 计数／层级（≤%d 级）／体积（≤%d MB）／private 五项全过"
               % (PLATFORM_MAX_DEPTH, PLATFORM_MAX_MB))
+
+        # ---- 封装为 .skill（头部 ＋ 同一个 zip 负载）
+        sp = os.path.join(outdir, "%s.skill" % stem)
+        if fmt in ("both", "skill"):
+            meta, nhead = write_skill(zp, sp, product, sid, tag, _date)
+            with zipfile.ZipFile(sp) as zf2:
+                n2 = len([n for n in zf2.namelist() if not n.endswith("/")])
+            same = hashlib.sha256(open(zp, "rb").read()).hexdigest() == meta["payload_sha256"]
+            print("built", sp, "（头部 %d B ＋ zip 负载 %d B）" % (nhead, meta["payload_bytes"]))
+            print("  [i] 头部元数据：%s ｜ %s ｜ %s ｜ %s ｜ 条目 %d ｜ sha256 %s…"
+                  % (meta["product"], meta["id"], meta["version"], meta["date"], meta["entries"],
+                     meta["payload_sha256"][:16]))
+            print("  [%s] .skill 解开即 %d 条目，负载与 .zip 字节一致"
+                  % ("OK" if (n2 == n_entry and same) else "FAIL", n2))
+        if fmt == "skill" and os.path.exists(zp):
+            os.remove(zp)   # 只要 .skill 时，中间的 zip 不留
+        if fmt == "zip" and os.path.exists(sp):
+            os.remove(sp)
     return True
 
 def read_skill_version(base):
@@ -250,6 +356,9 @@ if __name__ == "__main__":
     ap.add_argument("--tag", default=None, help="版本标签（默认自动读 SKILL.md frontmatter）")
     ap.add_argument("--keep-tools", action="store_true",
                     help="保留 config.json 里填好的工具路径（默认清空，避免作者本机路径随包外发）")
+    ap.add_argument("--format", choices=["skill", "zip", "both"], default="both",
+                    help="封装格式（默认 both＝两种都出，主格式为 .skill）："
+                         "skill＝只出 .skill；zip＝只出 .zip（平台上传多认这个）")
     a = ap.parse_args()
     if a.include_private:
         print("[警告] --include-private 已启用，private/（企业内控口径）将被打入发布包，"
@@ -258,5 +367,5 @@ if __name__ == "__main__":
         print("[注意] --keep-tools 已启用：config.json 的工具路径将**原样入包**，"
               "确认这些路径对接收方有效。")
     ok = build(a.base, a.out or os.path.join(a.base, "_发布包"), a.include_private,
-               a.tag or read_skill_version(a.base), a.keep_tools)
+               a.tag or read_skill_version(a.base), a.keep_tools, a.format)
     sys.exit(0 if ok else 1)
