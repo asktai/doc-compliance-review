@@ -24,7 +24,7 @@ _sys.dont_write_bytecode = True   # 不在技能目录留下 __pycache__（避�
     private/ 私有库     ✔                ✔           ✔      ✔      ✔       ✔      ✔     ✔
 
 条件A（行业库删除按库区分，不是一刀切）：
-    **初始内置的 8 个行业库不可删除**（upgrade 时会整体覆盖、删了装不回来），但**可以修改内容**；
+    **初始内置的行业库（见 SEED_INDUSTRIES）不可删除**（upgrade 时会整体覆盖、删了装不回来），但**可以修改内容**；
     **使用者自建的行业库可以删除**——自己的东西，留或删自定。种子库的识别见 `SEED_INDUSTRIES`。
 
 三处要点：
@@ -55,7 +55,7 @@ _sys.dont_write_bytecode = True   # 不在技能目录留下 __pycache__（避�
 **回溯（restore）**是维护子菜单的一项：改库改坏了、或想退回某个时点的口径，就从备份里选一份恢复。
 三条安全阀：① 恢复前**先把当前状态自动备份一份**（标记 `-prerestore`，所以任何一次回溯都还能再退回来）；
 ② 只做「覆盖＋补齐」，**默认不删**当前有而备份里没有的文件——想严格还原成备份那一刻，加 `--prune`
-（私有库照删；行业库**跳过初始内置 8 个库的文件**，只删自建部分）；③ 权限按 POLICY 判定，通用库不可回溯。
+（私有库照删；行业库**跳过初始内置库的文件**，只删自建部分）；③ 权限按 POLICY 判定，通用库不可回溯。
 
 本脚本纯本地执行，不访问任何网络。
 """
@@ -76,10 +76,12 @@ ROOT = os.path.dirname(HERE)
 BACKUP_DIR = os.environ.get("DCR_BACKUP_DIR") or os.path.join(os.path.expanduser("~"), ".dcr-backups")
 MAX_BACKUPS = 5   # 每库最多保留份数，满则删最旧（循环覆盖）
 
-# 初始内置的 8 个行业库（随包分发）。**不可删除**，但可修改内容；使用者自建的库不受此限。
+# 初始内置的行业库（随包分发）。**不可删除**，但可修改内容；使用者自建的库不受此限。
 # 判据：行业库文件名形如 <slug>-rules.md / <slug>-meta.md，slug 在此集合内即为种子库。
+# 增删本集合时，对外文案一律用 len(SEED_INDUSTRIES) 取数，不要另写死数字，避免口径漂移。
 SEED_INDUSTRIES = {"food", "hr", "manufacturing", "medical",
-                   "newenergy", "newmedia", "newretail", "pharma"}
+                   "newenergy", "newmedia", "newretail", "pharma",
+                   "realestate"}
 
 # 权限矩阵（写死）。read=AI 内部读取用于审查；view=展示/输出给使用者。
 # delete 对 industries 不是简单 True/False —— 种子库不可删、自建库可删，由 do_check 二次判定，
@@ -135,7 +137,7 @@ def industry_slug(rel):
 
 
 def is_seed_industry(rel):
-    """路径是否落在初始内置 8 个行业库范围内（不可删除，但可修改）。"""
+    """路径是否落在初始内置行业库范围内（不可删除，但可修改）。"""
     return industry_slug(rel) in SEED_INDUSTRIES
 
 
@@ -186,8 +188,9 @@ def do_policy():
         for op in OPS + ("backup",):
             row += " %-8s" % ("允许" if p.get(op) else "禁止")
         print(row)
-    print("[guard] 注：行业库 delete 列的「允许」是**条件允许**——初始内置 8 个行业库"
-          "（%s）不可删除，其余自建库可删。" % "、".join(sorted(SEED_INDUSTRIES)))
+    print("[guard] 注：行业库 delete 列的「允许」是**条件允许**——初始内置 %d 个行业库"
+          "（%s）不可删除，其余自建库可删。"
+          % (len(SEED_INDUSTRIES), "、".join(sorted(SEED_INDUSTRIES))))
     print("[guard] 说明：read=AI 内部读取（审查必需）；view=展示给使用者查看。")
     print("[guard] 可查看清单（%d 项）：%s"
           % (len(VIEWABLE) + 1, "、".join([VIEW_CN[k] for k in ("readme", "version", "versionfile",
@@ -238,7 +241,7 @@ def do_check(target, op):
         print("[guard] 拒绝：技能自带文件不可%s" % OP_CN[op])
         return 3
     p = POLICY[lib]
-    # 行业库 delete 的二次判定：初始内置 8 个行业库**不可删除**，但修改/编辑/更新照常放行；
+    # 行业库 delete 的二次判定：初始内置行业库**不可删除**，但修改/编辑/更新照常放行；
     # 使用者自建的行业库（slug 不在 SEED_INDUSTRIES 内）可删。
     if lib == "industries" and op == "delete":
         slug = industry_slug(rel)
@@ -365,7 +368,8 @@ def do_restore(lib, pick=None, zipfile_path=None, prune=False):
         print("[guard] 拒绝：%s 不允许删除，故不支持 `--prune` 严格还原（只做覆盖＋补齐）" % LIB_CN[lib])
         return 3
     if lib == "industries" and prune:
-        print("[guard] 提示：行业库 `--prune` 只删自建库文件，初始内置 8 个行业库一律保留。")
+        print("[guard] 提示：行业库 `--prune` 只删自建库文件，初始内置 %d 个行业库一律保留。"
+              % len(SEED_INDUSTRIES))
     names = _backup_names(lib)
     if not names:
         print("[guard] %s 尚无备份，无回溯点可退（先跑：python guard.py backup %s）" % (LIB_CN[lib], lib))
@@ -422,7 +426,7 @@ def do_restore(lib, pick=None, zipfile_path=None, prune=False):
                     added += 1
                 shutil.copyfile(os.path.join(r, f), tgt)
         # 安全阀二：默认只覆盖＋补齐，不删；--prune 才严格还原。
-        # 私有库照删；行业库**跳过初始内置 8 个库的文件**——那些是随包资产，删了升级也回不来。
+        # 私有库照删；行业库**跳过初始内置库的文件**——那些是随包资产，删了升级也回不来。
         if prune:
             for r, ds, fs in os.walk(dest):
                 ds[:] = [d for d in ds if d != "__pycache__"]
@@ -604,7 +608,7 @@ def main():
     rs.add_argument("--pick", default=None, help="备份序号（见 list-backups，1＝最新）")
     rs.add_argument("--file", dest="zipfile", default=None, help="直接指定备份 zip 路径或文件名")
     rs.add_argument("--prune", action="store_true",
-                    help="严格还原：删除备份中没有的现有文件（行业库跳过初始内置 8 个库）")
+                    help="严格还原：删除备份中没有的现有文件（行业库跳过初始内置库）")
     ex = sub.add_parser("export", help="导出库为 zip（换机器/给同事；导出的是库内容，不是技能本体）")
     ex.add_argument("lib", help="private 或 industries")
     ex.add_argument("--out", default=None, help="输出 zip 路径（默认当前目录 <库>-V<版本>-<时间>.zip）")
