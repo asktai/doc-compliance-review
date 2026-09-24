@@ -67,6 +67,7 @@ PY_DEPS = [
     ("docx", "python-docx", "Word 读取与生成（.docx 提取、9 类交付物）", "必需"),
     ("openpyxl", "openpyxl", "Excel 比对台账与清单", "推荐"),
     ("PIL", "Pillow", "头标绘制（只在重画 assets 时需要）", "可选"),
+    ("markdown", "markdown", "HTML 交付物转换（缺失时自动降级内置转换器，HTML 照样出）", "可选"),
 ]
 
 # 分平台安装命令（只列主流包管理器；使用者按自己机器挑一条）

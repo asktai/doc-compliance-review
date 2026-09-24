@@ -32,6 +32,11 @@
   md     —— Markdown
   excel  —— Excel（openpyxl；比对/报告/照录/脱敏/清洁均有对应工作面）
   pdf    —— PDF（由已生成的 docx 经 LibreOffice 无头转换；`render.pdf_export=false` 可关闭）
+  html   —— 网页浏览版（**单文件、零外部资源**：CSS/JS 全内联，断网可开、可直接转发）
+           · 顶部固定目录导航（锚点服务端生成，禁用 JS 也能跳）、点击标题折叠/展开条款、
+             右上角「打印 / 存 PDF」（@media print 已排 A4 版心并隐藏导航与按钮）；
+           · 由 md 转换；**优先用 markdown 库**，未安装则自动降级内置转换器（不报错、不阻断）；
+           · 评级 ★/★★/★★★ 着色为三色标签（高红／中橙／低绿，与三色分级同一套色值）。
 
 排版样式档位（--style，或 spec.style、config.json 的 render.style）：
   default  —— 不改动版式（保持既有的不居中、不缩进）
@@ -46,7 +51,7 @@
 工具路径与默认工作目录由 `scripts/config.json` 提供（见 `_config.py`）；命令行参数优先。
 
 用法：
-  python make-docx.py spec.json --reviewer 胡皓 [--out D:\某目录] [--subdir 采购合同A] [--types ...] [--formats docx,md,excel,pdf] [--cmp-a 旧版.txt --cmp-b 新版.txt] [--ts ...]
+  python make-docx.py spec.json --reviewer 胡皓 [--out D:\某目录] [--subdir 采购合同A] [--types ...] [--formats docx,md,excel,pdf,html] [--cmp-a 旧版.txt --cmp-b 新版.txt] [--ts ...]
   默认输出目录：<工作根目录>\输出（工作根目录按候选链自动探测，见 set-workdir.py；
                 可用 --out 覆盖；--subdir 建子文件夹）
   （--ts 建议由 AI 传入准确时间，勿依赖本机时钟）
@@ -59,7 +64,8 @@ spec.json 关键字段：
   original_text（可选）：原文照录版/原文脱敏版 需要（全文文本）
   compare{a_label,a_text,b_label,b_text}（可选）：文件比对报告 需要（两份全文）
   template{name,placeholders[],body,optional[],notes}（可选）：模板版 需要（转模板 / 撰写模板）
-依赖：python-docx（>=1.2，支持批注）；openpyxl（Excel 导出）；LibreOffice（PDF 导出，可选）。
+依赖：python-docx（>=1.2，支持批注）；openpyxl（Excel 导出）；LibreOffice（PDF 导出，可选）；
+      markdown（HTML 导出，可选——缺失时自动降级内置转换器，HTML 照样出）。
 """
 import sys as _sys
 
@@ -1108,6 +1114,261 @@ MD_GEN = {
     "template": md_template,
 }
 
+# ---------- html 导出（10 类 × 网页浏览版 · 单文件） ----------
+# 设计要点：
+#   · **优先用 markdown 库**（表格、围栏代码等语法覆盖更全）；未安装则自动降级到内置
+#     转换器 `_md_fallback`——降级不报错、不阻断出件，产物照样可用（缺库只影响极少数语法）。
+#   · 产出**单文件网页**：CSS/JS 全内联，**零外部资源**，断网可开、可直接转发给别人。
+#   · 交互三件套：顶部固定目录导航（锚点由**服务端**生成，不依赖 JS 也能跳转）、
+#     点击标题折叠/展开条款、右上角打印（Ctrl+P 亦可；@media print 隐藏导航与按钮并排 A4 版心）。
+#   · 评级符号 ★/★★/★★★ 着色为三色标签——色值与 SKILL.md 三色分级同一套（高红/中橙/低绿）。
+try:
+    import markdown as _mdlib
+except Exception:
+    _mdlib = None
+
+_MD_EXT = ["tables", "fenced_code", "sane_lists", "nl2br"]
+_SAFE_TAGS = ("ins", "del", "br", "span", "strong", "em", "code", "b", "i")
+
+
+def _risk_spans(s):
+    """评级符号 → 三色标签。在转 HTML **之前**做：raw HTML 会被 markdown 原样保留。"""
+    def rep(m):
+        n = len(m.group(0))
+        cls = "r3" if n >= 3 else ("r2" if n == 2 else "r1")
+        return '<span class="risk %s">%s</span>' % (cls, m.group(0))
+    return re.sub(r"★+", rep, s)
+
+
+def _esc_keep(s):
+    """转义 < &，但放行白名单内联标签（<ins>/<del>/<br>/<span> 是 md 生成器有意写出的）。"""
+    s = re.sub(r"&(?!#?\w+;)", "&amp;", s)
+    s = re.sub(r"<(?!/?(?:%s)\b[^>]*>)" % "|".join(_SAFE_TAGS), "&lt;", s)
+    return s
+
+
+def _split_row(line):
+    line = line.strip()
+    if line.startswith("|"):
+        line = line[1:]
+    if line.endswith("|"):
+        line = line[:-1]
+    return [c.strip() for c in re.split(r"(?<!\\)\|", line)]
+
+
+def _md_fallback(md):
+    """内置 Markdown → HTML 转换器（markdown 库缺失时的降级通道）。
+
+    只需覆盖本脚本自身 md 生成器会吐出的语法：ATX 标题、引用块、分隔线、管道表格、
+    无序/有序列表、段落，以及行内 **粗体** / ~~删除线~~ / `代码` 与白名单内联标签。
+    """
+    def inline(s):
+        s = _esc_keep(s)
+        s = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", s, flags=re.S)
+        s = re.sub(r"~~(.+?)~~", r"<del>\1</del>", s, flags=re.S)
+        s = re.sub(r"`([^`]+)`", r"<code>\1</code>", s)
+        return s.replace("\n", "<br>")
+
+    def is_table_start(i, lines):
+        if "|" not in lines[i] or i + 1 >= len(lines):
+            return False
+        return bool(re.match(r"^\s*\|?[\s:\-|]*-[\s:\-|]*$", lines[i + 1])) and "-" in lines[i + 1]
+
+    out, i, lines = [], 0, md.splitlines()
+    while i < len(lines):
+        ln = lines[i]
+        if not ln.strip():
+            i += 1
+            continue
+        m = re.match(r"^(#{1,6})\s+(.*)$", ln)
+        if m:
+            out.append("<h%d>%s</h%d>" % (len(m.group(1)), inline(m.group(2)), len(m.group(1))))
+            i += 1
+            continue
+        if re.match(r"^\s*(---+|\*\*\*+)\s*$", ln):
+            out.append("<hr>")
+            i += 1
+            continue
+        if ln.lstrip().startswith(">"):
+            buf = []
+            while i < len(lines) and lines[i].lstrip().startswith(">"):
+                buf.append(re.sub(r"^\s*>\s?", "", lines[i]))
+                i += 1
+            out.append("<blockquote>%s</blockquote>" % inline("\n".join(buf)))
+            continue
+        if is_table_start(i, lines):
+            head = _split_row(lines[i])
+            i += 2
+            body = []
+            while i < len(lines) and "|" in lines[i] and lines[i].strip():
+                body.append(_split_row(lines[i]))
+                i += 1
+            th = "".join("<th>%s</th>" % inline(c) for c in head)
+            tb = "".join("<tr>%s</tr>" % "".join("<td>%s</td>" % inline(c) for c in r) for r in body)
+            out.append("<table><thead><tr>%s</tr></thead><tbody>%s</tbody></table>" % (th, tb))
+            continue
+        if re.match(r"^\s*[-*]\s+", ln):
+            items = []
+            while i < len(lines) and re.match(r"^\s*[-*]\s+", lines[i]):
+                items.append(re.sub(r"^\s*[-*]\s+", "", lines[i]))
+                i += 1
+            out.append("<ul>%s</ul>" % "".join("<li>%s</li>" % inline(t) for t in items))
+            continue
+        if re.match(r"^\s*\d+[.)]\s+", ln):
+            items = []
+            while i < len(lines) and re.match(r"^\s*\d+[.)]\s+", lines[i]):
+                items.append(re.sub(r"^\s*\d+[.)]\s+", "", lines[i]))
+                i += 1
+            out.append("<ol>%s</ol>" % "".join("<li>%s</li>" % inline(t) for t in items))
+            continue
+        buf = []
+        while i < len(lines) and lines[i].strip():
+            if re.match(r"^\s*(#{1,6}\s|>|[-*]\s|\d+[.)]\s)", lines[i]) or is_table_start(i, lines):
+                break
+            buf.append(lines[i])
+            i += 1
+        out.append("<p>%s</p>" % inline("\n".join(buf)))
+    return "\n".join(out)
+
+
+def md_to_html(md_text):
+    """Markdown → HTML 正文片段。markdown 库可用则用之，否则降级内置转换器。"""
+    src = _risk_spans(md_text)
+    if _mdlib is not None:
+        try:
+            return _mdlib.markdown(src, extensions=_MD_EXT)
+        except Exception as e:
+            print("[make-docx] 提示：markdown 库转换失败（%s），改用内置转换器。" % e)
+    return _md_fallback(src)
+
+
+HTML_CSS = """
+:root{--navy:#0b2038;--gold:#c9a24a;--fg:#1f2430;--fg2:#5a6478;--line:#e3e7ef;--bg:#f6f7fa}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--fg);
+     font-family:"Microsoft YaHei","PingFang SC","Noto Sans CJK SC",system-ui,sans-serif;
+     font-size:15px;line-height:1.75}
+.topbar{position:fixed;top:0;left:0;right:0;height:46px;z-index:50;display:flex;align-items:center;
+        gap:10px;padding:0 14px;background:var(--navy);color:#fff;box-shadow:0 2px 10px rgba(0,0,0,.18)}
+.topbar .brand{font-weight:700;letter-spacing:.3px;white-space:nowrap}
+.topbar .brand em{font-style:normal;color:var(--gold)}
+.toc{flex:1;overflow-x:auto;white-space:nowrap;scrollbar-width:thin}
+.toc::-webkit-scrollbar{height:4px}
+.toc::-webkit-scrollbar-thumb{background:rgba(255,255,255,.25);border-radius:4px}
+.toc a{color:#cfd8e6;text-decoration:none;font-size:13px;padding:3px 8px;border-radius:12px;
+       display:inline-block}
+.toc a:hover{background:rgba(255,255,255,.12);color:#fff}
+.toc a.lv3{opacity:.82;font-size:12px}
+.btn{background:var(--gold);color:#20180a;border:0;border-radius:14px;padding:5px 12px;
+     font-size:13px;cursor:pointer;white-space:nowrap;font-family:inherit}
+.btn.ghost{background:transparent;color:#cfd8e6;border:1px solid rgba(255,255,255,.35)}
+.btn:hover{filter:brightness(1.06)}
+.page{max-width:980px;margin:0 auto;padding:66px 22px 60px;background:#fff;min-height:100vh;
+      box-shadow:0 0 0 1px var(--line)}
+h1{font-size:25px;margin:6px 0 14px;padding-bottom:10px;border-bottom:2px solid var(--gold)}
+h2{font-size:19px;margin:26px 0 10px;padding-left:10px;border-left:4px solid var(--gold);
+   cursor:pointer;user-select:none}
+h3{font-size:16px;margin:18px 0 8px;color:#33405a;cursor:pointer;user-select:none}
+h2:hover,h3:hover{color:var(--gold)}
+h2::after,h3::after{content:" ▾";font-size:12px;color:#9aa4b8}
+h2.closed::after,h3.closed::after{content:" ▸"}
+blockquote{margin:10px 0;padding:8px 12px;background:#fbfaf6;border-left:3px solid var(--gold);
+           color:var(--fg2);font-size:13.5px}
+table{border-collapse:collapse;width:100%;margin:12px 0;font-size:13.5px}
+th,td{border:1px solid var(--line);padding:7px 9px;vertical-align:top;text-align:left}
+th{background:#f2f4f8;font-weight:600}
+tbody tr:nth-child(even){background:#fcfcfe}
+ul,ol{margin:8px 0 8px 22px;padding:0}
+li{margin:3px 0}
+code{background:#f2f4f8;padding:1px 5px;border-radius:4px;font-size:13px}
+ins{background:#e6f6ec;color:#1c7a45;text-decoration:none}
+del{background:#fdeceb;color:#b0302a}
+.risk{display:inline-block;padding:0 7px;border-radius:10px;color:#fff;font-size:12.5px;
+      line-height:1.6;letter-spacing:1px}
+.risk.r3{background:#d8443c}.risk.r2{background:#e3a637}.risk.r1{background:#3e9b6b}
+.foot{margin-top:34px;padding-top:12px;border-top:1px solid var(--line);color:#8b93a6;font-size:12.5px}
+@media print{
+  body{background:#fff;font-size:11pt}
+  .topbar{display:none!important}
+  .page{box-shadow:none;padding:0;max-width:none}
+  h2::after,h3::after{content:""}
+  @page{size:A4;margin:16mm}
+}
+@media (max-width:640px){.page{padding:60px 14px 40px}.topbar .brand{font-size:13px}}
+"""
+
+HTML_JS = """
+(function(){
+  var hs=[].slice.call(document.querySelectorAll('h2,h3'));
+  hs.forEach(function(h){
+    if(!h.id){h.id='s'+hs.indexOf(h);}
+    h.addEventListener('click',function(){
+      h.classList.toggle('closed');
+      var show=!h.classList.contains('closed'), el=h.nextElementSibling;
+      while(el && !/^H[23]$/.test(el.tagName)){ el.style.display=show?'':'none'; el=el.nextElementSibling; }
+    });
+  });
+  var fold=document.getElementById('btn-fold'), exp=document.getElementById('btn-expand');
+  function setAll(closed){
+    hs.forEach(function(h){
+      h.classList.toggle('closed',closed);
+      var el=h.nextElementSibling;
+      while(el && !/^H[23]$/.test(el.tagName)){ el.style.display=closed?'none':''; el=el.nextElementSibling; }
+    });
+  }
+  if(fold) fold.onclick=function(){setAll(true)};
+  if(exp) exp.onclick=function(){setAll(false)};
+  var p=document.getElementById('btn-print'); if(p) p.onclick=function(){window.print()};
+})();
+"""
+
+
+def html_page(slug, spec, body):
+    """把正文片段包成单文件网页：**顶部固定目录导航 + 可折叠条款 + 打印按钮**。
+
+    目录锚点在**服务端**生成（正则扫 h2/h3 后回填 id），所以即使浏览器禁用 JS，
+    导航与跳转照样能用；JS 只负责折叠与打印。
+    """
+    toc = []
+
+    def _mk(m):
+        lv, inner = int(m.group(1)), m.group(2)
+        if lv not in (2, 3):
+            return m.group(0)
+        idx = len(toc)
+        toc.append((lv, re.sub(r"<[^>]+>", "", inner)))
+        return '<h%d id="s%d">%s</h%d>' % (lv, idx, inner, lv)
+
+    body = re.sub(r"<h([23])[^>]*>(.*?)</h\1>", _mk, body, flags=re.S)
+    nav = "".join('<a class="lv%d" href="#s%d" title="%s">%s</a>'
+                  % (lv, i, esc(t), (t[:14] + "…") if len(t) > 15 else t)
+                  for i, (lv, t) in enumerate(toc))
+    if not nav:
+        nav = '<span style="color:#8b93a6;font-size:13px">（本类型无小节标题，无目录）</span>'
+    doc_title = "%s · %s" % (title(spec), SLUGS.get(slug, slug))
+    return """<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>%(t)s</title>
+<style>%(css)s</style></head><body>
+<div class="topbar">
+  <span class="brand">文档合规审查助手 <em>%(slug)s</em></span>
+  <nav class="toc">%(nav)s</nav>
+  <button class="btn ghost" id="btn-fold">全部折叠</button>
+  <button class="btn ghost" id="btn-expand">全部展开</button>
+  <button class="btn" id="btn-print">打印 / 存 PDF</button>
+</div>
+<main class="page">
+%(body)s
+<div class="foot">%(meta)s　｜　本文件由「文档合规审查助手AI合同审核全能版」生成，仅供辅助参考，不构成法律意见；须经执业律师复核后方可据此决策。</div>
+</main>
+<script>%(js)s</script>
+</body></html>
+""" % {"t": esc(doc_title), "css": HTML_CSS, "nav": nav, "slug": esc(SLUGS.get(slug, slug)),
+       "body": body, "meta": esc(md_meta_line(slug)), "js": HTML_JS}
+
+
 def main():
     global REVIEWER, ROUND, TS, SOURCE, SOURCE_DOCX
     ap = argparse.ArgumentParser(description="文档合规审查交付物产出（10 类型，审查人必填；类型以勾选框多选、一次全部显示供用户勾选）")
@@ -1118,7 +1379,7 @@ def main():
     ap.add_argument("--round", default=None); ap.add_argument("--ts", default=None)
     ap.add_argument("--types", default=None,
                     help="逗号分隔：tracked,reportc,clean,redline,report,masked,original,diff,compare,template（默认 1、2、3 三类；全部 10 类请显式列出；亦可写中文类型名）")
-    ap.add_argument("--formats", default="docx", help="逗号分隔：docx,md,excel,pdf（PDF 由 docx 转换）")
+    ap.add_argument("--formats", default="docx", help="逗号分隔：docx,md,excel,pdf,html（PDF 由 docx 转换；HTML 由 md 转换）")
     ap.add_argument("--comments", action="store_true", help="兼容保留：等价于在 --types 中追加 reportc（审查意见批注版）")
     ap.add_argument("--style", default=None,
                     help="排版样式档位：default（不改动）/contract（合同风，默认）/official（公文风）；亦可写 spec.style 或 config.json 的 render.style；只对 1、3、4、6、7 五类生效")
@@ -1197,7 +1458,7 @@ def main():
         print("[make-docx] 错误：--types 未包含任何有效类型。"); sys.exit(2)
     fmts = [f.strip().lower() for f in a.formats.split(",") if f.strip()]
     if not fmts:
-        print("[make-docx] 错误：--formats 至少包含 docx / md / excel / pdf 之一。"); sys.exit(2)
+        print("[make-docx] 错误：--formats 至少包含 docx / md / excel / pdf / html 之一。"); sys.exit(2)
     # 兼容：--comments 等价于选中 reportc（批注版＝正式交付物类型 5）
     if a.comments and "reportc" not in types:
         types.append("reportc")
@@ -1211,6 +1472,10 @@ def main():
         if "md" in fmts and t in MD_GEN:
             name = outname(t, "md")
             open(os.path.join(a.out, name), "w", encoding="utf-8").write(MD_GEN[t](spec)); made.append(name)
+        if "html" in fmts and t in MD_GEN:
+            name = outname(t, "html")
+            open(os.path.join(a.out, name), "w", encoding="utf-8").write(
+                html_page(t, spec, md_to_html(MD_GEN[t](spec)))); made.append(name)
         if "excel" in fmts:
             wb = EXCEL_GEN[t](spec)
             if wb is None:

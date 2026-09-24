@@ -340,10 +340,10 @@ def main():
         check("python-docx 直读 docx（降级通道可用）", False, repr(e))
 
     # --- 2. 交付物链路 ---
-    print("\n[2] 交付物链路（10 类型 × docx/excel/pdf）")
+    print("\n[2] 交付物链路（10 类型 × docx/excel/html/pdf）")
     spec = build_spec(os.path.join(work, "spec.json"))
     outdir = os.path.join(work, "交付物")
-    fmts = "docx,excel" if a.fast else "docx,excel,pdf"   # --fast 跳过 PDF 导出（耗时大头）
+    fmts = "docx,excel,html" if a.fast else "docx,excel,html,pdf"   # --fast 跳过 PDF 导出（耗时大头）
     mk = run([PY, os.path.join(HERE, "make-docx.py"), spec,
               "--reviewer", "SMOKE-TEST", "--ts", datetime.datetime.now().strftime("%Y%m%d-%H%M"),
               "--formats", fmts, "--comments", "--out", outdir,
@@ -357,6 +357,21 @@ def main():
     check("产出 审查意见批注版.docx（类型 2，--comments 兼容开关）",
           any("批注版" in f and f.endswith(".docx") for f in produced))
     check("产出 Excel（.xlsx）", any(f.endswith(".xlsx") for f in produced))
+    check("产出 HTML（.html，10 类全覆盖）",
+          sum(1 for f in produced if f.endswith(".html")) >= 10)
+    hp = next((os.path.join(outdir, f) for f in produced
+               if f.endswith(".html") and "审查意见报告" in f), None)
+    ok_html = False
+    if hp and os.path.isfile(hp):
+        try:
+            h = open(hp, encoding="utf-8").read()
+            # 单文件自检：目录导航 + 三色风险标签 + 打印按钮 + 零外部资源
+            ok_html = ('<nav class="toc">' in h and 'class="risk r' in h
+                       and 'id="btn-print"' in h
+                       and 'src="http' not in h and 'href="http' not in h)
+        except Exception:
+            ok_html = False
+    check("HTML 单文件自检（目录/三色标签/打印按钮/零外链）", ok_html)
     if a.fast:
         skip("产出 PDF（.pdf，依赖 LibreOffice）", "快速档已跳过（跑全量档加 --full）")
     else:

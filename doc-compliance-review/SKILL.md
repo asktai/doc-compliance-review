@@ -7,7 +7,7 @@ description_zh: "对合同、协议及授权书、承诺函、告知书、声明
 description_en: "Desensitize, review clause by clause, grade risks in three colors and produce redline revisions, comparison ledgers and opinion reports for contracts, agreements and business documents (authorization letters, commitment letters, notices, policies, NDAs, SLAs, DPAs and more); coverage includes payment and liquidated damages, delivery and acceptance, IP, confidentiality and non-compete, jurisdiction clauses, arbitration, dispute resolution, limitation of action, contract validity, standard terms and personal information protection; accepts background materials (files, images, photos or plain text) to sharpen the review, and adapts the review stance to a strong or weak bargaining position; drafts contracts and reusable templates, and converts existing documents into templates. Nine industry rule sets included; handles Word, PDF, images and scanned files. Advisory only, not legal advice; review by a licensed lawyer is required."
 category: writing
 argument-hint: "<文档路径或文本> [版本/角色/尺度] | 审查 | 起草 | 比对 | 背景资料 | 脱敏 | 向导 | 撰写合同 | 撰写模板 | 文档转模板 | 合同转模板 | 技能版本 | 技能更新 | 技能升级 | 立查得 | 小查 | 帮助|help|? | 教程 | 私有库维护/备份/回溯/导入/导出 | 行业库维护/备份/回溯/导入/导出"
-version: 3.10.2
+version: 3.11.0
 license: 个人使用授权 · 商业使用须取得书面授权（见 `LICENSE.md`）
 author: 胡皓
 examples_zh:
@@ -26,7 +26,7 @@ examples_en:
 
 ![文档合规审查助手AI合同审核全能版 · 合同与商务文档逐条审查 · 风险三色分级](assets/banner-dark.png)
 
-**V3.10.2** ｜ 作者：胡皓 ｜ 许可：个人使用授权 · 商业使用须取得书面授权（详见 `LICENSE.md`）
+**V3.11.0** ｜ 作者：胡皓 ｜ 许可：个人使用授权 · 商业使用须取得书面授权（详见 `LICENSE.md`）
 
 > **免责声明**：本技能仅作辅助法律工作，**不构成法律意见**，输出内容须经**执业律师复核**；**每次使用由技能先输出全文**——见**步骤 0.0**，全文亦见 `LICENSE.md`。
 
@@ -234,7 +234,7 @@ examples_en:
 
 > **输入**：待审文档（合同/授权书/承诺函/告知书/制度等；PDF/Word/图片/Excel/文本）＋上下文（我方角色、尺度、行业、私有库、审查人）。
 > **处理**：预处理 → （可选）脱敏 → 类型判定与规则装配 → 背景确认 → 主体尽调 → 逐条对标 → 三色分级 → 出具意见与红线 → 输出交付物（多份时逐份循环，见第 10 步）。
-> **输出**：10 类交付物（多选）× 4 格式（WORD/MD/Excel/PDF），详见下章「输出交付物」。
+> **输出**：10 类交付物（多选）× 5 格式（WORD/MD/Excel/HTML/PDF），详见下章「输出交付物」。
 
 1. **文档预处理**：把任意来源文档转为可信、可检索、可溯源的干净文本（后续审查唯一依据）。流程六步：
    - **1. 登记留存**：原件永留存，登记元数据。
@@ -274,7 +274,8 @@ examples_en:
 
   **类型清单固定为这 10 类**，不增不减；**用户勾选几项就出几项**，按其所选产出。**用户未做选择（含答「全默认」）时，默认产出 1、2、3 三类**（修订版／审查意见批注版／修改后清洁版）——这是日常审查最常用的组合，余下 7 类按需要显式勾选。**第 10 类只在「撰写合同模板」（第十六节）与「转模板」（第十七节）两条链路中产出**，常规审查链路不默认出它。有交互控件时直接弹**多选勾选框**；无控件（纯对话/云 AI）时按上面勾选框的书写形式整块列出，用户回复编号或类型名（**可多选**）。
 - **两类比对的区别（勿混用）**：**8. 文件比对报告**＝比对**两份文件/两个版本**（如对方回稿 ↔ 我方上版、正文 ↔ 附件），产出差异台账（差异定位／变更类型＝新增·删除·修改／相似度／影响提示），输入 `spec.compare{a_text,b_text,a_label,b_label}` 或 `--cmp-a/--cmp-b`；未提供两份全文时自动降级为条款级变更台账。**9. 新旧比对**＝同一份文档的改前/改后条款级左右对照表（原文／修改后／评级／法条）。
-- **文件格式（4 种，勾选框 · 多选，一次全部显示）**：`[ ] WORD  [ ] MD  [ ] Excel  [ ] PDF`（同样一次列出全部、勾选框多选；`--formats docx,md,excel,pdf`；四者均由 `make-docx.py` 实现——Excel 用 openpyxl，PDF 由 docx 经 LibreOffice 转换）。
+- **文件格式（5 种，勾选框 · 多选，一次全部显示）**：`[ ] WORD  [ ] MD  [ ] Excel  [ ] HTML  [ ] PDF`（同样一次列出全部、勾选框多选；`--formats docx,md,excel,html,pdf`；五者均由 `make-docx.py` 实现——Excel 用 openpyxl，HTML 由 md 转换，PDF 由 docx 经 LibreOffice 转换）。
+  - **HTML 网页浏览版（第 5 种格式）**：产出**单文件网页**（CSS/JS 全内联、零外部资源，断网可开、可直接转发）；带**顶部固定目录导航**（锚点服务端生成，禁用 JS 也能跳转）、**点击标题折叠/展开条款**、右上角「**打印 / 存 PDF**」（`@media print` 已排 A4 版心并隐藏导航与按钮）；评级 ★/★★/★★★ 着色为**三色标签**（高红／中橙／低绿，与三色分级同色值）。由 md 转换，**优先用 `markdown` 库、缺失则自动降级内置转换器**（不报错、不阻断出件）。
 - **排版样式档位（3 档，`--style`，亦可写 `spec.style` 或 `config.json` 的 `render.style`）**：`default`（不改动版式）／`contract` 合同风（**默认**：文档标题居中、条款标题加粗不缩进、正文首行缩进 2 字符、行距 1.5、段前 6pt）／`official` 公文风（标题居中二号、正文三号首行缩进）。**只对 1、3、4、6、7 五类生效**（这五类要还原原文观感）；报告类 2、5、8、9、10 本就是新写文档，不套用（五类**标题一律居中**，不套指的是正文不按角色重排）。说明：9 类 Word 均按审查规格重建、**不读原文档格式**（扫描件/OCR/粘贴文本亦无格式可继承），故采用「按文本特征推断段落角色 ＋ 套用样式档位」补齐版式，而不是还原原稿版式——需要与原稿版式完全一致时，请使用者以原 `.docx` 另存后再人工套版。
 - **排版保真进阶（半档 C，`--source-docx <原稿.docx>`，可选）**：拿到原稿 `.docx` 时，**3. 修改后清洁版／6. 原文脱敏版／7. 原文照录版**改为「**以原稿做底 ＋ 段落级替换文字**」——不增删段落，只换文字，故**字体、字号、对齐、缩进、行距、页边距、页眉页脚、表格与图片全部沿用原稿**，保真度远高于样式档位；**1. 修订版／4. 红线修订格式版尚不走这条**（需在既有 run 之间插入 `w:ins`/`w:del`），报告类 2、5、8、9、10 亦不适用。原稿缺失/非 `.docx`/打开失败时**自动回退**样式档位，不影响产出。文本行数少于原稿段落数时，多余段落留空并给出提示。
 - **审查人名称（必填·写死）**：由启动流程 **1.0.2 开场清单第 9 项**收集（写入文件名 `<审查人>` 字段＋Word 修订者 `w:author` 显示）；**清单已收则全程不再为它打断**——只有当清单被跳过或该项为空时，才在产出前**补问一次**；拿到才产出；纯自动化可显式指定 `--reviewer`。

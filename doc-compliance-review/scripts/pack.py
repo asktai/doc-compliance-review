@@ -51,7 +51,7 @@ _sys.dont_write_bytecode = True
 
 **文件名四段式**：`中文产品名-技能ID-版本号-日期.封装格式`，例如
 
-    文档合规审查助手AI合同审核全能版-doc-compliance-review-V3.10.2-2026-09-24.skill
+    文档合规审查助手AI合同审核全能版-doc-compliance-review-V3.11.0-2026-09-24.skill
 
 产品名取 `SKILL.md` frontmatter 的 `display_name`、技能 ID 取 `name`、版本号取 `version`、
 日期为**打包当天**。四段各自自动读取，不靠手填，避免"版本升了文件名还写着旧号"。
