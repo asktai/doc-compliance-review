@@ -14,6 +14,7 @@
     python sample-baseline.py --list                 列出台账全部用例与预期
     python sample-baseline.py --check <报告.md|目录>   拿实际报告与台账比对（漏报/漂移/多报）
     python sample-baseline.py --check <目录> --case S1 只比对 S1（报告名含样例名即自动配对）
+    python sample-baseline.py --check <目录> --all    全部报告对全部用例（默认只比配到报告的）
     python sample-baseline.py --verify               只校验台账自身（供 check.py 调用）
     python sample-baseline.py --record --id S1 \
            --sample samples/敏感信息示例.docx \
@@ -25,6 +26,11 @@
 或用分号分隔。**备选定位**用 `/` 分隔：报告标题写法不固定（有人写「第六条 违约责任」，有人
 写「违约金」），任一定位命中即算该项报出——没有备选时，标题写法一变就是假漏报。
 --status：draft＝初拟（比对只提示、不计失败）；confirmed＝已人工确认（比对计失败）。
+
+**默认只比配到了专属报告的用例**：报告文件名含样例文件名主干即算专属（如
+`…_图片合同示例_审查意见报告_….md`）。只审了一个文档就跑 --check 时，其余用例**一律跳过**
+并列出——拿 A 合同的报告去比对 B 合同的预期全是假漏报，实测会凭空产生 23 项。
+确实要"全部报告对全部用例"（例如 5 个样例一次全审完）时加 `--all`。
 
 台账文件：`core/_sample-baseline.json`（随包，可读可改）。
 报告解析：按审查意见报告的章节标题「## N. <条款定位>  ★★★ 高风险」取定位与评级；
@@ -194,12 +200,15 @@ def match(exp, act):
     return pairs, extra
 
 
-def check(paths, only=None):
-    """拿报告与台账比对。返回 (结果列表, 失败数)。
+def check(paths, only=None, all_reports=False):
+    """拿报告与台账比对。返回 (结果列表, 失败数, 跳过数)。
 
     报告与用例的配对：报告文件名含样例文件名主干（如 `…_合同比对A版_审查意见报告_….md`）
-    即算该用例的专属报告；配不到就用全部报告比对并提示——因为一个目录里常混着多份
-    不同文档的报告，不配对会把 A 合同的结论拿去比对 B 合同的预期，全是假漏报。
+    即算该用例的专属报告。
+
+    **默认只比配到了专属报告的用例**：拿 A 合同的报告去比对 B 合同的预期，全是假漏报
+    ——实测只审一个文档时，其余 4 例会凭空产生 23 项"漏报"。故配不到的用例一律跳过并
+    列出，需要"全部报告对全部用例"时显式加 `--all`（适合一次性把 5 个样例全审完的场景）。
     """
     data = load()
     if not data:
@@ -226,7 +235,7 @@ def check(paths, only=None):
     for _f, _a, r in per:
         all_rules |= r
 
-    results, fails = [], 0
+    results, fails, skipped = [], 0, 0
     for c in data.get("cases") or []:
         cid = c.get("id")
         if only and cid != only:
@@ -237,6 +246,14 @@ def check(paths, only=None):
             continue
         stem = os.path.splitext(os.path.basename(c.get("sample") or ""))[0]
         owned = [x for f, a, _r in per if stem and stem in os.path.basename(f) for x in a]
+        if not owned and not all_reports:
+            # 没有这个样例的报告就别拿别人的报告硬比——那只会产出假漏报
+            skipped += 1
+            results.append({"id": cid, "status": st, "sample": c.get("sample"),
+                            "expected": len(exp), "actual": 0, "matched_report": False,
+                            "skipped": True, "missing": [], "drift": [], "must_not_hit": [],
+                            "counted": False})
+            continue
         used_act = owned if owned else all_act
         rules = set()
         for f, _a, r in per:
@@ -256,7 +273,7 @@ def check(paths, only=None):
                         "matched_report": bool(owned),
                         "missing": miss, "drift": drift, "must_not_hit": wrong,
                         "counted": st == "confirmed"})
-    return results, fails
+    return results, fails, skipped
 
 
 def main():
@@ -264,6 +281,8 @@ def main():
     ap.add_argument("--list", action="store_true", help="列出台账")
     ap.add_argument("--check", nargs="*", metavar="路径", help="报告文件或目录")
     ap.add_argument("--case", help="只比对指定用例 ID（配合 --check）")
+    ap.add_argument("--all", action="store_true",
+                    help="--check 时全部报告对全部用例（默认只比配到专属报告的用例，避免假漏报）")
     ap.add_argument("--verify", action="store_true", help="只校验台账自身")
     ap.add_argument("--record", action="store_true", help="写入/覆盖一个用例")
     ap.add_argument("--id", help="用例 ID（如 S1）")
@@ -352,16 +371,22 @@ def main():
         if not a.check:
             print("[sample-baseline] --check 须给报告文件或目录")
             return 2
-        res, fails = check(a.check, only=a.case)
+        res, fails, skipped = check(a.check, only=a.case, all_reports=a.all)
         if not res:
             print("[sample-baseline] 没有可比的用例（用例为空或 --case 未命中）")
             return 0
         if a.json:
-            print(json.dumps({"cases": res, "fails": fails}, ensure_ascii=False, indent=2))
+            print(json.dumps({"cases": res, "fails": fails, "skipped": skipped},
+                             ensure_ascii=False, indent=2))
             return 1 if fails else 0
         print("[sample-baseline] 比对 %d 个用例（confirmed 计入失败，draft 仅提示）："
-              % len(res))
+              % len([r for r in res if not r.get("skipped")]))
         for r in res:
+            if r.get("skipped"):
+                print("  [跳过] %s %s（预期 %d 项）：没有该样例的专属报告，"
+                      "不拿别人的报告硬比（要全量比对加 --all）"
+                      % (r["id"], os.path.basename(r["sample"] or ""), r["expected"]))
+                continue
             flag = "FAIL" if (r["counted"] and (r["missing"] or r["drift"] or r["must_not_hit"])) \
                 else ("注意" if (r["missing"] or r["drift"]) else "OK")
             print("  [%s] %s %s（预期 %d 项 / 报告 %d 项%s）"
@@ -376,6 +401,9 @@ def main():
             for w in r["must_not_hit"]:
                 print("      不应报出的规则被报出：%s" % w)
         print("[sample-baseline] 失败项 %d（未确认的 draft 用例不计）" % fails)
+        if skipped:
+            print("[sample-baseline] 跳过 %d 个用例（无专属报告）。补审后重跑，"
+                  "或用 --all 强制全部报告对全部用例。" % skipped)
         return 1 if fails else 0
 
     ap.print_help()

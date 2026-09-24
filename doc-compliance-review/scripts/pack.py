@@ -34,11 +34,19 @@ _sys.dont_write_bytecode = True
   确需连同私有库一起打包（如企业内部留档）时，须显式加 --include-private，脚本会打印醒目警告，
   并在打包后复查包内是否混入 private/。
 
+**作者本机路径不出包**：`scripts/config.json` 的 `tools` 段若填的是开发机绝对路径
+（如 `D:\\Tools\\tesseract\\tesseract.exe`），随包分发会让每个新装使用者一跑 `check.py`
+就吃一条「工具路径在本机不存在」的警告，跑全量档冒烟时 OCR/PDF 相关项还会失败。
+故**出包时只清空包内副本的 tools 段**（磁盘上的文件一字不动），留空即按内置默认值与 PATH
+回退——使用者要固化本机路径，跑一次 `detect-tools.py --write` 即可。
+确需带本机路径出包（如给自己的另一台机器留档）时用 `--keep-tools`。
+
 用法：
   python pack.py <技能根目录> [--out <发布包目录，默认 <根>/_发布包>]
                              [--include-private] [--tag <版本标签，默认读 SKILL.md>]
+                             [--keep-tools]
 """
-import os, re, sys, zipfile, argparse
+import os, re, sys, json, zipfile, argparse
 
 # SECURITY.md 必须随包：README 目录树、SKILL 第十二节、提示词版边界条款均指向它，
 # 漏掉会变成「包内文档指向包外不存在的文件」。
@@ -73,7 +81,29 @@ PLATFORM_MAX_MB = 3
 # 平台只解析两级（技能目录/二级目录/文件）
 PLATFORM_MAX_DEPTH = 2
 
-def add_tree(zf, base, relpath, recurse=True, prefix=""):
+# 出包时需清空的配置文件（相对技能根）——只清 tools 段，其余段（隐私/输出策略）保持原样
+CONFIG_REL = "scripts/config.json"
+
+
+def neutralise_config(text):
+    """把 config.json 的 tools 段清成空串，返回新文本；无需改动则返回 None。
+
+    只动 tools：workdir/privacy/output 是策略项，留着才对（workdir 本就是 auto）。
+    解析失败一律返回 None（宁可原样打包，也不写出一个坏掉的 config）。
+    """
+    try:
+        d = json.loads(text)
+    except Exception:
+        return None
+    tools = d.get("tools")
+    if not isinstance(tools, dict) or not any((v or "").strip() for v in tools.values()):
+        return None
+    for k in tools:
+        tools[k] = ""
+    return json.dumps(d, ensure_ascii=False, indent=2) + "\n"
+
+
+def add_tree(zf, base, relpath, recurse=True, prefix="", blank_tools=True, report=None):
     src = os.path.join(base, relpath)
     for root, dirs, files in os.walk(src):
         if recurse:
@@ -87,6 +117,17 @@ def add_tree(zf, base, relpath, recurse=True, prefix=""):
                 continue   # 本地测试日志（如 _testrb.log.txt）不得混入发布包
             fp = os.path.join(root, f)
             arc = os.path.relpath(fp, base).replace("\\", "/")
+            if blank_tools and arc == CONFIG_REL:
+                try:
+                    with open(fp, encoding="utf-8") as cf:
+                        got = neutralise_config(cf.read())
+                except Exception:
+                    got = None
+                if got:
+                    zf.writestr(prefix + arc, got)
+                    if report is not None:
+                        report.append(arc)
+                    continue
             zf.write(fp, prefix + arc if prefix else arc)
 
 def verify_zip(zp):
@@ -122,10 +163,11 @@ def verify_zip(zp):
     return bad
 
 
-def build(base, outdir, include_private=False, tag="V3.0.0"):
+def build(base, outdir, include_private=False, tag="V3.0.0", keep_tools=False):
     os.makedirs(outdir, exist_ok=True)
     priv_path = os.path.join(base, PRIVATE_DIR)
     prefix = SKILL_DIR + "/"   # 上架版结构：所有条目都套一层技能目录
+    blanked = []               # 本次包内被清空工具路径的配置文件（用于收尾提示）
     for files, dirs, name in [
         (FULL_FILES, list(FULL_DIRS), f"{SKILL_DIR}-{tag}.zip"),
     ]:
@@ -143,7 +185,8 @@ def build(base, outdir, include_private=False, tag="V3.0.0"):
                     zf.write(fp, prefix + f)
             for d in dirs:
                 if os.path.isdir(os.path.join(base, d)):
-                    add_tree(zf, base, d, recurse=(d not in NONREC_DIRS), prefix=prefix)
+                    add_tree(zf, base, d, recurse=(d not in NONREC_DIRS), prefix=prefix,
+                             blank_tools=not keep_tools, report=blanked)
         with zipfile.ZipFile(zp) as zf:
             entries = zf.namelist()
         n_entry = len([n for n in entries if not n.endswith("/")])
@@ -155,6 +198,11 @@ def build(base, outdir, include_private=False, tag="V3.0.0"):
                   % len(leaked_hit))
         else:
             print("  [OK] 已排除 private/（企业内控口径未入包）")
+        if blanked:
+            print("  [OK] 已清空包内 %s 的 tools 段（作者本机路径不随包；使用者跑 "
+                  "detect-tools.py --write 写入本机路径）" % "、".join(blanked))
+        elif not keep_tools:
+            print("  [i] 包内 config.json 的 tools 段本就为空，无需清空")
         bad = verify_zip(zp)
         if bad:
             for b in bad:
@@ -192,10 +240,15 @@ if __name__ == "__main__":
     ap.add_argument("--include-private", action="store_true",
                     help="将 private/ 一并打入包内（默认排除；内含企业内控口径，慎用）")
     ap.add_argument("--tag", default=None, help="版本标签（默认自动读 SKILL.md frontmatter）")
+    ap.add_argument("--keep-tools", action="store_true",
+                    help="保留 config.json 里填好的工具路径（默认清空，避免作者本机路径随包外发）")
     a = ap.parse_args()
     if a.include_private:
         print("[警告] --include-private 已启用，private/（企业内控口径）将被打入发布包，"
               "请确认发布对象，勿对外发布。")
+    if a.keep_tools:
+        print("[注意] --keep-tools 已启用：config.json 的工具路径将**原样入包**，"
+              "确认这些路径对接收方有效。")
     ok = build(a.base, a.out or os.path.join(a.base, "_发布包"), a.include_private,
-               a.tag or read_skill_version(a.base))
+               a.tag or read_skill_version(a.base), a.keep_tools)
     sys.exit(0 if ok else 1)
