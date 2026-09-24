@@ -721,6 +721,102 @@ def check_smoke_count():
         info("冒烟项数：文档 %d 处口径与实测一致（%d 项）" % (seen, real))
 
 
+def _doc_lines(rel):
+    p = os.path.join(ROOT, rel)
+    return _read(p).splitlines() if os.path.exists(p) else []
+
+
+def check_doc_number_caliber():
+    """文档数字口径守卫（格式数 / 菜单项数 / 内置库数）。
+
+    背景（V3.11.1）：新增 HTML 格式时，SKILL 与教程的个别位置改了、README 与教程另一处没改，
+    文档里同时存在「4 种格式」与「5 种格式」，而既有守卫只查冒烟项数与规则条数，**不查格式数**，
+    于是漏改 5 处一路带到出包。同类风险还有两处这次一并堵上：功能菜单项数（曾写 11 项、
+    实际 0–11 共 12 项）、初始内置行业库数（曾写 8 库、真源 9 个）。
+
+    做法与冒烟项数守卫同源：**真源一律可实算，不写死数字**——
+      · 格式数 ← `make-docx.py` 的 `--formats` 帮助串里列出的合法值；
+      · 菜单项数 ← `SKILL.md` 功能菜单代码块里「N. 」开头的实际行数；
+      · 内置库数 ← `guard.py` 的 `SEED_INDUSTRIES` 实读。
+    只扫明确写「N 种格式 / N 格式 / N 项功能 / N 个行业库」这类总量表述，
+    `VERSION.md` 为沿革表（旧数字属历史记录）跳过。
+    """
+    DOCS = ("SKILL.md", "README.md", "安装使用教程.md",
+            "文档合规审查助手AI合同审核提示词版.md")
+
+    # ---- 真源 1：格式数 ----
+    real_fmt = None
+    mk = os.path.join(HERE, "make-docx.py")
+    if os.path.exists(mk):
+        m = re.search(r'"--formats"[^\n]*?help="逗号分隔：([a-z,]+)', _read(mk))
+        if m:
+            real_fmt = len([x for x in m.group(1).split(",") if x])
+    # ---- 真源 2：菜单项数 ----
+    real_menu = None
+    sk = _read(os.path.join(ROOT, "SKILL.md")) if os.path.exists(os.path.join(ROOT, "SKILL.md")) else ""
+    m = re.search(r"【本技能功能 · 请单选】\n(.*?)```", sk, re.S)
+    if m:
+        real_menu = len(re.findall(r"^\s*(\d+)\.\s", m.group(1), re.M))
+    # ---- 真源 3：内置库数 ----
+    real_seed = None
+    gd = os.path.join(HERE, "guard.py")
+    if os.path.exists(gd):
+        m = re.search(r"SEED_INDUSTRIES\s*=\s*[\[\{](.*?)[\]\}]", _read(gd), re.S)
+        if m:
+            real_seed = len(re.findall(r"['\"]([a-z][a-z0-9]*)['\"]", m.group(1)))
+
+    src_note = []
+    if real_fmt:  src_note.append("格式 %d" % real_fmt)
+    if real_menu: src_note.append("菜单 %d 项" % real_menu)
+    if real_seed: src_note.append("内置库 %d 个" % real_seed)
+    if not src_note:
+        info("数字口径：真源未能解析，跳过")
+        return
+
+    fmt_bad, menu_bad, seed_bad = [], [], []
+    for rel in DOCS:
+        for ln, line in enumerate(_doc_lines(rel), 1):
+            # 格式数：「N 种格式」／「N 格式」／「N 种封装」不算（那是发布包封装格式）
+            if real_fmt:
+                for m in re.finditer(r"(\d+)\s*种?\s*格式", line):
+                    if "封装" in line or ".skill" in line or ".zip" in line:
+                        continue
+                    n = int(m.group(1))
+                    if n != real_fmt:
+                        fmt_bad.append("%s:%d 写 %d 种" % (rel, ln, n))
+            # 菜单项数：只认「列出 N 项」「N 项功能」「N 项全列」这类总量表述，
+            # 且同行须出现菜单/向导语境——否则「第 5／6 项」「13 项要素」都会被误抓。
+            if real_menu:
+                if not any(k in line for k in ("向导", "菜单", "功能总菜单")):
+                    pass
+                else:
+                    hits = [int(x) for x in re.findall(r"列出\s*\**(\d+)\s*\**\s*项", line)]
+                    hits += [int(x) for x in
+                             re.findall(r"(\d+)\s*\**\s*项(?:功能|全列)", line)]
+                    for n in hits:
+                        if n != real_menu:
+                            menu_bad.append("%s:%d 写 %d 项" % (rel, ln, n))
+            # 内置库数：「N 个行业库」／「初始 N 库」
+            if real_seed:
+                for m in re.finditer(r"(\d+)\s*个(?:内置)?行业库|初始\s*(\d+)\s*库", line):
+                    n = int(m.group(1) or m.group(2))
+                    if n != real_seed:
+                        seed_bad.append("%s:%d 写 %d 个" % (rel, ln, n))
+
+    msg = []
+    if fmt_bad:
+        err("交付物格式数失准（真源 `--formats` 共 %d 种）：%s"
+            % (real_fmt, "；".join(fmt_bad)))
+    if menu_bad:
+        err("功能菜单项数失准（真源菜单代码块共 %d 项）：%s"
+            % (real_menu, "；".join(menu_bad)))
+    if seed_bad:
+        err("内置行业库数失准（真源 `SEED_INDUSTRIES` 共 %d 个）：%s"
+            % (real_seed, "；".join(seed_bad)))
+    if not (fmt_bad or menu_bad or seed_bad):
+        info("数字口径：格式／菜单项数／内置库数三处与真源一致（%s）" % "、".join(src_note))
+
+
 def check_version_consistency():
     """版本号一致性：SKILL.md frontmatter 为准，正文标题与各文档里的版本串都要跟上。
 
@@ -869,6 +965,7 @@ def main():
         check_header_version()
         check_rule_metadata()
         check_smoke_count()
+        check_doc_number_caliber()
         check_sample_baseline()
         check_version_consistency()
         check_config()
