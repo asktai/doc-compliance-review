@@ -7,7 +7,7 @@ description_zh: "对合同、协议及授权书、承诺函、告知书、声明
 description_en: "Desensitize, review clause by clause, grade risks in three colors and produce redline revisions, comparison ledgers and opinion reports for contracts, agreements and business documents (authorization letters, commitment letters, notices, policies, NDAs, SLAs, DPAs and more); coverage includes payment and liquidated damages, delivery and acceptance, IP, confidentiality and non-compete, jurisdiction clauses, arbitration, dispute resolution, limitation of action, contract validity, standard terms and personal information protection; accepts background materials (files, images, photos or plain text) to sharpen the review, and adapts the review stance to a strong or weak bargaining position; drafts contracts and reusable templates, and converts existing documents into templates. Nine industry rule sets included; handles Word, PDF, images and scanned files. Advisory only, not legal advice; review by a licensed lawyer is required."
 category: writing
 argument-hint: "<文档路径或文本> [版本/角色/尺度] | 审查 | 起草 | 比对 | 背景资料 | 脱敏 | 向导 | 撰写合同 | 撰写模板 | 文档转模板 | 合同转模板 | 技能版本 | 技能更新 | 技能升级 | 立查得 | 小查 | 帮助|help|? | 教程 | 私有库维护/备份/回溯/导入/导出 | 行业库维护/备份/回溯/导入/导出"
-version: 3.10.1
+version: 3.10.2
 license: 个人使用授权 · 商业使用须取得书面授权（见 `LICENSE.md`）
 author: 胡皓
 examples_zh:
@@ -26,7 +26,7 @@ examples_en:
 
 ![文档合规审查助手AI合同审核全能版 · 合同与商务文档逐条审查 · 风险三色分级](assets/banner-dark.png)
 
-**V3.10.1** ｜ 作者：胡皓 ｜ 许可：个人使用授权 · 商业使用须取得书面授权（详见 `LICENSE.md`）
+**V3.10.2** ｜ 作者：胡皓 ｜ 许可：个人使用授权 · 商业使用须取得书面授权（详见 `LICENSE.md`）
 
 > **免责声明**：本技能仅作辅助法律工作，**不构成法律意见**，输出内容须经**执业律师复核**；**每次使用由技能先输出全文**——见**步骤 0.0**，全文亦见 `LICENSE.md`。
 
@@ -516,7 +516,8 @@ python scripts/guard.py policy            # 权限矩阵
 python scripts/guard.py check <路径> --op <read|write|delete|copy|export|import|view>   # 单个动作判定（0 放行 / 3 拒绝）
 ```
 
-> **完整权限矩阵、8 个维护触发词、备份与回溯子菜单（每库最多 5 份循环覆盖）、导入导出用法、技能本体可查看清单** → 读 `permissions-and-libraries.md`。
+> **完整权限矩阵、维护触发词（4 类：私有库向导／行业库向导／导出／导入）、备份与回溯子菜单（每库最多 5 份循环覆盖）、导入导出用法、技能本体可查看清单** → 读 `permissions-and-libraries.md`。
+> 口径说明：维护触发词**按入口类别计、不以词条数计**——同一入口有多个等价说法，词条数会随增删浮动，导致 SKILL／教程／权限文档三处对不上；类别数以 `permissions-and-libraries.md`「维护触发词」表的行数为唯一真源。
 
 ---
 
