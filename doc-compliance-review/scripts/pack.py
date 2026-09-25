@@ -245,7 +245,7 @@ def package_stem(base, tag):
     product = _safe_name(product) or SKILL_DIR
     en = _safe_name(en) or sid
     date = datetime.date.today().strftime("%Y%m%d")
-    return "%s_%s_%s_(%s)" % (product, tag, date, en), product, sid, date
+    return "%s_%s_%s_(%s)" % (product, tag, date, en), product, sid, date, en
 
 
 def _safe_name(s):

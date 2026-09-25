@@ -817,6 +817,83 @@ def check_doc_number_caliber():
         info("数字口径：格式／菜单项数／内置库数三处与真源一致（%s）" % "、".join(src_note))
 
 
+def check_package_fields():
+    """出包必填字段守卫：`pack.py` 组装文件名所依赖的 frontmatter 字段，必须齐且非空。
+
+    真源不写死在 check.py——从 `pack.py` 里实际调用的 `_fm_field(base, "X")` 抽出来，
+    以后 pack.py 新增依赖字段，本守卫自动跟上，不需要人回来改两张表。
+
+    **为什么非有这条不可**：`package_stem` 对每个字段都写了 `or` 兜底，字段丢了**不报错**，
+    只会静默降级——最典型的是 `display_name_en` 一丢，文件名的技能 ID 段就从英文可读名
+    退化成 slug，四段式看着仍合规，`verify_filename` 也照样放行。V3.11.2 把它列为遗留，
+    本条即其落地：**不再允许静默**。
+
+    **第二道**：直接调用 pack.py 自己的 `package_stem` 实算文件名、再交给 `verify_filename`
+    校验，这样"字段齐全但拼出来仍不合规"（例如产品名被非法字符洗空）也能当场抓住——
+    生产与校验分离，任一边改坏都会被另一边查出。
+
+    **第三道**：文档里凡以本技能产品名开头的四段式文件名（教程第一节放的就是实际产名），
+    其**版本段必须等于当前版本**。示例串写死一次很容易在升版后被忘在旧号上——那正好是
+    文件名规范刚埋下的新漂移点，此处一并堵上。
+    """
+    skill = os.path.join(ROOT, "SKILL.md")
+    pack = os.path.join(HERE, "pack.py")
+    if not os.path.exists(skill) or not os.path.exists(pack):
+        return
+    keys = []
+    for k in re.findall(r'_fm_field\s*\(\s*base\s*,\s*"([^"]+)"', _read(pack)):
+        if k not in keys:
+            keys.append(k)
+    if not keys:
+        warn("pack.py 里未定位到 _fm_field 调用，出包字段校验未执行（改过 pack.py 请复核本守卫）")
+        return
+    fm = re.search(r"^---\n(.*?)\n---", _read(skill), re.S)
+    fmtext = fm.group(1) if fm else ""
+    missing = []
+    for k in keys:
+        m = re.search(r"(?m)^%s:[ \t]*(.*)$" % re.escape(k), fmtext)
+        val = (m.group(1) if m else "").strip().strip('"').strip("'").strip()
+        if not val:
+            missing.append(k)
+    if missing:
+        err("SKILL.md frontmatter 缺出包必填字段（缺了该字段会**静默降级**，"
+            "文件名看着仍合规）：%s" % "、".join(missing))
+    else:
+        info("出包必填字段：%s 齐全（真源＝pack.py 的 _fm_field 调用）" % "、".join(keys))
+
+    # 第二道：加载 pack.py 实算文件名（这里是真跑它的代码，不是照抄一份正则来比对）
+    try:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("_pack_probe", pack)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)   # pack.py 的 main 在 __main__ 保护下，导入无副作用
+        tag = mod.read_skill_version(ROOT)
+        stem, product, _sid, _d, _en = mod.package_stem(ROOT, tag)
+        bad = mod.verify_filename(stem)
+        if bad:
+            err("实算出的出包文件名不合四段式：%s" % "；".join(bad))
+        else:
+            info("出包文件名实算合规：%s.%s" % (stem, mod.FMT_EXT["skill"]))
+    except Exception as e:
+        warn("出包文件名实算未执行：%s" % e)
+        return
+
+    # 第三道：文档里本技能的四段式示例，版本段必须与当前版本一致
+    pat = re.escape(product) + r"_([Vv]?\d+(?:\.\d+)+)_\d{8}_\([^()]+\)"
+    stale = []
+    for rel in ("安装使用教程.md", "README.md"):
+        p = os.path.join(ROOT, rel)
+        if not os.path.exists(p):
+            continue
+        for s in re.findall(pat, _read(p)):
+            if s.lstrip("Vv") != tag.lstrip("Vv"):
+                stale.append("%s 里的示例仍是 %s（当前 %s）" % (rel, s, tag))
+    if stale:
+        err("文档里的出包文件名示例版本滞后：%s" % "；".join(stale))
+    else:
+        info("出包文件名示例：文档中的版本段与当前版本一致（%s）" % tag)
+
+
 def check_version_consistency():
     """版本号一致性：SKILL.md frontmatter 为准，正文标题与各文档里的版本串都要跟上。
 
@@ -966,6 +1043,7 @@ def main():
         check_rule_metadata()
         check_smoke_count()
         check_doc_number_caliber()
+        check_package_fields()
         check_sample_baseline()
         check_version_consistency()
         check_config()
@@ -989,7 +1067,7 @@ def _report(quiet):
             print("[E] " + m)
         print("错误 %d 项，警告 %d 项 —— 未通过。" % (len(ERRS), len(WARNS)))
         return 1
-    print("通过：结构 / 字段 / 头标 / 去企业化 / 规则ID / 免责声明 / 长文档分批 / 规则元数据 / 样例基线 / 版本一致性 / 配置 / 安全项 无错误（警告 %d 项，提示 %d 项）。"
+    print("通过：结构 / 字段 / 头标 / 去企业化 / 规则ID / 免责声明 / 长文档分批 / 规则元数据 / 样例基线 / 版本一致性 / 出包字段 / 配置 / 安全项 无错误（警告 %d 项，提示 %d 项）。"
           % (len(WARNS), len(INFOS)))
     return 0
 
