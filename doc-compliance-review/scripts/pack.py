@@ -49,19 +49,17 @@ _sys.dont_write_bytecode = True
 回退——使用者要固化本机路径，跑一次 `detect-tools.py --write` 即可。
 确需带本机路径出包（如给自己的另一台机器留档）时用 `--keep-tools`。
 
-**文件名四段式**：`中文产品名-技能ID-版本号-日期.封装格式`，例如
+**文件名四段式**：`中文产品名_版本号_日期_(技能ID).封装格式`，例如
 
-    文档合规审查助手AI合同审核全能版-doc-compliance-review-V3.11.0-2026-09-24.skill
+    向导式Ai教程_v1.0.0_20260925_(Guided AI Tutorial).Skill
 
-产品名取 `SKILL.md` frontmatter 的 `display_name`、技能 ID 取 `name`、版本号取 `version`、
-日期为**打包当天**。四段各自自动读取，不靠手填，避免"版本升了文件名还写着旧号"。
+各段均**自动读取，不靠手填**，避免"版本升了文件名还写着旧号"：
+产品名取 `SKILL.md` frontmatter 的 `display_name`，版本号取 `version`，日期为**打包当天**
+（紧凑写 `%Y%m%d`），括号段取 `display_name_en`（英文可读名；缺失时退回 `name`）。
+封装格式**默认 `.Skill`**。
 
-**两种封装格式**：
-
-- `.skill`（**默认主格式**）＝自定义头部 ＋ zip 负载的自描述封装，头部带产品名／技能 ID／
-  版本／日期／条目数／负载 SHA-256，便于归档与对账。负载是裸 zip，Python `zipfile` 与
-  `unzip` 都能直接取内容（后者会提示"前面多了若干字节"但仍能解开）。
-  **注意**：这是本技能自定义的封装，非平台公开规范；上传到开放平台若被拒，改用 `.zip`。
+> 注：文件名含空格与成对半角括号，属合法文件名；在终端里操作记得加引号或用转义。
+> `.Skill` 首字母大写是规范写法，Linux/macOS 大小写敏感，脚本内以 `FMT_EXT` 为准，勿另行硬拼。
 - `.zip` ＝纯 ZIP，与开放平台（open.workbuddy.cn）实测口径一致（**平台官方收 zip、≤3 MB**）。
 
 用法：
@@ -207,8 +205,10 @@ def verify_zip(zp):
 # （unzip 会提示"前面多了若干字节"但仍能处理），不需要专用工具也能取内容。
 SKILL_MAGIC = b"SKLP"
 SKILL_FMT_VER = 1
-# 文件名四段式：中文产品名-技能ID-版本号-日期.封装格式
-FMT_EXT = {"zip": "zip", "skill": "skill"}
+# 文件名四段式：`中文产品名_版本号_日期_(技能ID).封装格式`
+#   例：向导式Ai教程_v1.0.0_20260925_(Guided AI Tutorial).Skill
+# 段序、分隔符与大小写一律以本常量为准，**不要在别处另行拼装文件名**。
+FMT_EXT = {"zip": "zip", "skill": "Skill"}
 
 
 def _fm_field(base, key):
@@ -223,18 +223,59 @@ def _fm_field(base, key):
 
 
 def package_stem(base, tag):
-    """四段式文件名主干：**中文产品名-技能ID-版本号-日期**。返回 (主干, 产品名, 技能ID, 日期)。
+    """四段式文件名主干：**中文产品名_版本号_日期_(技能ID)**。返回 (主干, 产品名, 技能ID, 日期, 英文名)。
 
-    产品名取 frontmatter 的 display_name（去引号、去文件名非法字符），
-    技能 ID 取 name，版本号即 tag，日期为**打包当天**。
+    对照规范（示例见文档）：
+
+        向导式Ai教程_v1.0.0_20260925_(Guided AI Tutorial).Skill
+        └─产品名──┘ └版本号┘ └─日期─┘ └────技能ID（英文）────┘ └封装┘
+
+    各段取值：
+      · 产品名 ← frontmatter 的 `display_name`（去引号、去文件名非法字符）
+      · 版本号 ← tag（`read_skill_version` 自动读 `version`，不靠手填）
+      · 日期   ← 打包当天，**紧凑写**（`%Y%m%d`，如 20260925）
+      · 技能ID ← frontmatter 的 `display_name_en`（英文可读名，与示例形态一致），
+                 缺失时退回 `name`（slug）
     四段一并返回，供 .skill 头部元数据复用——**不要从文件名反解**：
-    日期段自带两个 `-`，按 `-` 切会把字段切错位。
+    产品名与英文 ID 都可能含空格、中点或与分隔符同形的字符，按 `_` 切会错位。
     """
     product = _fm_field(base, "display_name") or _fm_field(base, "name") or SKILL_DIR
     sid = _fm_field(base, "name") or SKILL_DIR
-    product = re.sub(r'[\\/:*?"<>|]+', "", product).strip() or SKILL_DIR
-    date = datetime.date.today().isoformat()
-    return "%s-%s-%s-%s" % (product, sid, tag, date), product, sid, date
+    en = _fm_field(base, "display_name_en") or sid
+    product = _safe_name(product) or SKILL_DIR
+    en = _safe_name(en) or sid
+    date = datetime.date.today().strftime("%Y%m%d")
+    return "%s_%s_%s_(%s)" % (product, tag, date, en), product, sid, date
+
+
+def _safe_name(s):
+    """文件名安全化：去掉 Windows/Linux 非法字符与首尾空白，保留空格与中点。"""
+    return re.sub(r'[\\/:*?"<>|]+', "", s).strip()
+
+
+# 四段式文件名正则：`中文产品名_版本号_日期_(技能ID).封装格式`
+# 注意括号段允许空格与中点（英文名自带），日期段为紧凑 8 位。
+STEM_RE = re.compile(r"^.+_[Vv]?\d+(?:\.\d+)*_\d{8}_\([^()]+\)$")
+
+
+def verify_filename(stem):
+    """出包前自测文件名是否符合四段式规范。返回错误列表（空＝合规）。
+
+    规范只是一段文档的话，改代码的人很容易忘（或按旧习惯拼出一个看似合理的名字）。
+    这里把它做成**每次出包都会跑**的断言，格式漂移当场拦下。
+    """
+    bad = []
+    if not STEM_RE.match(stem):
+        bad.append("文件名不合四段式「产品名_版本号_日期_(技能ID)」：%s" % stem)
+    else:
+        # 逐段再核一遍，报错时指向具体哪一段（比只报"不合格式"更好排查）
+        m = re.match(r"^(?P<p>.+?)_(?P<v>[Vv]?\d+(?:\.\d+)*)_(?P<d>\d{8})_(?P<i>\(.+\))$", stem)
+        if m:
+            if len(m.group("d")) != 8:
+                bad.append("日期段应为 8 位紧凑写（%%Y%%m%%d）：%s" % m.group("d"))
+            if not m.group("i").startswith("(") or not m.group("i").endswith(")"):
+                bad.append("技能ID 段应由半角括号包裹：%s" % m.group("i"))
+    return bad
 
 
 def write_skill(zp, out, product, sid, version, date):
@@ -266,9 +307,15 @@ def build(base, outdir, include_private=False, tag="V3.0.0", keep_tools=False, f
     priv_path = os.path.join(base, PRIVATE_DIR)
     prefix = SKILL_DIR + "/"   # 上架版结构：所有条目都套一层技能目录
     blanked = []               # 本次包内被清空工具路径的配置文件（用于收尾提示）
-    stem, product, sid, _date = package_stem(base, tag)
+    stem, product, sid, _date = package_stem(base, tag)[:4]
+    _bad = verify_filename(stem)
+    if _bad:
+        for b in _bad:
+            print("  [FAIL] " + b)
+        print("  [x] 文件名不合四段式规范，已中止出包（勿手工改名绕过，去修 package_stem）。")
+        return False
     for files, dirs, name in [
-        (FULL_FILES, list(FULL_DIRS), "%s.zip" % stem),
+        (FULL_FILES, list(FULL_DIRS), "%s.%s" % (stem, FMT_EXT["zip"])),
     ]:
         dirs = list(dirs)
         with_private = include_private and os.path.isdir(priv_path)
@@ -311,8 +358,8 @@ def build(base, outdir, include_private=False, tag="V3.0.0", keep_tools=False, f
         print("  [OK] 出包自检通过：顶层／SKILL.md 计数／层级（≤%d 级）／体积（≤%d MB）／private 五项全过"
               % (PLATFORM_MAX_DEPTH, PLATFORM_MAX_MB))
 
-        # ---- 封装为 .skill（头部 ＋ 同一个 zip 负载）
-        sp = os.path.join(outdir, "%s.skill" % stem)
+        # ---- 封装为 .Skill（头部 ＋ 同一个 zip 负载）
+        sp = os.path.join(outdir, "%s.%s" % (stem, FMT_EXT["skill"]))
         if fmt in ("both", "skill"):
             meta, nhead = write_skill(zp, sp, product, sid, tag, _date)
             with zipfile.ZipFile(sp) as zf2:
