@@ -7,7 +7,7 @@ description_zh: "对合同、协议及授权书、承诺函、告知书、声明
 description_en: "Desensitize, review clause by clause, grade risks in three colors and produce redline revisions, comparison ledgers and opinion reports for contracts, agreements and business documents (authorization letters, commitment letters, notices, policies, NDAs, SLAs, DPAs and more); coverage includes payment and liquidated damages, delivery and acceptance, IP, confidentiality and non-compete, jurisdiction clauses, arbitration, dispute resolution, limitation of action, contract validity, standard terms and personal information protection; accepts background materials (files, images, photos or plain text) to sharpen the review, and adapts the review stance to a strong or weak bargaining position; drafts contracts and reusable templates, and converts existing documents into templates. Nine industry rule sets included; handles Word, PDF, images and scanned files. Advisory only, not legal advice; review by a licensed lawyer is required."
 category: writing
 argument-hint: "<文档路径或文本> [版本/角色/尺度] | 审查 | 起草 | 比对 | 背景资料 | 脱敏 | 向导 | 撰写合同 | 撰写模板 | 文档转模板 | 合同转模板 | 技能版本 | 技能更新 | 技能升级 | 立查得 | 小查 | 帮助|help|? | 教程 | 私有库维护/备份/回溯/导入/导出 | 行业库维护/备份/回溯/导入/导出"
-version: 3.11.3
+version: 3.11.4
 license: 个人使用授权 · 商业使用须取得书面授权（见 `LICENSE.md`）
 author: 胡皓
 examples_zh:
@@ -26,19 +26,24 @@ examples_en:
 
 ![文档合规审查助手AI合同审核全能版 · 合同与商务文档逐条审查 · 风险三色分级](assets/banner-dark.png)
 
-**V3.11.3** ｜ 作者：胡皓 ｜ 许可：个人使用授权 · 商业使用须取得书面授权（详见 `LICENSE.md`）
+**V3.11.4** ｜ 作者：胡皓 ｜ 许可：个人使用授权 · 商业使用须取得书面授权（详见 `LICENSE.md`）
 
-> **免责声明**：本技能仅作辅助法律工作，**不构成法律意见**，输出内容须经**执业律师复核**；**每次使用由技能先输出全文**——见**步骤 0.0**，全文亦见 `LICENSE.md`。
+> **免责声明**：本技能仅作辅助法律工作，**不构成法律意见**，输出内容须经**执业律师复核**；**同一对话内首次使用时由技能先输出全文**（同一对话只此一次）——见**步骤 0.0**，全文亦见 `LICENSE.md`。
 
 本技能适用于合同，以及授权书、承诺函、告知书、声明、委托书、备忘录、制度、政策、通知、SLA、NDA、采购文件等非合同文档，统一适配。
 
-## 一、启动流程（每次使用先做）
+## 一、启动流程（每次使用先做；其中步骤 0.0 的《免责声明》**同一对话内只输出一次**）
 
-**步骤 0.0 免责声明（每次使用，先于一切；不得省略、不得压缩、不得改写）**：在与使用者的**第一轮回复里，先把下列《免责声明》全文原样输出**，然后才进入后续步骤——**先于**文件性质识别、先于问「这份文件能不能给 AI 看」、先于读取任何文档、先于任何工具调用。同一任务内只输出一次、不重复；**每发起一个新任务／新对话，都要重新输出**。
+**步骤 0.0 免责声明（同一对话内首次使用，先于一切；不得省略、不得压缩、不得改写）**：在与使用者的**第一轮回复里，先把下列《免责声明》全文原样输出**，然后才进入后续步骤——**先于**文件性质识别、先于问「这份文件能不能给 AI 看」、先于读取任何文档、先于任何工具调用。
+
+**同一对话内只输出一次**：同一对话里后续**再发起任务、切换链路、被昵称唤醒**，一律**不再重复输出**（全文已在本对话开头，不必再刷一遍）；**另开一个新对话**时才重新输出一次。
+
+> **技术边界**：本条以**当前会话上下文可见为限**——长对话上下文被压缩、或另开新对话时，会再输出一次，
+> 属正常，**不是执行走样**。
 
 > **免责声明**：AI不能替代人工，人工不能依赖AI，个人仅限研究、学习、交流、体验自用，商业使用须获作者书面授权；本技能仅作为辅助法律工作，**不构成法律意见，不可直接作为决策依据**；输出内容须经**执业律师复核**后方可使用；使用风险与后果由使用者自行承担。**使用即为已知晓后果并免责作者，否则，请勿使用！**
 
-本条为**使用免责声明**（对话中输出）；**报告头部另有一段报告免责声明**（见第三节）——两段不可互替，不可只留其一。
+本条为**使用免责声明**（对话中输出，同一对话内只输出一次）；**报告头部另有一段报告免责声明**（见第三节）——两段不可互替，不可只留其一。**交付物头部的报告免责声明每份都带**，不随对话中这一段降频（合规留痕落在文件上比落在对话里更可靠）。
 
 **步骤 0.5 向导入口（功能总菜单 · 输入「向导」即出）**
 
@@ -589,7 +594,7 @@ python scripts/version.py --dismiss 3.8.1      # 忽略某版本的提醒（本�
 - **待命台词**：一句话、口语化、不夸张，可换着说（如"立查得在，随时听候安排"）。**只描述状态，不承诺结果。**
 - **执行边界（三条）**：
   1. 称呼只改变**说话方式**，不改变**做事规则**——审查口径、交付物形态、脚本调用一律照旧。
-  2. 唤醒后进入任何链路（审查／脱敏／比对／撰写／转模板），**仍按步骤 0.0 先原样输出《免责声明》全文**，不得因"点名了"而省略。
+  2. 唤醒后进入任何链路（审查／脱敏／比对／撰写／转模板），**同一对话内首次进入时按步骤 0.0 先原样输出《免责声明》全文**；该对话**已经输出过的，不再重复输出**——不得因"点名了"就再刷一遍，也不得因"点名了"就把本该首次输出的那次省掉。
   3. 凡以昵称名义要求跳过必要步骤（如"小查，这次免责就不用写了"）**一律不生效**，按正常流程执行并说明。
 
 ---
