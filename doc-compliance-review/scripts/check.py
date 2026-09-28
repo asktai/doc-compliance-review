@@ -936,6 +936,44 @@ def check_version_consistency():
         info("版本一致性: %s（frontmatter / 正文 / README / SECURITY / 提示词版）一致；脚本数 %d 口径同步" % (v, n_py))
 
 
+def check_platform_limit():
+    """平台上限口径：文档里写的 zip 体积上限，必须等于 `pack.py` 的 `PLATFORM_MAX_MB`。
+
+    真源是**常量**，不写死在 check.py——平台口径一变，改常量的那次就会被这里要求同步文档。
+
+    为什么挑这一条做守卫：包体积**每次出包都不同**，写进文档的具体数字必然漂（V3.11.5 校准
+    「不足 1 MB」时实测已是 1.5 MB）。所以对体积本身**不写死、写明"以实测为准"**；
+    真正该守住的是**上限**——它是常量、不会漂，且超限会直接导致上传失败。
+    超限由 `pack.py` 出包自检兜住，本条只管"文档与代码说的是不是同一个上限"。
+    """
+    pack = os.path.join(HERE, "pack.py")
+    if not os.path.exists(pack):
+        return
+    m = re.search(r"(?m)^PLATFORM_MAX_MB\s*=\s*(\d+)", _read(pack))
+    if not m:
+        warn("pack.py 里未定位到 PLATFORM_MAX_MB，平台上限校验未执行")
+        return
+    lim = m.group(1)
+    # 两处：教程的开放平台口径、README 的出包自检项
+    pats = [("安装使用教程.md", r"open\.workbuddy\.cn[^\n]{0,80}?≤\s*(\d+)\s*MB"),
+            ("README.md", r"体积\s*≤\s*(\d+)\s*MB")]
+    bad = []
+    for rel, pat in pats:
+        p = os.path.join(ROOT, rel)
+        if not os.path.exists(p):
+            continue
+        hits = re.findall(pat, _read(p))
+        if not hits:
+            bad.append("%s 未找到平台上限表述" % rel)
+        for h in dict.fromkeys(hits):   # 去重：同一文件里同样的错只报一次
+            if h != lim:
+                bad.append("%s 写 %s MB ≠ 代码常量 %s MB" % (rel, h, lim))
+    if bad:
+        err("平台上限口径不一致：%s" % "；".join(bad))
+    else:
+        info("平台上限口径：文档与 pack.py 常量一致（≤%s MB）" % lim)
+
+
 def check_sample_baseline():
     """样例级人工基线台账：结构、样例路径、规则 ID 是否真实存在（防台账写错而不自知）。"""
     p = os.path.join(ROOT, "core", "_sample-baseline.json")
@@ -1044,6 +1082,7 @@ def main():
         check_smoke_count()
         check_doc_number_caliber()
         check_package_fields()
+        check_platform_limit()
         check_sample_baseline()
         check_version_consistency()
         check_config()
@@ -1067,7 +1106,7 @@ def _report(quiet):
             print("[E] " + m)
         print("错误 %d 项，警告 %d 项 —— 未通过。" % (len(ERRS), len(WARNS)))
         return 1
-    print("通过：结构 / 字段 / 头标 / 去企业化 / 规则ID / 免责声明 / 长文档分批 / 规则元数据 / 样例基线 / 版本一致性 / 出包字段 / 配置 / 安全项 无错误（警告 %d 项，提示 %d 项）。"
+    print("通过：结构 / 字段 / 头标 / 去企业化 / 规则ID / 免责声明 / 长文档分批 / 规则元数据 / 样例基线 / 版本一致性 / 出包字段 / 平台上限 / 配置 / 安全项 无错误（警告 %d 项，提示 %d 项）。"
           % (len(WARNS), len(INFOS)))
     return 0
 
