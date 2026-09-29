@@ -824,9 +824,10 @@ def check_package_fields():
     以后 pack.py 新增依赖字段，本守卫自动跟上，不需要人回来改两张表。
 
     **为什么非有这条不可**：`package_stem` 对每个字段都写了 `or` 兜底，字段丢了**不报错**，
-    只会静默降级——最典型的是 `display_name_en` 一丢，文件名的技能 ID 段就从英文可读名
-    退化成 slug，四段式看着仍合规，`verify_filename` 也照样放行。V3.11.2 把它列为遗留，
+    只会静默降级——四段式看着仍合规，`verify_filename` 也照样放行。V3.11.2 把它列为遗留，
     本条即其落地：**不再允许静默**。
+    （V3.11.6 起文件名第四段改用 slug `name`，丢了会退化成技能目录名；`display_name_en`
+    仍读取、仍属必填，只是不进文件名——本守卫照旧看 `pack.py` 的真实调用，自动跟上。）
 
     **第二道**：直接调用 pack.py 自己的 `package_stem` 实算文件名、再交给 `verify_filename`
     校验，这样"字段齐全但拼出来仍不合规"（例如产品名被非法字符洗空）也能当场抓住——
@@ -878,20 +879,27 @@ def check_package_fields():
         warn("出包文件名实算未执行：%s" % e)
         return
 
-    # 第三道：文档里本技能的四段式示例，版本段必须与当前版本一致
-    pat = re.escape(product) + r"_([Vv]?\d+(?:\.\d+)+)_\d{8}_\([^()]+\)"
+    # 第三道：文档里本技能的四段式示例，版本段必须与当前版本一致、形态必须符合新规范
+    # 括号段这里**故意放宽**成 `[^()]+`：若写成只认 slug，旧形态示例会直接匹配不到而漏检，
+    # 反倒失去"抓住滞后示例"的作用——形态问题另由下面的校验单列报错。
+    pat = re.escape(product) + r"_([Vv]?\d+(?:\.\d+)+)_\d{8}_(\([^()]+\))"
     stale = []
     for rel in ("安装使用教程.md", "README.md"):
         p = os.path.join(ROOT, rel)
         if not os.path.exists(p):
             continue
-        for s in re.findall(pat, _read(p)):
-            if s.lstrip("Vv") != tag.lstrip("Vv"):
-                stale.append("%s 里的示例仍是 %s（当前 %s）" % (rel, s, tag))
+        for ver, seg in re.findall(pat, _read(p)):
+            if ver.lstrip("Vv") != tag.lstrip("Vv"):
+                stale.append("%s 里的示例仍是 %s（当前 %s）" % (rel, ver, tag))
+            if not ver.startswith("V"):
+                stale.append("%s 里的示例版本号未带大写 V：%s" % (rel, ver))
+            if " " in seg or "（" in seg or "）" in seg:
+                stale.append("%s 里的示例技能ID 段仍是旧形态（应为 slug + 半角括号）：%s"
+                             % (rel, seg))
     if stale:
-        err("文档里的出包文件名示例版本滞后：%s" % "；".join(stale))
+        err("文档里的出包文件名示例不合新四段式：%s" % "；".join(stale))
     else:
-        info("出包文件名示例：文档中的版本段与当前版本一致（%s）" % tag)
+        info("出包文件名示例：文档中的版本段与当前版本一致、形态合规（%s）" % tag)
 
 
 def check_version_consistency():

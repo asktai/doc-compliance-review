@@ -51,14 +51,17 @@ _sys.dont_write_bytecode = True
 
 **文件名四段式**：`中文产品名_版本号_日期_(技能ID).封装格式`，例如
 
-    向导式Ai教程_v1.0.0_20260925_(Guided AI Tutorial).Skill
+    广告合规审查_V1.7.0_20260928_(advertising-compliance-review).zip
+
+四段定式：**版本号带大写 V**、**日期紧凑 8 位**、**技能 ID 用半角括号包裹置末**、
+**分隔符一律下划线**；封装格式**默认同时出 `.Skill` 与 `.zip` 两种**。
 
 各段均**自动读取，不靠手填**，避免"版本升了文件名还写着旧号"：
-产品名取 `SKILL.md` frontmatter 的 `display_name`，版本号取 `version`，日期为**打包当天**
-（紧凑写 `%Y%m%d`），括号段取 `display_name_en`（英文可读名；缺失时退回 `name`）。
-封装格式**默认 `.Skill`**。
+产品名取 `SKILL.md` frontmatter 的 `display_name`，版本号取 `version`（统一补大写 `V`），
+日期为**打包当天**（紧凑写 `%Y%m%d`），括号段取 `name`（**slug**，小写字母/数字/连字符）。
+`display_name_en`（英文可读名）仍属出包必填字段——平台展示要用，但**不进文件名**。
 
-> 注：文件名含空格与成对半角括号，属合法文件名；在终端里操作记得加引号或用转义。
+> 注：文件名含成对半角括号，属合法文件名；在终端里操作记得加引号或用转义。
 > `.Skill` 首字母大写是规范写法，Linux/macOS 大小写敏感，脚本内以 `FMT_EXT` 为准，勿另行硬拼。
 - `.zip` ＝纯 ZIP，与开放平台（open.workbuddy.cn）实测口径一致（**平台官方收 zip、≤3 MB**）。
 
@@ -206,7 +209,13 @@ def verify_zip(zp):
 SKILL_MAGIC = b"SKLP"
 SKILL_FMT_VER = 1
 # 文件名四段式：`中文产品名_版本号_日期_(技能ID).封装格式`
-#   例：向导式Ai教程_v1.0.0_20260925_(Guided AI Tutorial).Skill
+#   例：广告合规审查_V1.7.0_20260928_(advertising-compliance-review).zip
+# 四段定式（2026-09-29 定，V3.11.6 起生效）：
+#   · 版本号 **带大写 V** 前缀（`V1.7.0`，不是 `v1.7.0`、也不是裸 `1.7.0`）
+#   · 日期 **紧凑 8 位**（`%Y%m%d`，如 20260928）
+#   · 技能 ID 用 **半角括号**包裹，内容为 **slug**（`name` 字段，小写字母/数字/连字符）
+#   · 分隔符一律 **下划线**
+#   · 封装格式默认同时出 `.Skill` 与 `.zip` 两种（见 `--format`，默认 both）
 # 段序、分隔符与大小写一律以本常量为准，**不要在别处另行拼装文件名**。
 FMT_EXT = {"zip": "zip", "skill": "Skill"}
 
@@ -227,25 +236,29 @@ def package_stem(base, tag):
 
     对照规范（示例见文档）：
 
-        向导式Ai教程_v1.0.0_20260925_(Guided AI Tutorial).Skill
-        └─产品名──┘ └版本号┘ └─日期─┘ └────技能ID（英文）────┘ └封装┘
+        广告合规审查_V1.7.0_20260928_(advertising-compliance-review).zip
+        └─产品名─┘ └版本号┘ └─日期─┘ └────技能ID（slug）────┘ └封装┘
 
     各段取值：
       · 产品名 ← frontmatter 的 `display_name`（去引号、去文件名非法字符）
-      · 版本号 ← tag（`read_skill_version` 自动读 `version`，不靠手填）
-      · 日期   ← 打包当天，**紧凑写**（`%Y%m%d`，如 20260925）
-      · 技能ID ← frontmatter 的 `display_name_en`（英文可读名，与示例形态一致），
-                 缺失时退回 `name`（slug）
+      · 版本号 ← tag（`read_skill_version` 自动读 `version`，**统一补大写 V**，不靠手填）
+      · 日期   ← 打包当天，**紧凑写**（`%Y%m%d`，如 20260928）
+      · 技能ID ← frontmatter 的 `name`（slug，小写字母/数字/连字符），**配半角括号置末**
+                 ——2026-09-29 起由英文可读名改为 slug，与平台/目录名保持同一套标识
+      · 英文名 `display_name_en` **仍读取**但**不进文件名**（平台展示用；保留在 pack.py 的
+                 `_fm_field` 调用里，`check.py` 的出包必填字段守卫仍会校验它，守卫不削弱）
     四段一并返回，供 .skill 头部元数据复用——**不要从文件名反解**：
-    产品名与英文 ID 都可能含空格、中点或与分隔符同形的字符，按 `_` 切会错位。
+    产品名可能含空格、中点或与分隔符同形的字符，按 `_` 切会错位，
+    一律以本函数的返回值为准（slug 段本身不含空格，可安全切）。
     """
     product = _fm_field(base, "display_name") or _fm_field(base, "name") or SKILL_DIR
     sid = _fm_field(base, "name") or SKILL_DIR
     en = _fm_field(base, "display_name_en") or sid
     product = _safe_name(product) or SKILL_DIR
     en = _safe_name(en) or sid
+    sid = _safe_name(sid) or SKILL_DIR
     date = datetime.date.today().strftime("%Y%m%d")
-    return "%s_%s_%s_(%s)" % (product, tag, date, en), product, sid, date, en
+    return "%s_%s_%s_(%s)" % (product, tag, date, sid), product, sid, date, en
 
 
 def _safe_name(s):
@@ -254,8 +267,11 @@ def _safe_name(s):
 
 
 # 四段式文件名正则：`中文产品名_版本号_日期_(技能ID).封装格式`
-# 注意括号段允许空格与中点（英文名自带），日期段为紧凑 8 位。
-STEM_RE = re.compile(r"^.+_[Vv]?\d+(?:\.\d+)*_\d{8}_\([^()]+\)$")
+#   · 版本号段 **必须**带大写 V（小写 v、裸数字一律不合规）
+#   · 日期段紧凑 8 位（合法性另由 verify_filename 用 strptime 复核）
+#   · 技能 ID 段由**半角括号**包裹，内容为 slug（字母/数字/`.`/`_`/`-`，**不含空格**）
+#     旧版此处放英文可读名（含空格与中点），改 slug 后此正则即能把它挡住，防旧形态回流。
+STEM_RE = re.compile(r"^.+_V\d+(?:\.\d+)*_\d{8}_\([A-Za-z0-9][A-Za-z0-9._-]*\)$")
 
 
 def verify_filename(stem):
@@ -266,15 +282,24 @@ def verify_filename(stem):
     """
     bad = []
     if not STEM_RE.match(stem):
-        bad.append("文件名不合四段式「产品名_版本号_日期_(技能ID)」：%s" % stem)
-    else:
-        # 逐段再核一遍，报错时指向具体哪一段（比只报"不合格式"更好排查）
-        m = re.match(r"^(?P<p>.+?)_(?P<v>[Vv]?\d+(?:\.\d+)*)_(?P<d>\d{8})_(?P<i>\(.+\))$", stem)
-        if m:
-            if len(m.group("d")) != 8:
-                bad.append("日期段应为 8 位紧凑写（%%Y%%m%%d）：%s" % m.group("d"))
-            if not m.group("i").startswith("(") or not m.group("i").endswith(")"):
-                bad.append("技能ID 段应由半角括号包裹：%s" % m.group("i"))
+        bad.append("文件名不合四段式「产品名_版本号(带大写V)_日期8位_(技能ID slug)」：%s" % stem)
+    # 逐段再核一遍，报错指向具体哪一段（比只报"不合格式"更好排查）
+    m = re.match(r"^(?P<p>.+?)_(?P<v>[Vv]?\d+(?:\.\d+)*)_(?P<d>\d{8})_(?P<i>\(.+\))$", stem)
+    if m:
+        v, d, i = m.group("v"), m.group("d"), m.group("i")
+        if not v.startswith("V"):
+            bad.append("版本号段应以大写 V 开头（如 V1.7.0）：%s" % v)
+        if len(d) != 8:
+            bad.append("日期段应为 8 位紧凑写（%%Y%%m%%d）：%s" % d)
+        else:
+            try:
+                datetime.datetime.strptime(d, "%Y%m%d")
+            except ValueError:
+                bad.append("日期段不是合法日期（%%Y%%m%%d）：%s" % d)
+        if not (i.startswith("(") and i.endswith(")")):
+            bad.append("技能ID 段应由半角括号包裹：%s" % i)
+        elif " " in i or "（" in i or "）" in i:
+            bad.append("技能ID 段应为 slug（半角括号、无空格、不用全角括号）：%s" % i)
     return bad
 
 
@@ -390,7 +415,8 @@ def read_skill_version(base):
         m = re.search(r"(?m)^version:\s*([0-9][0-9A-Za-z.\-]*)", head)
         if m:
             v = m.group(1).strip()
-            return v if v.upper().startswith("V") else "V" + v
+            # 四段式要求版本号**带大写 V**：frontmatter 里写 `3.11.5` 或 `v3.11.5` 都统一成 `V3.11.5`
+            return "V" + re.sub(r"^[Vv]", "", v)
     except OSError:
         pass
     return "V0.0.0"
@@ -407,7 +433,7 @@ if __name__ == "__main__":
     ap.add_argument("--keep-tools", action="store_true",
                     help="保留 config.json 里填好的工具路径（默认清空，避免作者本机路径随包外发）")
     ap.add_argument("--format", choices=["skill", "zip", "both"], default="both",
-                    help="封装格式（默认 both＝两种都出，主格式为 .skill）："
+                    help="封装格式（默认 both＝两种都出，主格式为 .Skill）："
                          "skill＝只出 .skill；zip＝只出 .zip（平台上传多认这个）")
     a = ap.parse_args()
     if a.include_private:
