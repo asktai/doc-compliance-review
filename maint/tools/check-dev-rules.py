@@ -216,8 +216,11 @@ def check_refs(s, show=False):
         info("无悬空引用（全部指向存在的条）")
     if show and not QUIET:
         print("  ── 引用上下文（供人工复核**指向是否正确**，脚本查不出语义）──")
+        fenced = in_fence_lines(s)
         for i, line in enumerate(s.splitlines(), 1):
-            if line.startswith(("#", "|")) and re.search(r"第 \d+ 条", line):
+            if i in fenced or line.lstrip().startswith("- ["):   # 排除代码块与目录
+                continue
+            if re.search(r"第 \d+ 条|(?<!V)(?<![\d.])\d+\.\d+(?![\d.])", line):
                 print("     %4d│ %s" % (i, line.strip()[:96]))
 
 
