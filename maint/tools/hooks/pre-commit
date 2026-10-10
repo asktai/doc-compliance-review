@@ -1,0 +1,22 @@
+#!/bin/sh
+# 铁律自检 · pre-commit 钩子（**只警告、不阻断**）
+# ---------------------------------------------------------------
+# 由 maint/tools/check-dev-rules.py --install-hook 安装。
+# 本文件受 git 跟踪（源码在 maint/tools/hooks/pre-commit），换机器重装即可。
+#
+# 设计：只在本次提交**涉及 DEV-RULES.md** 时才跑检查，且无论结果如何都 exit 0
+#       （不阻断提交）——理由是脚本自身也可能有 bug，不该让它卡死工作流。
+#       要强制门禁，请手动运行脚本并查看退出码（可用于 CI）。
+set -u
+
+repo_root=$(git rev-parse --show-toplevel 2>/dev/null || echo .)
+cd "$repo_root" || exit 0
+
+if git diff --cached --name-only | grep -q '^DEV-RULES.md$'; then
+    if command -v python3 >/dev/null 2>&1; then
+        echo "[hook] 检测到 DEV-RULES.md 改动，运行铁律自检（只警告、不阻断）…"
+        python3 maint/tools/check-dev-rules.py || true
+    fi
+fi
+
+exit 0
