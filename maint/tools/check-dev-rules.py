@@ -9,7 +9,7 @@
   (2) 导读表      文首"三条铁律"导读表的条号与名称，须与正文标题一致（双源比对）
   (3) 条号引用    引用的条号必须存在（悬空引用即报错）；--refs 另打印引用上下文供人工复核
   (4) 用词        已废止词（维护侧／开发端／实例侧等）不得在正文残留；术语说明语境除外
-  (5) 表述        不得使用相对引用（"见下方"等）；日期月／日须补零；编号须可键入；款项子项用 (N)；「表述纪律」条自身反例除外
+  (5) 表述        不得使用相对引用（"见下方"等）；日期月／日须补零；编号须可键入；条以下用十进制路径（禁 1.／(N)）；路径须连号；「表述纪律」条自身反例除外
   (6) 路径真实性  正文反引号中的文件／目录引用必须真实存在
 
 归属说明
@@ -287,7 +287,7 @@ def check_wording(s):
 # ────────────────────────────── (5) 表述 ──────────────────────────────
 
 def check_expression(s):
-    head("(5) 表述（相对引用／日期形态／编号）")
+    head("(5) 表述（相对引用／日期形态／编号形态与连续性）")
     seg = section_by_kw(s, "表述纪律")   # 该条表格内是**反例**，须排除（按关键词定位，不写死条号）
     body = s.replace(seg, "") if seg else s
 
@@ -317,29 +317,42 @@ def check_expression(s):
     else:
         info("编号字符均可直接键入（无圆圈数字等特殊符号）")
 
-    # 款项子项须用 (N)（编号体系）：检出缩进句点式列表（跳过代码围栏与「表述纪律」反例段）
+    # 旧编号形态（1.／(N)）已废止：编号体系要求条以下一律十进制路径
     fence = in_fence_lines(s)
     seg_lines = set()
     if seg:
         off = s.index(seg)
         first = s[:off].count("\n") + 1
         seg_lines = set(range(first, first + len(seg.splitlines()) + 1))
-    # 排除 Markdown 4 空格缩进代码块（前一行空白 + 本行缩进≥4），避免把代码块误判为子项
     lines_all = s.splitlines()
     ind_code = set()
     for i, l in enumerate(lines_all):
         if i > 0 and lines_all[i - 1].strip() == "" and re.match(r"^( {4,}|\t)\S", l):
             ind_code.add(i + 1)
-    bad_sub = []
+    bad_old = []
     for i, l in enumerate(lines_all, 1):
         if i in fence or i in seg_lines or i in ind_code:
             continue
-        if re.match(r"^[ \t]+\d+\.[ \t]", l):
-            bad_sub.append("第 %d 行 %s" % (i, l.strip()[:46]))
-    if bad_sub:
-        err("款项子项用了句点式编号（编号体系：款项子项应用 (N)）：%s" % "；".join(bad_sub))
+        if re.match(r"^[ \t]*(?:\d+\.|\(\d+\))[ \t]", l):
+            bad_old.append("第 %d 行 %s" % (i, l.strip()[:44]))
+    if bad_old:
+        err("仍在使用旧编号形态 1.／(N)（编号体系：条以下用十进制路径 N.M(.K)）：%s" % "；".join(bad_old))
     else:
-        info("款项子项编号形态合规（均用 (N)，无缩进句点式列表）")
+        info("编号形态合规（无 1.／(N) 旧形态）")
+
+    # 路径连续性：N.M / N.M.K / N.M.K.L 同级须自 1 连号、不跳号、不重号
+    kids = {}
+    for m in re.finditer(r"(?m)^(?: {0,2}- )?\*\*((?:\d+|A\.\d)(?:\.\d+)+)(?:\s|\*\*)", s):
+        path = m.group(1); parent, child = path.rsplit(".", 1)
+        kids.setdefault(parent, []).append(int(child))
+    bad_path = []
+    for par, v in sorted(kids.items()):
+        if sorted(v) != list(range(1, len(v) + 1)):
+            bad_path.append("%s → %s" % (par, sorted(v)))
+    if bad_path:
+        err("路径编号不连续或重号：%s" % "；".join(bad_path))
+    else:
+        info("路径编号连续（%d 组父级，均自 1 连号）" % len(kids))
 
 
 # ────────────────────────────── (6) 路径真实性 ──────────────────────────────
