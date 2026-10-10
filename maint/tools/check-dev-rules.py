@@ -83,6 +83,21 @@ def ok(m):
         print("  [OK] " + m)
 
 
+def no_of(s, keyword):
+    """按「条标题含关键词」动态取条号——**不写死条号**，挪号后自动跟上。
+
+    教训：本脚本曾把「第 19 条」写死用于排除反例，V1.24.0 该条挪为第 20 条后，
+    排除立即失效、连报 3 项误报（把该条自己的反例当成真问题）。
+    """
+    m = re.search(r"^### 第 (\d+) 条 [^\n]*" + re.escape(keyword), s, re.M)
+    return int(m.group(1)) if m else None
+
+
+def section_by_kw(s, keyword):
+    n = no_of(s, keyword)
+    return section(s, "### 第 %d 条" % n) if n else ""
+
+
 def head(t):
     if not QUIET:
         print(t)
@@ -273,14 +288,14 @@ def check_wording(s):
 
 def check_expression(s):
     head("(5) 表述（相对引用／日期形态）")
-    seg19 = section(s, "### 第 19 条")           # 该条表格内是**反例**，须排除
-    body = s.replace(seg19, "") if seg19 else s
+    seg = section_by_kw(s, "表述纪律")   # 该条表格内是**反例**，须排除（按关键词定位，不写死条号）
+    body = s.replace(seg, "") if seg else s
 
     hits = [l.strip()[:70] for l in body.splitlines()
             if any(p in l for p in REL_REFS)]
     if hits:
         for h in hits:
-            err("相对引用（应为绝对编号，如「见第 17 条」）：%s" % h)
+            err("相对引用（应为绝对编号，如「见第 %d 条」）：%s" % (no_of(s, "分发包命名") or 0, h))
     else:
         info("无相对引用（%s）" % "／".join(REL_REFS))
 
@@ -294,10 +309,10 @@ def check_expression(s):
     else:
         info("日期形态无未补零项")
 
-    # 编号须用**可直接键入**的字符（第 19 条第 8 项）：不得用圆圈数字等特殊符号
+    # 编号须用**可直接键入**的字符（表述纪律第 8 项）：不得用圆圈数字等特殊符号
     sp = re.findall(r"[①-⑩⑴-⑽㈠-㈩]", body)
     if sp:
-        err("使用了难以键入的特殊编号字符（第 19 条第 8 项）：%s —— 应改用 (1)(2)(3)…"
+        err("使用了难以键入的特殊编号字符（表述纪律第 8 项）：%s —— 应改用 (1)(2)(3)…"
             % "".join(sorted(set(sp))))
     else:
         info("编号字符均可直接键入（无圆圈数字等特殊符号）")
