@@ -13,10 +13,10 @@
 
 排版引擎（V2，2026-09-24 重写）
     V1 的病灶（由 layout-audit 实测坐实）：
-      ① 主标题与副标**真实重叠 8px** —— CJK 字身框高是字号的约 1.45 倍（60px→87px），
+      (1) 主标题与副标**真实重叠 8px** —— CJK 字身框高是字号的约 1.45 倍（60px→87px），
          旧代码按"字号"估位置，估小了；
-      ② 最小字号 15px、正文 17.5px —— 卡片按 480px 宽预览等效 6.7px，缩略即糊；
-      ③ 73 个文字块挤在 1080×1440，密度过高。
+      (2) 最小字号 15px、正文 17.5px —— 卡片按 480px 宽预览等效 6.7px，缩略即糊；
+      (3) 73 个文字块挤在 1080×1440，密度过高。
     V2 的三条对策：
       A. **按墨迹框排布**：所有文字以"基线 + em 框"定位，不再用字身框拍脑袋；
       B. **字号整体上调**：正文 17.5→22、chips 17→19、页脚 16→18，最小字号 17；
@@ -376,7 +376,7 @@ def render_card(version, f_serif, f_sans, f_sansb, f_seal, ss=2, verbose=False):
     draw_frame_corners(d, [seal_cx - 78 * S, seal_cy - 78 * S, seal_cx + 78 * S, seal_cy + 78 * S],
                        GOLD + (150,), max(2, int(2.4 * S)), 26 * S)
 
-    # ① 英文小标（17px，字距拉开；整串登记一次，免得字距被当成重叠）
+    # (1) 英文小标（17px，字距拉开；整串登记一次，免得字距被当成重叠）
     f_en = font(f_sans, 17 * U)
     x = PAD * U
     for i, ch in enumerate(EN_SUB):
@@ -385,13 +385,13 @@ def render_card(version, f_serif, f_sans, f_sansb, f_seal, ss=2, verbose=False):
             AUD.add(x, 52 * U, EN_SUB, f_en, "la", span=EN_SUB)
         x += d.textlength(ch, font=f_en) + 2.6 * U
 
-    # ② 主标题 64px（anchor la：y 是字身顶，墨迹底须由基线推算）
+    # (2) 主标题 64px（anchor la：y 是字身顶，墨迹底须由基线推算）
     f_title = font(f_serif, 64 * U)
     put((PAD * U, 92 * U), TITLE_MAIN, f_title, FG, "la")
     asc_t, _ = f_title.getmetrics()
     title_ink_bottom = 92 * U + asc_t + 0.12 * f_title.size
 
-    # ③ 副标行：AI 胶囊 ＋ 副标 38px ＋ 版本徽章 ＋ 作者（同排，省一整行）
+    # (3) 副标行：AI 胶囊 ＋ 副标 38px ＋ 版本徽章 ＋ 作者（同排，省一整行）
     f_sub = font(f_serif, 38 * U)
     sub_base = title_ink_bottom + 30 * U + 0.88 * f_sub.size     # 墨迹顶 = 标题墨迹底 + 30
     sub_ink_mid = sub_base - 0.38 * f_sub.size                   # 墨迹垂直中心
@@ -412,7 +412,7 @@ def render_card(version, f_serif, f_sans, f_sansb, f_seal, ss=2, verbose=False):
     # 取本行最高的元素作为行底（胶囊 46px 比文字墨迹高）
     sub_row_bottom = max(sub_base + 0.12 * f_sub.size, sub_ink_mid + cap_h / 2, sub_ink_mid + 22 * U)
 
-    # ④ 一句话定位 22px（单行；超宽会在审计里以粘连/重叠形式暴露）
+    # (4) 一句话定位 22px（单行；超宽会在审计里以粘连/重叠形式暴露）
     f_tag = font(f_sans, 22 * U)
     put((PAD * U, ls_y(sub_row_bottom + 30 * U, f_tag)), TAGLINE, f_tag, FG2, "ls")
     y0 = sub_row_bottom + 30 * U + f_tag.size                    # 内容区起点
@@ -567,7 +567,7 @@ def verify_copy():
     又抓到"行业库 8 个"未随 realestate 转正）。故在**源头**——每次重绘时——
     拿文案里的数字与代码实扫值核对，不一致即拒绝出图。"""
     ok = True
-    # ① 通用库规则数 ↔ core/01 实扫
+    # (1) 通用库规则数 ↔ core/01 实扫
     core = os.path.join(SKILL_ROOT, "core", "01-general-risk-rules.md")
     if os.path.exists(core):
         real = len(re.findall(r"(?m)^\|\s*[A-Z]\d+\s*\|", open(core, encoding="utf-8").read()))
@@ -581,7 +581,7 @@ def verify_copy():
             print("[make-card] 卡片文案数字失准：写 %d 条，core/01 实为 %d 条。" % (written, real),
                   file=sys.stderr)
             ok = False
-    # ② 内置行业库数量 ↔ guard.py SEED_INDUSTRIES
+    # (2) 内置行业库数量 ↔ guard.py SEED_INDUSTRIES
     seeds = count_seed_industries()
     if seeds:
         written = 0
