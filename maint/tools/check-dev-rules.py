@@ -408,6 +408,58 @@ def check_paths(s):
         info("路径／文件引用 %d 项全部真实存在（已排除围栏代码块与纯扩展名）" % len(cands))
 
 
+# 开发侧需要跟随铁律版本号的文档（真源＝DEV-RULES.md 顶部版本行）
+VER_FILES = ["maint/DEVLOG.md", "CHANGELOG.md", "publish.py"]
+# 只匹配"当前状态陈述"：现 **Vx.y.z** ／ 当前 **Vx.y.z**（历史流水里的旧值不算）
+VER_RE = re.compile(r"(?:现|当前)\s*\*{0,2}(V\d+\.\d+\.\d+)\*{0,2}")
+
+
+def check_rules_version(s):
+    """(7) 铁律版本串跨文档一致性。
+
+    真源＝DEV-RULES.md 顶部"**版本 Vx.y.z**"。开发侧文档里凡以"**现** Vx.y.z／
+    **当前** Vx.y.z"形式陈述**当前**铁律版本的，必须与真源一致。
+
+    **只查各文档的文件头**（顶部 40 行）：文件头写的是"当前状态"，必须准；
+    正文属历史流水，"V1.0.0 时…"是当时记录，不查——否则每篇历史条目都会误报
+    （范围过宽是第一次写这个守卫时踩的坑）。
+
+    **引号内豁免**：文中**引述**历史值时会带引号（如 `停留在"现 V1.22.0"`），
+    这类是"提到那个字符串"而非"声明当前版本"，一律不判——与第 20 条"指代明确"
+    同理：引号即"这是转述"的标记。
+    教训：DEVLOG 文件头"现 V1.22.0"长期未随真源更新，脚本此前只扫本文件内部，查不出漂移。
+    """
+    head("(7) 铁律版本串一致性（跨开发侧文档·限文件头）")
+    m = re.search(r"\*\*版本 (V\d+\.\d+\.\d+)\*\*", s)
+    if not m:
+        err("未能从真源解析铁律版本（顶部应为「**版本 Vx.y.z**」）")
+        return
+    truth = m.group(1)
+    HEAD_LINES = 40
+    bad = []
+    for rel in VER_FILES:
+        p = os.path.join(DEV, rel)
+        if not os.path.exists(p):
+            continue
+        with open(p, encoding="utf-8") as f:
+            for i, line in enumerate(f, 1):
+                if i > HEAD_LINES:
+                    break
+                # 只在"铁律"语境行上比对，避免误抓技能自身版本号
+                if "铁律" not in line:
+                    continue
+                # 引号内的版本串＝引述历史值，剔除后再查
+                stripped = re.sub(r"[“\"]([^”\"]*)[”\"]", "", line)
+                for got in VER_RE.findall(stripped):
+                    if got != truth:
+                        bad.append("%s:%d 铁律版本 %s ≠ 真源 %s" % (rel, i, got, truth))
+    if bad:
+        for b in bad:
+            err(b)
+    else:
+        info("真源 %s；开发侧 %d 份文档文件头的铁律版本串一致" % (truth, len(VER_FILES)))
+
+
 # ────────────────────────────── 钩子 ──────────────────────────────
 
 def install_hook():
@@ -450,6 +502,7 @@ def main():
     check_wording(s)
     check_expression(s)
     check_paths(s)
+    check_rules_version(s)
     print("=" * 62)
     if ERRS:
         print("结果：错误 %d 项，警告 %d 项 —— **未通过**" % (len(ERRS), len(WARNS)))

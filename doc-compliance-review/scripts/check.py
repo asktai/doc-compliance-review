@@ -220,7 +220,7 @@ def check_rule_ids():
 
 
 def check_id_group_whitelist():
-    """规则ID组字母白名单：①三脚本彼此一致 ②覆盖 core/01 实际用到的全部组。
+    """规则ID组字母白名单：(1)三脚本彼此一致 (2)覆盖 core/01 实际用到的全部组。
     背景：新增规则组（如 V3.8.0 的 K 组、既有但漏管的 A/B/X 组）若某脚本漏改，
     会导致规则计数与基线条账静默缺项。此处常驻校验，堵住该漂移面。"""
     scripts = ["check.py", "rule-baseline.py", "sample-baseline.py"]
@@ -693,8 +693,8 @@ def check_smoke_count():
     if not isinstance(real, int) or not real:
         return
     # 只扫与冒烟/自检同一行的数字。须排除两类干扰，否则会把别的脚本的项数当成冒烟项数：
-    # ① 其他脚本所在行（check.py 的 12 项、pack.py 的 5 项都不是冒烟项数）
-    # ② 列表式表述「N 项：结构／字段／…」——那是分项的枚举，不是总数
+    # (1) 其他脚本所在行（check.py 的 12 项、pack.py 的 5 项都不是冒烟项数）
+    # (2) 列表式表述「N 项：结构／字段／…」——那是分项的枚举，不是总数
     kw = ("smoke-test", "冒烟", "自检")
     other_scripts = ("check.py", "pack.py", "sample-baseline", "guard.py", "rule-baseline")
     bad, seen = [], 0
