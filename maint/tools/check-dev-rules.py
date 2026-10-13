@@ -179,8 +179,13 @@ def check_structure(s):
     else:
         info("章序号一至%s连续" % want[-1])
 
-    rng = [(n, int(a), int(b)) for n, a, b in
-           re.findall(r"^## (第.+?章) .*?（第 (\d+)—(\d+) 条）\s*$", s, re.M)]
+    # 章区间标注：支持两种形态——区间「（第 A—B 条）」与单条「（第 N 条）」
+    # （单条章如第七章，只有一个条号，不写成 "21—21"）
+    rng = []
+    for name, a, b in re.findall(r"^## (第.+?章) .*?（第 (\d+)—(\d+) 条）\s*$", s, re.M):
+        rng.append((name, int(a), int(b)))
+    for name, a in re.findall(r"^## (第.+?章) .*?（第 (\d+) 条）\s*$", s, re.M):
+        rng.append((name, int(a), int(a)))
     for name, a, b in rng:
         have = [n for n in nums if a <= n <= b]
         if len(have) != b - a + 1:
@@ -599,6 +604,74 @@ def check_ref_anchor(s):
         info("表格行引用均带父级（无语义判定——语义仍靠人工复核）")
 
 
+# ──────────────────── (11) 加粗行首段落须带编号 ────────────────────
+
+def check_bold_heading(s):
+    """(11) 凡"行首加粗段落"，须带 `N.M` 编号（编号体系／书写段规则的守卫）。
+
+    规则（DEV-RULES.md「书写」段）：**行首加粗即声明"这是一个编号单元"**，
+    故加粗行首段落必须带 `N.M`（`N` 为条号或章号），不得以加粗冒充小标题。
+
+    背景：V1.30.3 曾靠**人工截图**才发现 11 处无编号加粗段落；做本守卫时又查出
+    **9 处更隐蔽的**（真·段落起点而无编号）。**人眼与裸 grep 均会漏，故必须固化。**
+
+    放行（不算违规）：
+    - 带编号者：`**N.M …**`、`**N.M.K …**`、`**A.N …**`、`**N.0 …**`（0 为总述位）；
+    - **续行**：上一非空行不是空行／标题／表格／引用块，即本行是上句的继续，非段落起点；
+    - **文件头元信息**（首 40 行内、含 `｜` 或"导读"者）；
+    - **导读区**（第 1 条之前）：该区本就声明"不属编号单元"（见「导读说明」行）；
+    - **明确声明游离的段**：加粗文字中含"非本规范组成部分"字样；
+    - 围栏代码块内、表格行、列表项（`- ` 开头，走二级编号规则）、引用块（`> `）。
+    """
+    head("(11) 加粗行首段落须带编号")
+    lines = s.splitlines()
+    fenced = in_fence_lines(s)
+    # 第 1 条标题行号——之前的属"导读区"，放行
+    first_art = None
+    for i, l in enumerate(lines, 1):
+        if re.match(r"^### 第 1 条", l):
+            first_art = i
+            break
+
+    bad = []
+    for i, l in enumerate(lines, 1):
+        if i in fenced:
+            continue
+        # 二级编号单元（列表项 `- **N.M.K …**`）——**也须带编号**。
+        # 负向测试暴露的盲区：只查 `^**` 会漏掉列表项，而 9.3／9.4／9.5 正是此形态。
+        m_li = re.match(r"^(\s*)- \*\*([^*]+)\*\*", l)
+        if m_li:
+            if not re.match(r"^(?:\d+(?:\.\d+)+|A\.\d+(?:\.\d+)*)\b", m_li.group(2).strip()):
+                # 排除：明确声明游离的段
+                if "非本规范组成部分" not in l:
+                    bad.append((i, l.strip()[:56]))
+            continue
+        # 一级编号单元（加粗行首段落 `**N.M …**`）
+        if not re.match(r"^\*\*[^*]", l):
+            continue
+        # 带编号 → 合规（N.M / N.M.K / A.N / N.0）
+        if re.match(r"^\*\*(?:\d+(?:\.\d+)+|A\.\d+(?:\.\d+)*)\b", l):
+            continue
+        # 导读区（第 1 条之前）与文件头元信息 → 放行
+        if first_art and i < first_art:
+            continue
+        if i <= 40:
+            continue
+        # 明确声明"非本规范组成部分"的游离段 → 放行
+        if "非本规范组成部分" in l:
+            continue
+        # 续行判定：上一非空行不是空行／标题／表格／引用块 → 本行是续行，放行
+        prev = lines[i - 2].strip() if i >= 2 else ""
+        if prev and not prev.startswith(("#", "|", ">", "---")):
+            continue
+        bad.append((i, l.strip()[:56]))
+    if bad:
+        for i, t in bad:
+            err("第 %d 行：加粗行首段落无编号（须带 `N.M`，或以不加粗改写）：%s" % (i, t))
+    else:
+        info("加粗行首段落／编号列表项均带编号（放行续行／导读区／元信息／围栏／游离声明段）")
+
+
 # ────────────────────────────── 钩子 ──────────────────────────────
 
 def install_hook():
@@ -645,6 +718,7 @@ def main():
     check_cross_side()
     check_toc_anchor(s)
     check_ref_anchor(s)
+    check_bold_heading(s)
     print("=" * 62)
     if ERRS:
         print("结果：错误 %d 项，警告 %d 项 —— **未通过**" % (len(ERRS), len(WARNS)))
