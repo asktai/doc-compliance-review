@@ -350,18 +350,27 @@ def check_expression(s):
         info("编号形态合规（无 1.／(N) 旧形态）")
 
     # 路径连续性：N.M / N.M.K / N.M.K.L 同级须自 1 连号、不跳号、不重号
+    # **例外**：`N.0` 为"总述位"（见铁律编号体系"唯一例外"条）——某条需在首个子项
+    # 之前先作总述时用 `N.0`，其后子项仍自 `N.1` 起连号。故同级序列允许
+    # `[0,1,...,n]`（0 至多一个且必在首位）或 `[1,...,n]`。
     kids = {}
     for m in re.finditer(r"(?m)^(?: {0,2}- )?\*\*((?:\d+|A\.\d)(?:\.\d+)+)(?:\s|\*\*)", s):
         path = m.group(1); parent, child = path.rsplit(".", 1)
         kids.setdefault(parent, []).append(int(child))
     bad_path = []
     for par, v in sorted(kids.items()):
-        if sorted(v) != list(range(1, len(v) + 1)):
-            bad_path.append("%s → %s" % (par, sorted(v)))
+        sv = sorted(v)
+        # 合法形态一：自 1 连号
+        ok = sv == list(range(1, len(sv) + 1))
+        # 合法形态二：0 在首位且其后自 1 连号（总述位）
+        if not ok and sv and sv[0] == 0:
+            ok = sv[1:] == list(range(1, len(sv)))
+        if not ok:
+            bad_path.append("%s → %s" % (par, sv))
     if bad_path:
         err("路径编号不连续或重号：%s" % "；".join(bad_path))
     else:
-        info("路径编号连续（%d 组父级，均自 1 连号）" % len(kids))
+        info("路径编号连续（%d 组父级，均自 1 连号；含总述位 `N.0` 例外）" % len(kids))
 
 
 # ────────────────────────────── (6) 路径真实性 ──────────────────────────────
