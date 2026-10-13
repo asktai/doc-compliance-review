@@ -171,7 +171,39 @@
 `names = [x for x in names if x]` 用错变量名，未过滤 `out`），第四部分渲染成 0 条；
 已修并加"空则回退全盘扫描"的兜底。
 
-**方案 C（未启动）**：开发者要求 A、B 弄完后再弄；B 待开发者侧确认权限开通。
+**方案 C（已落地）**：走**腾讯文档（`tdocs-app`）**通道——该链路的写入能力**可用**（与资料库形成对照）。
+
+**已验证的腾讯文档交付链**（4 步，缺一不可）：
+
+1. `manage.create_file`（`file_type=doc`）建在线文档 → 得 `file_url`；
+2. `manage.pre_import`（`file_name` ＋ `file_size` ＋ `file_md5`）→ 得 `upload_url`／`file_key`／`task_id`；
+3. **`curl -X PUT` 把文件本体传到 `upload_url`**（须带 `Content-Length`，用 `--data-binary @文件`）；
+4. `manage.async_import` 触发 → `manage.import_progress` 轮询至 `progress=100` → 得 `file_id`／`file_url`。
+
+**本次交付物**：
+
+| 内容 | 在线地址 | file_id |
+|---|---|---|
+| 产出物台账（在线版） | https://docs.qq.com/doc/DRHRTZWtFdEpvSmdj | `DtSekEtJoJgc` |
+| 技能包 V3.11.7 `.Skill` | https://docs.qq.com/document/DREJQaVZQeHBjT3BY | `DBPiVPxpcOpX` |
+| 技能包 V3.11.7 `.zip` | https://docs.qq.com/document/DRFVmU3NybUVOeE9M | `DUfSsrmENxOL` |
+
+**踩坑（2 个，均已修）**：
+
+1. **凭证与文件错配**：`pre_import` **每调一次就换一组 `file_key`／`upload_url`**。
+   我先取了凭证 A 却没立即上传，转头又调了一次 `pre_import` 拿到凭证 B，
+   结果文件 PUT 到 A 的地址、导入却提交 B 的凭证——**必须"取凭证 → 立即 PUT → 立即 async_import"三步一气呵成**，
+   凭证用后即弃。
+2. **误用 `insert_markdown` 造成正文重复**：台账更新后再"写入"在线文档时，
+   `insert_markdown` 是**追加**语义（`idx=0` 仍插在文首、且**不覆盖**旧内容），
+   导致文档出现两份完整正文（段落 1—36 ＋ 37—68，全文 25227 字符）。
+   修复：用 `resolve_document_structure` 定位第二份起点（`start_index=12927`），
+   以 `doc.replace_text` ＋ 零宽字符 `\u200b` 清空至文末（`end=25227`）；
+   **注**：`replace_text` 的 `text` 传空串会被判为"缺参"，须传零宽字符占位。
+   复验大纲：L1 × 1 ＋ L2 × 6，结构干净。
+
+**教训固化**：在线文档"刷新内容"**不能靠再次 `insert_markdown`**——它是追加而非覆盖。
+若须刷新，正解是**新建文档重新导入**（旧文档另作留存或删除），或先精确删旧内容再插新内容。
 
 ---
 
