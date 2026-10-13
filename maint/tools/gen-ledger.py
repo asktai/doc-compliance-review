@@ -209,15 +209,18 @@ def build(no_files=False):
     A("")
     A("| 内容 | 类型 | 在线地址 |")
     A("|---|---|---|")
-    A("| 产出物台账（本文档的在线版） | 腾讯文档 | https://docs.qq.com/doc/DRHRTZWtFdEpvSmdj |")
-    A("| 技能包 V3.11.7（`.Skill`） | 腾讯文档 · 文件 | https://docs.qq.com/document/DREJQaVZQeHBjT3BY |")
-    A("| 技能包 V3.11.7（`.zip`） | 腾讯文档 · 文件 | https://docs.qq.com/document/DRFVmU3NybUVOeE9M |")
+    # ⚠ 在线链接与 file_id 来自外部上传，无法自动派生：每次重传后须同步更新以下两端。
+    _online_ver = latest or "—"
+    A("| 产出物台账（本文档的在线版） | 腾讯文档 | "
+      "https://docs.qq.com/markdown/DRGhzeHBSZ0FXRUNP ｜ **以最新导入为准** |")
+    A(f"| 技能包 {_online_ver}（`.Skill`） | 腾讯文档 · 文件 | https://docs.qq.com/document/DRHRMSUNHdmFRS0FS |")
+    A(f"| 技能包 {_online_ver}（`.zip`） | 腾讯文档 · 文件 | https://docs.qq.com/document/DRG5OdXJDVkZ3VENS |")
     A("")
     A("**导入溯源**（腾讯文档侧 `file_id`，便于核对）："
-      "台账 `DtSekEtJoJgc`／`.Skill` `DBPiVPxpcOpX`／`.zip` `DUfSsrmENxOL`。")
+      "台账 `DhsxpRgAWECO`／`.Skill` `DtLICGvaQKAR`／`.zip` `DnNurCVFwTCR`。")
     A("")
-    A("> **维护提示**：台账更新后，腾讯文档版**不会自动同步**——"
-      "需重新导入覆盖（或另建文档）。在线链接如有变更，须同步更新本节。")
+    A("> **维护提示**：腾讯文档导入**只新建、不覆盖**，故台账自指的「在线版」链接天然差一代——"
+      "本节链接与 `file_id` 仅供溯源，**以最新导入的那一份为准**。技能包链接反之稳定，可长期引用。")
     A("")
     A("---")
     A("")
