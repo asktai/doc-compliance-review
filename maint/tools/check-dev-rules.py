@@ -291,8 +291,13 @@ def check_expression(s):
     seg = section_by_kw(s, "表述纪律")   # 该条表格内是**反例**，须排除（按关键词定位，不写死条号）
     body = s.replace(seg, "") if seg else s
 
+    # 引号内豁免：引号里的软指代是**列举反例**（如 A.4「禁用软指代（"见下款"…）」），
+    # 属"提到那个说法"而非"使用那个说法"——与 (7) 版本串守卫同一判据。
+    def _strip_quotes(x):
+        return re.sub(r"[“\"]([^”\"]*)[”\"]", "", x)
+
     hits = [l.strip()[:70] for l in body.splitlines()
-            if any(p in l for p in REL_REFS)]
+            if any(p in _strip_quotes(l) for p in REL_REFS)]
     if hits:
         for h in hits:
             err("相对引用（应为绝对编号，如「见第 %d 条」）：%s" % (no_of(s, "分发包命名") or 0, h))
