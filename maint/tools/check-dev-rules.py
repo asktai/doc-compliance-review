@@ -47,6 +47,10 @@ DEV = os.path.dirname(os.path.dirname(HERE))            # /workspace/dev
 RULES = os.path.join(DEV, "DEV-RULES.md")
 SKILL = os.path.join(DEV, "doc-compliance-review")
 RUN = os.path.expanduser("~/.codebuddy/skills/doc-compliance-review")
+# 跨侧比对时排除的项，与 publish.py 的 EXCLUDE 保持一致
+# （生成物只应存在于运行实例，且 .git 等本就不该同步）
+EXCLUDE = {".git", "__pycache__", ".DS_Store",
+           ".integrity.json", "_rules-baseline.json", "_smoke-baseline.json"}
 DIST = "/workspace/dist"
 HOOK_SRC = os.path.join(HERE, "hooks", "pre-commit")
 HOOK_DST = os.path.join(DEV, ".git", "hooks", "pre-commit")
@@ -465,6 +469,127 @@ def check_rules_version(s):
         info("真源 %s；开发侧 %d 份文档文件头的铁律版本串一致" % (truth, len(VER_FILES)))
 
 
+# ────────────────────── (8) 跨侧漂移（开发侧 ↔ 运行实例） ──────────────────────
+
+def check_cross_side(s_ignored=None):
+    """开发侧与运行实例比对——**须排除运行侧生成物**。
+
+    实查（2026-10-13）：开发侧 66 个文件、运行实例 69 个，差 3 个正是运行侧生成物
+    （`_rules-baseline.json`、`.integrity.json`、`_smoke-baseline.json`）——
+    它们**只应存在于运行实例**，故不能全量比对，须按 EXCLUDE 排除后再比。
+    比对内容：应镜像文件的**相对路径 ＋ sha256**。
+    """
+    head("(8) 跨侧一致性（开发侧 ↔ 运行实例）")
+    if not os.path.isdir(RUN):
+        info("运行实例不存在（未装机），跳过——不视为漂移")
+        return
+    import hashlib
+
+    def digest(p):
+        with open(p, "rb") as f:
+            return hashlib.sha256(f.read()).hexdigest()
+
+    drift = []
+    dev_files = {}
+    for root, dirs, files in os.walk(SKILL):
+        dirs[:] = [d for d in dirs if d not in EXCLUDE]
+        for fn in files:
+            if fn in EXCLUDE:
+                continue
+            fp = os.path.join(root, fn)
+            dev_files[os.path.relpath(fp, SKILL)] = fp
+    for rel, fp in sorted(dev_files.items()):
+        rp = os.path.join(RUN, rel)
+        if not os.path.exists(rp):
+            drift.append("运行实例缺此文件：%s" % rel)
+        elif digest(fp) != digest(rp):
+            drift.append("两侧不一致：%s" % rel)
+    if drift:
+        for d in drift[:10]:
+            err(d)
+        if len(drift) > 10:
+            err("……另有 %d 处，不逐一列出" % (len(drift) - 10))
+    else:
+        info("开发侧 %d 个文件与运行实例一致（已排除运行侧生成物）" % len(dev_files))
+
+
+# ────────────────────── (9) 目录锚点一致性 ──────────────────────
+
+def _gh_anchor(n, title):
+    """按 GitHub 规则由条标题重算锚点（已实测：现目录 20 条 20/20 吻合）。"""
+    t = title.lower()
+    t = re.sub(r"[（）、，：；／·]", "", t)
+    return "第-%d-条-%s" % (n, t.replace(" ", "-"))
+
+
+def check_toc_anchor(s):
+    """(9) 目录的条标题／锚点须与正文同步。
+
+    目录是正文标题的**引用**——标题改了目录没改，即引用漂移（2.3.3）。
+    V1.30.0 改第 2 条标题时目录未跟，而当时七维查不出（只查条号连续性）。
+    """
+    head("(9) 目录锚点一致性")
+    toc = re.findall(r"^\s*- \[第 (\d+) 条 ([^\]]+)\]\(#([^)]+)\)", s, re.M)
+    if not toc:
+        info("无目录（跳过）")
+        return
+    body = {n: rest.strip() for n, rest in title_rows(s)}
+    bad = []
+    for ns, title, anchor in toc:
+        n = int(ns)
+        bt = body.get(n)
+        if bt is None:
+            bad.append("目录有第 %d 条，正文无此条" % n)
+            continue
+        if bt != title:
+            bad.append("第 %d 条：目录「%s」≠ 正文「%s」" % (n, title, bt))
+            continue
+        exp = _gh_anchor(n, title)
+        if exp != anchor:
+            bad.append("第 %d 条：锚点 `#%s` ≠ 重算 `#%s`" % (n, anchor, exp))
+    if len(toc) != len(body):
+        bad.append("目录 %d 条 ≠ 正文 %d 条" % (len(toc), len(body)))
+    if bad:
+        for b in bad:
+            err(b)
+    else:
+        info("目录 %d 条的标题与锚点均与正文一致" % len(toc))
+
+
+# ────────────────────── (10) 引用锚点完整性 ──────────────────────
+
+def check_ref_anchor(s):
+    """(10) 引用表格行须带父级。
+
+    铁律 2.3.3「引用漂移」含"语义已变"，而语义**无法自动化**（脚本做不到）。
+    本项只覆盖其中**可自动化的形态部分**：引用表格行时须写 `N.M 第 K 行`，
+    不得裸写"第 K 行"（不知是哪张表）——正是历史事故的形态（第 14 条"（第 4 行）"）。
+    **语义理解仍靠人工复核（17.4），本项不覆盖，也不得据本项通过而认为该类已闭合。**
+    """
+    head("(10) 引用锚点完整性（表格行引用须带父级）")
+    fenced = in_fence_lines(s)
+    seg = section_by_kw(s, "表格例外")          # 该处是规则说明，含反例，排除
+    bad = []
+    for i, line in enumerate(s.splitlines(), 1):
+        if i in fenced or (seg and line in seg.splitlines()):
+            continue
+        if line.lstrip().startswith(("- [", "|", ">")):   # 目录／表格／引用块里的举例跳过
+            continue
+        # 裸写"第 N 行"（前面既非 `N.M` 也非条级"第 N 条"／`N`）→ 违规。
+        # **父级有两种合法形态**：款级 `17.3`、条级 `14` 或 `第 14 条`（实测都出现过）。
+        for m in re.finditer(r"(?<![\.\d])(?<!M )第 (\d+) 行", line):
+            pre = line[:m.start()]
+            ok_parent = re.search(r"(?:\d+\.\d+|\d+)\s*$", pre) or re.search(r"第\s*\d+\s*条\s*$", pre)
+            if not ok_parent:
+                bad.append("第 %d 行：裸写「第 %s 行」，应带父级（如 `17.3 第 %s 行`）：%s"
+                           % (i, m.group(1), m.group(1), line.strip()[:60]))
+    if bad:
+        for b in bad:
+            err(b)
+    else:
+        info("表格行引用均带父级（无语义判定——语义仍靠人工复核）")
+
+
 # ────────────────────────────── 钩子 ──────────────────────────────
 
 def install_hook():
@@ -508,6 +633,9 @@ def main():
     check_expression(s)
     check_paths(s)
     check_rules_version(s)
+    check_cross_side()
+    check_toc_anchor(s)
+    check_ref_anchor(s)
     print("=" * 62)
     if ERRS:
         print("结果：错误 %d 项，警告 %d 项 —— **未通过**" % (len(ERRS), len(WARNS)))
