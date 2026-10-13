@@ -1080,6 +1080,56 @@ def check_gitignore():
         info("gitignore：无行尾注释写法（规则不会静默失效）")
 
 
+def check_skill_ext_lowercase():
+    """封装扩展名小写守卫：`.skill` 必须全小写，防止回流成 `.Skill`。
+
+    V3.11.9 起，分发包主格式扩展名由 `.Skill` 统一改为全小写 `.skill`——部分系统
+    做扩展名匹配时**大小写敏感**，统一小写更稳妥。为防日后有人照旧例写回大写，
+    本守卫断言两件事：
+
+    1. `pack.py` 的 `FMT_EXT["skill"]` 值全小写（真源本身不能是大写）；
+    2. 入口文档与脚本中不出现作为**格式引用**的大写 `.Skill`（解释性提及除外，
+       由 `ALLOW` 白名单显式放行，如变更说明里"此前为大写 `.Skill`"这类记载）。
+    """
+    # 1) 真源：FMT_EXT 的 skill 值须全小写
+    pack = os.path.join(HERE, "pack.py")
+    if not os.path.exists(pack):
+        info("封装扩展名：未找到 pack.py，跳过")
+        return
+    src = _read(pack)
+    m = re.search(r'FMT_EXT\s*=\s*\{[^}]*"skill"\s*:\s*"([^"]*)"', src)
+    if not m:
+        warn("封装扩展名：未能解析 pack.py 的 FMT_EXT，跳过")
+        return
+    if m.group(1) != m.group(1).lower():
+        err("pack.py 的 FMT_EXT[\"skill\"] 应为全小写：当前 %r" % m.group(1))
+        return
+
+    # 2) 文档与脚本中不得出现作为格式引用的大写 .Skill
+    # 放行清单：变更说明里需保留"此前为大写 `.Skill`"的历史记载。
+    allow_docs = {"VERSION.md"}        # 版本沿革，须保留历史版本当时的写法
+    allow_scripts = {"pack.py", "check.py"}   # 变更说明与守卫本身需引用"错误形态"
+    bad = []
+    for rel in ("SKILL.md", "README.md", "VERSION.md", "SECURITY.md",
+                "安装使用教程.md", "文档合规审查助手AI合同审核提示词版.md"):
+        if rel in allow_docs:
+            continue
+        for ln, line in enumerate(_doc_lines(rel), 1):
+            if ".Skill" in line:
+                bad.append("%s:%d" % (rel, ln))
+    for p in _walk(HERE, exts=(".py", ".ps1")):
+        if os.path.basename(p) in allow_scripts:
+            continue
+        for ln, line in enumerate(_read(p).splitlines(), 1):
+            if ".Skill" in line:
+                bad.append("%s:%d" % (os.path.relpath(p, ROOT), ln))
+    if bad:
+        err("发现大写 .Skill 格式引用 %d 处（应为小写 .skill）：%s"
+            % (len(bad), "、".join(bad[:5])))
+    else:
+        info("封装扩展名：FMT_EXT 全小写，文档/脚本无大写 .Skill 回流")
+
+
 def check_sample_baseline():
     """样例级人工基线台账：结构、样例路径、规则 ID 是否真实存在（防台账写错而不自知）。"""
     p = os.path.join(ROOT, "core", "_sample-baseline.json")
@@ -1192,6 +1242,7 @@ def main():
         check_sample_baseline()
         check_reproducible_build()
         check_gitignore()
+        check_skill_ext_lowercase()
         check_version_consistency()
         check_config()
         check_hardcoded_paths()

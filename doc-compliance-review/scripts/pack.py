@@ -54,7 +54,7 @@ _sys.dont_write_bytecode = True
     广告合规审查_V1.7.0_20260928_(advertising-compliance-review).zip
 
 四段定式：**版本号带大写 V**、**日期紧凑 8 位**、**技能 ID 用半角括号包裹置末**、
-**分隔符一律下划线**；封装格式**默认同时出 `.Skill` 与 `.zip` 两种**。
+**分隔符一律下划线**；封装格式**默认同时出 `.skill` 与 `.zip` 两种**。
 
 各段均**自动读取，不靠手填**，避免"版本升了文件名还写着旧号"：
 产品名取 `SKILL.md` frontmatter 的 `display_name`，版本号取 `version`（统一补大写 `V`），
@@ -62,7 +62,8 @@ _sys.dont_write_bytecode = True
 `display_name_en`（英文可读名）仍属出包必填字段——平台展示要用，但**不进文件名**。
 
 > 注：文件名含成对半角括号，属合法文件名；在终端里操作记得加引号或用转义。
-> `.Skill` 首字母大写是规范写法，Linux/macOS 大小写敏感，脚本内以 `FMT_EXT` 为准，勿另行硬拼。
+> `.skill` 全小写（V3.11.9 起；此前为大写 `.Skill`，因部分系统扩展名匹配大小写敏感，
+> 统一小写更稳妥）。脚本内以 `FMT_EXT` 为准，勿另行硬拼。
 - `.zip` ＝纯 ZIP，与开放平台（open.workbuddy.cn）实测口径一致（**平台官方收 zip、≤3 MB**）。
 
 用法：
@@ -243,9 +244,9 @@ SKILL_FMT_VER = 1
 #   · 日期 **紧凑 8 位**（`%Y%m%d`，如 20260928）
 #   · 技能 ID 用 **半角括号**包裹，内容为 **slug**（`name` 字段，小写字母/数字/连字符）
 #   · 分隔符一律 **下划线**
-#   · 封装格式默认同时出 `.Skill` 与 `.zip` 两种（见 `--format`，默认 both）
+#   · 封装格式默认同时出 `.skill` 与 `.zip` 两种（见 `--format`，默认 both）
 # 段序、分隔符与大小写一律以本常量为准，**不要在别处另行拼装文件名**。
-FMT_EXT = {"zip": "zip", "skill": "Skill"}
+FMT_EXT = {"zip": "zip", "skill": "skill"}
 
 
 def _fm_field(base, key):
@@ -414,7 +415,7 @@ def build(base, outdir, include_private=False, tag="V3.0.0", keep_tools=False, f
         print("  [OK] 出包自检通过：顶层／SKILL.md 计数／层级（≤%d 级）／体积（≤%d MB）／private 五项全过"
               % (PLATFORM_MAX_DEPTH, PLATFORM_MAX_MB))
 
-        # ---- 封装为 .Skill（头部 ＋ 同一个 zip 负载）
+        # ---- 封装为 .skill（头部 ＋ 同一个 zip 负载）
         sp = os.path.join(outdir, "%s.%s" % (stem, FMT_EXT["skill"]))
         if fmt in ("both", "skill"):
             meta, nhead = write_skill(zp, sp, product, sid, tag, _date)
@@ -464,7 +465,7 @@ if __name__ == "__main__":
     ap.add_argument("--keep-tools", action="store_true",
                     help="保留 config.json 里填好的工具路径（默认清空，避免作者本机路径随包外发）")
     ap.add_argument("--format", choices=["skill", "zip", "both"], default="both",
-                    help="封装格式（默认 both＝两种都出，主格式为 .Skill）："
+                    help="封装格式（默认 both＝两种都出，主格式为 .skill）："
                          "skill＝只出 .skill；zip＝只出 .zip（平台上传多认这个）")
     ap.add_argument("--date", default=None, metavar="YYYYMMDD",
                     help="文件名日期段（默认打包当天）。需复现某日包或 CI 固定日期时指定；"

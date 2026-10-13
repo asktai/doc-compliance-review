@@ -28,7 +28,7 @@ OUT = os.path.join(ROOT, "产出物台账.md")
 CST = timezone(timedelta(hours=8))
 
 # 分发包四段式：中文产品名_版本号_日期_(技能ID).扩展名
-PKG_RE = re.compile(r"^(?P<name>.+?)_(?P<ver>V\d+\.\d+\.\d+)_(?P<date>\d{8})_\((?P<slug>[^)]+)\)\.(?P<ext>Skill|zip)$")
+PKG_RE = re.compile(r"^(?P<name>.+?)_(?P<ver>V\d+\.\d+\.\d+)_(?P<date>\d{8})_\((?P<slug>[^)]+)\)\.(?P<ext>skill|zip)$")
 
 
 def sha256(path):
@@ -44,7 +44,7 @@ def ver_key(v):
 
 
 def scan_dist():
-    """扫分发包，按 版本→扩展名(.Skill 在前) 排序。"""
+    """扫分发包，按 版本→扩展名(.skill 在前) 排序。"""
     rows = []
     if not os.path.isdir(DIST):
         return rows
@@ -64,7 +64,7 @@ def scan_dist():
             "sha256": sha256(p),
             "version_in_name": (m.group("ver") == m.group("ver")),  # 占位，正文另校验
         })
-    rows.sort(key=lambda r: (ver_key(r["ver"]), 0 if r["ext"] == "Skill" else 1))
+    rows.sort(key=lambda r: (ver_key(r["ver"]), 0 if r["ext"] == "skill" else 1))
     return rows
 
 
@@ -162,11 +162,11 @@ def build(no_files=False):
     A("| 产出物 | 版本 | 状态 | 文件 |")
     A("|---|---|---|---|")
     if latest:
-        sk = [p for p in pkgs if p["ver"] == latest and p["ext"] == "Skill"]
+        sk = [p for p in pkgs if p["ver"] == latest and p["ext"] == "skill"]
         zp = [p for p in pkgs if p["ver"] == latest and p["ext"] == "zip"]
         f1 = f"`dist/{sk[0]['file']}`" if sk else "—"
         f2 = f"`dist/{zp[0]['file']}`" if zp else "—"
-        A(f"| 文档合规审查技能（分发包） | {latest} | **在役** | {f1}（.Skill）<br>{f2}（.zip） |")
+        A(f"| 文档合规审查技能（分发包） | {latest} | **在役** | {f1}（.skill）<br>{f2}（.zip） |")
     A(f"| 开发工程规范（铁律） | {dev_ver or '—'} | **在役**（开发侧，不外流） | `dev/DEV-RULES.md` |")
     if skill_ver and latest and skill_ver != latest:
         A(f"| 技能本体（工作副本） | {skill_ver} | 注意：与最新包 {latest} 不一致 | `dev/doc-compliance-review/` |")
@@ -183,7 +183,7 @@ def build(no_files=False):
     A("## 二、分发包总表")
     A("")
     A("> 命名四段式：`中文产品名_版本号_日期_(技能ID).扩展名`。"
-      "同一版本成对出包：`.Skill`（自定义头部 + zip 负载）与 `.zip`（纯 ZIP）。")
+      "同一版本成对出包：`.skill`（自定义头部 + zip 负载）与 `.zip`（纯 ZIP）。")
     A("")
     A("| # | 版本 | 日期 | 格式 | 大小 | 文件 | SHA256（前 16 位） |")
     A("|---:|---|---|---|---|---|---|")
@@ -195,7 +195,7 @@ def build(no_files=False):
     A("**完整性核验**（在 `/workspace` 下执行）：")
     A("")
     A("```bash")
-    A("sha256sum dist/*.Skill dist/*.zip")
+    A("sha256sum dist/*.skill dist/*.zip")
     A("```")
     A("")
     A("---")
@@ -213,11 +213,11 @@ def build(no_files=False):
     _online_ver = latest or "—"
     A("| 产出物台账（本文档的在线版） | 腾讯文档 | "
       "https://docs.qq.com/markdown/DRGhzeHBSZ0FXRUNP ｜ **以最新导入为准** |")
-    A(f"| 技能包 {_online_ver}（`.Skill`） | 腾讯文档 · 文件 | https://docs.qq.com/document/DRHRMSUNHdmFRS0FS |")
+    A(f"| 技能包 {_online_ver}（`.skill`） | 腾讯文档 · 文件 | https://docs.qq.com/document/DRHRMSUNHdmFRS0FS |")
     A(f"| 技能包 {_online_ver}（`.zip`） | 腾讯文档 · 文件 | https://docs.qq.com/document/DRG5OdXJDVkZ3VENS |")
     A("")
     A("**导入溯源**（腾讯文档侧 `file_id`，便于核对）："
-      "台账 `DhsxpRgAWECO`／`.Skill` `DtLICGvaQKAR`／`.zip` `DnNurCVFwTCR`。")
+      "台账 `DhsxpRgAWECO`／`.skill` `DtLICGvaQKAR`／`.zip` `DnNurCVFwTCR`。")
     A("")
     A("> **维护提示**：腾讯文档导入**只新建、不覆盖**，故台账自指的「在线版」链接天然差一代——"
       "本节链接与 `file_id` 仅供溯源，**以最新导入的那一份为准**。技能包链接反之稳定，可长期引用。")
