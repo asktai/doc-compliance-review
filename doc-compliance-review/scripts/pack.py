@@ -116,6 +116,13 @@ PLATFORM_MAX_DEPTH = 2
 # 出包时需清空的配置文件（相对技能根）——只清 tools 段，其余段（隐私/输出策略）保持原样
 CONFIG_REL = "scripts/config.json"
 
+# zip 条目**固定时间戳**（可复现构建）：
+#   zf.write() 默认写源文件 mtime，而发布链 sync() 是 rmtree＋copytree 全量重建，
+#   重建后全部文件 mtime 都是同步时刻 → 同一版本每次重跑，包内容未变、字节却全变。
+# 统一用固定时间戳，内容相同则包字节必相同，包哈希可复现、可用于校验与缓存。
+# 取 1980-01-01 00:00:00（zip 格式可表示的最小合法值，避免各平台对 0 值的兼容差异）。
+ZIP_EPOCH = (1980, 1, 1, 0, 0, 0)
+
 
 def neutralise_config(text):
     """把 config.json 的 tools 段清成空串，返回新文本；无需改动则返回 None。
@@ -135,6 +142,37 @@ def neutralise_config(text):
     return json.dumps(d, ensure_ascii=False, indent=2) + "\n"
 
 
+def _zip_write(zf, fp, arc, blank_tools=False, report=None):
+    """把单个文件写入 zip，**条目时间戳固定**，保证可复现构建。
+
+    为什么要固定：`zf.write()` 默认把**源文件 mtime** 写进 zip 条目，而发布链的
+    `sync()` 是 `rmtree ＋ copytree` 全量重建，重建后所有文件 mtime 都变成同步时刻——
+    于是同一版本每次重跑，包内容一字未改、**字节却全变**，包哈希不可复现。
+    这里统一用固定时间戳（`ZIP_EPOCH`），内容相同则包字节必相同。
+
+    config.json 的"清空工具路径"分支走 `writestr`，此处一并统一时间戳。
+    """
+    if blank_tools and arc == CONFIG_REL:
+        try:
+            with open(fp, encoding="utf-8") as cf:
+                got = neutralise_config(cf.read())
+        except Exception:
+            got = None
+        if got:
+            zi = zipfile.ZipInfo(arc, date_time=ZIP_EPOCH)
+            zi.compress_type = zipfile.ZIP_DEFLATED
+            zi.external_attr = 0o644 << 16
+            zf.writestr(zi, got)
+            if report is not None:
+                report.append(arc)
+            return
+    zi = zipfile.ZipInfo(arc, date_time=ZIP_EPOCH)
+    zi.compress_type = zipfile.ZIP_DEFLATED
+    zi.external_attr = 0o644 << 16
+    with open(fp, "rb") as f:
+        zf.writestr(zi, f.read())
+
+
 def add_tree(zf, base, relpath, recurse=True, prefix="", blank_tools=True, report=None):
     src = os.path.join(base, relpath)
     for root, dirs, files in os.walk(src):
@@ -149,18 +187,8 @@ def add_tree(zf, base, relpath, recurse=True, prefix="", blank_tools=True, repor
                 continue   # 本地测试日志（如 _testrb.log.txt）不得混入发布包
             fp = os.path.join(root, f)
             arc = os.path.relpath(fp, base).replace("\\", "/")
-            if blank_tools and arc == CONFIG_REL:
-                try:
-                    with open(fp, encoding="utf-8") as cf:
-                        got = neutralise_config(cf.read())
-                except Exception:
-                    got = None
-                if got:
-                    zf.writestr(prefix + arc, got)
-                    if report is not None:
-                        report.append(arc)
-                    continue
-            zf.write(fp, prefix + arc if prefix else arc)
+            _zip_write(zf, fp, prefix + arc if prefix else arc,
+                       blank_tools=blank_tools, report=report)
 
 def verify_zip(zp):
     """出包自检：把上次被平台拒收的硬伤，做成**出包即拦**的守门（退码非 0 即视为打包失败）。
@@ -231,7 +259,7 @@ def _fm_field(base, key):
     return m.group(1).strip().strip('"').strip("'") if m else ""
 
 
-def package_stem(base, tag):
+def package_stem(base, tag, date=None):
     """四段式文件名主干：**中文产品名_版本号_日期_(技能ID)**。返回 (主干, 产品名, 技能ID, 日期, 英文名)。
 
     对照规范（示例见文档）：
@@ -242,7 +270,8 @@ def package_stem(base, tag):
     各段取值：
       · 产品名 ← frontmatter 的 `display_name`（去引号、去文件名非法字符）
       · 版本号 ← tag（`read_skill_version` 自动读 `version`，**统一补大写 V**，不靠手填）
-      · 日期   ← 打包当天，**紧凑写**（`%Y%m%d`，如 20260928）
+      · 日期   ← 打包当天，**紧凑写**（`%Y%m%d`，如 20260928）；
+                 可用 `date` 参数（命令行 `--date`）覆盖，供复现某日包或 CI 固定日期
       · 技能ID ← frontmatter 的 `name`（slug，小写字母/数字/连字符），**配半角括号置末**
                  ——2026-09-29 起由英文可读名改为 slug，与平台/目录名保持同一套标识
       · 英文名 `display_name_en` **仍读取**但**不进文件名**（平台展示用；保留在 pack.py 的
@@ -257,7 +286,7 @@ def package_stem(base, tag):
     product = _safe_name(product) or SKILL_DIR
     en = _safe_name(en) or sid
     sid = _safe_name(sid) or SKILL_DIR
-    date = datetime.date.today().strftime("%Y%m%d")
+    date = date or datetime.date.today().strftime("%Y%m%d")
     return "%s_%s_%s_(%s)" % (product, tag, date, sid), product, sid, date, en
 
 
@@ -327,12 +356,13 @@ def write_skill(zp, out, product, sid, version, date):
     return meta, len(head)
 
 
-def build(base, outdir, include_private=False, tag="V3.0.0", keep_tools=False, fmt="both"):
+def build(base, outdir, include_private=False, tag="V3.0.0", keep_tools=False, fmt="both",
+          date=None):
     os.makedirs(outdir, exist_ok=True)
     priv_path = os.path.join(base, PRIVATE_DIR)
     prefix = SKILL_DIR + "/"   # 上架版结构：所有条目都套一层技能目录
     blanked = []               # 本次包内被清空工具路径的配置文件（用于收尾提示）
-    stem, product, sid, _date = package_stem(base, tag)[:4]
+    stem, product, sid, _date = package_stem(base, tag, date)[:4]
     _bad = verify_filename(stem)
     if _bad:
         for b in _bad:
@@ -353,7 +383,8 @@ def build(base, outdir, include_private=False, tag="V3.0.0", keep_tools=False, f
             for f in files:
                 fp = os.path.join(base, f)
                 if os.path.exists(fp):
-                    zf.write(fp, prefix + f)
+                    _zip_write(zf, fp, prefix + f, blank_tools=keep_tools is False,
+                               report=blanked)
             for d in dirs:
                 if os.path.isdir(os.path.join(base, d)):
                     add_tree(zf, base, d, recurse=(d not in NONREC_DIRS), prefix=prefix,
@@ -435,6 +466,9 @@ if __name__ == "__main__":
     ap.add_argument("--format", choices=["skill", "zip", "both"], default="both",
                     help="封装格式（默认 both＝两种都出，主格式为 .Skill）："
                          "skill＝只出 .skill；zip＝只出 .zip（平台上传多认这个）")
+    ap.add_argument("--date", default=None, metavar="YYYYMMDD",
+                    help="文件名日期段（默认打包当天）。需复现某日包或 CI 固定日期时指定；"
+                         "此参数**只影响文件名与 .skill 头部**，不改变包内容")
     a = ap.parse_args()
     if a.include_private:
         print("[警告] --include-private 已启用，private/（企业内控口径）将被打入发布包，"
@@ -443,5 +477,5 @@ if __name__ == "__main__":
         print("[注意] --keep-tools 已启用：config.json 的工具路径将**原样入包**，"
               "确认这些路径对接收方有效。")
     ok = build(a.base, a.out or os.path.join(a.base, "_发布包"), a.include_private,
-               a.tag or read_skill_version(a.base), a.keep_tools, a.format)
+               a.tag or read_skill_version(a.base), a.keep_tools, a.format, a.date)
     sys.exit(0 if ok else 1)

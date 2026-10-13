@@ -32,6 +32,12 @@
 
 基线文件：`core/_rules-baseline.json`（随包，可读可改）。
 
+**可复现契约（V3.11.8 起）**：基线的 `generated` 字段是**内容标识**（`content-<16位 sha256>`，
+由 rules／files／meta 三层内容派生），**不是生成时刻**——规则内容不变，标识就不变，
+文件字节亦不变。如此，同一版本重跑发布链可产出**字节一致**的分发包，
+包哈希可复现、可用于校验与缓存。需要"何时生成"时看 git 记录，或看 `meta` 层里
+规则库自身的 `effective_date` / `last_revised`。
+
 **人工基线（样例级）**：审查结论由模型作出，脚本无法自动生成"预期风险项"。
 样例级基线用 `scripts/sample-baseline.py` 维护（台账 `core/_sample-baseline.json`
 ＋ 比对器），用法见该脚本 `--help` 与 `04-交付报告\规则回归基线-V3.4.0.md` 第三节。
@@ -151,6 +157,24 @@ def scan_meta_md(path):
             "sha256": hashlib.sha256(txt.encode("utf-8")).hexdigest()[:16]}
 
 
+def baseline_stamp(cr, cf, cm):
+    """基线的**可复现标识**——由规则库内容自身派生，与生成时刻无关。
+
+    为什么不用当前时间：基线文件随包分发，若标识取"生成时刻"，则同一版本**每重跑一次
+    发布链，包字节就变一次**（出包时间戳＋本文件时间戳），同版本无法产出字节一致的包，
+    包哈希不可复现、无法用于校验与缓存。此处改用**内容指纹**作标识：规则内容不变，
+    标识就不变，同版本重跑出包**字节级一致**。
+
+    真实生成时刻**不写入基线文件**——它随包分发，任何含时刻的字段都会让同一版本
+    每次重跑产出不同的包。需要"这份基线何时生成"时，看 git 记录或 `meta` 层里
+    规则库自身的 `effective_date` / `last_revised`（时间信息本就在那里）。
+    """
+    h = hashlib.sha256()
+    h.update(json.dumps({"rules": cr, "files": cf, "meta": cm},
+                        ensure_ascii=False, sort_keys=True).encode("utf-8"))
+    return "content-" + h.hexdigest()[:16]
+
+
 def collect():
     """返回 (rules, files, meta, sha)。meta＝生效日/最近修订；sha＝核心库内容指纹。"""
     rules, files, meta, sha = {}, {}, {}, {}
@@ -248,7 +272,7 @@ def main():
         data = {"_说明": "规则库回归基线（rule-baseline.py 生成）。rules＝通用库条目（ID/名称/评级★数/所属节）；"
                         "files＝行业库文件指纹（行数/节数/sha256）；meta＝生效日与最近修订（版本/生效日/"
                         "最近修订/内容sha256）。改动后跑 python scripts/rule-baseline.py 比对，差异交人工确认后再 --update。",
-                "generated": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "generated": baseline_stamp(cr, cf, cm),
                 "total": total, "rules": cr, "files": cf, "meta": cm}
         with open(BASELINE, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
@@ -263,7 +287,7 @@ def main():
     meta = json.load(open(BASELINE, encoding="utf-8"))
     base = (meta.get("rules") or {}, meta.get("files") or {}, meta.get("meta") or {})
     if a.show:
-        print("[baseline] 生成时间：%s　通用库 %d 条　行业库 %d 个文件"
+        print("[baseline] 内容标识：%s　通用库 %d 条　行业库 %d 个文件"
               % (meta.get("generated", "?"), meta.get("total", 0), len(base[1])))
         for f in sorted(base[0]):
             lv = {}
@@ -291,7 +315,8 @@ def main():
                          ensure_ascii=False, indent=2))
         return 1 if n else 0
 
-    print("[baseline] 基线 %s：通用库 %d 条；当前 %d 条" % (meta.get("generated", "?"), meta.get("total", 0), total))
+    print("[baseline] 基线 %s：通用库 %d 条；当前 %d 条"
+          % (meta.get("generated", "?"), meta.get("total", 0), total))
     if not n:
         print("[baseline] 无差异：规则条目（ID/名称/评级）与行业库文件指纹均与基线一致。")
         return 0

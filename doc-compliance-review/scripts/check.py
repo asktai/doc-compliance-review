@@ -982,6 +982,104 @@ def check_platform_limit():
         info("平台上限口径：文档与 pack.py 常量一致（≤%s MB）" % lim)
 
 
+def check_reproducible_build():
+    """可复现构建守卫：出包链不得引入随"生成时刻"变化的字节。
+
+    为什么守这条：分发包随包带两份**生成型台账**（`core/_rules-baseline.json`、
+    `scripts/.integrity.json`）。若其中写入生成时刻、或 zip 条目时间戳取自源文件 mtime，
+    则同一版本每次重跑发布链——包内容一字未改、**字节却全变**，包哈希不可复现，
+    无法用于校验、缓存与分发对账。
+
+    （`sync()` 是 rmtree＋copytree 全量重建，重建后全部文件 mtime 都变成同步时刻，
+    故"zip 条目用 mtime"这条尤其隐蔽：单看打包脚本没问题，跑完整发布链才暴露。）
+
+    本守卫逐条断言：
+      (1) rule-baseline.py 的 `generated` 由内容派生（`content-` 前缀），非当前时刻
+      (2) rule-baseline.py 不写入 `generated_at`（含时刻字段即破坏复现）
+      (3) rule-baseline.py 不含 `datetime.now()` 写入基线的路径
+      (4) pack.py 定义并统一使用固定 zip 条目时间戳（ZIP_EPOCH），不裸用 `zf.write(`
+    """
+    problems = []
+
+    rb = os.path.join(HERE, "rule-baseline.py")
+    if os.path.exists(rb):
+        src = _read(rb)
+        if "baseline_stamp(" not in src:
+            problems.append("rule-baseline.py 未见 baseline_stamp()：基线标识须由内容派生")
+        if '"content-"' not in src:
+            problems.append("rule-baseline.py 基线标识未用 content- 前缀（非内容派生）")
+        if "generated_at" in src:
+            problems.append("rule-baseline.py 写入了 generated_at：含生成时刻即破坏可复现")
+        if re.search(r'"generated":\s*datetime', src):
+            problems.append("rule-baseline.py 的 generated 仍取自 datetime（应为内容标识）")
+    else:
+        info("可复现构建：rule-baseline.py 不存在，跳过 (1)-(3)")
+
+    pk = os.path.join(HERE, "pack.py")
+    if os.path.exists(pk):
+        src = _read(pk)
+        # 不能用 "ZIP_EPOCH" in src —— 改名成 ZIP_EPOCH_UNUSED 仍会命中子串。
+        # 须精确断言：定义是一条赋值语句，且值为合法的 zip 时间戳元组（6 个整数）。
+        if not re.search(r"(?m)^ZIP_EPOCH\s*=\s*\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,"
+                         r"\s*\d+\s*,\s*\d+\s*,\s*\d+\s*\)\s*$", src):
+            problems.append("pack.py 未定义 ZIP_EPOCH（须为模块级 6 元组常量，"
+                            "形如 ZIP_EPOCH = (1980, 1, 1, 0, 0, 0)）")
+        # 裸 zf.write( 会把源文件 mtime 写进条目 —— 发布链重建 mtime 后包字节即变
+        # 判定范围须排除"非可执行文本"：注释行与 docstring 里都会以 zf.write() 举例
+        # （本守卫的说明文字自身即含此串）。用 AST 只取**真实调用**，最稳。
+        try:
+            import ast as _ast
+            tree = _ast.parse(src)
+            calls = []
+            for node in _ast.walk(tree):
+                if isinstance(node, _ast.Call):
+                    fn = node.func
+                    if (isinstance(fn, _ast.Attribute) and fn.attr == "write"
+                            and isinstance(fn.value, _ast.Name) and fn.value.id == "zf"):
+                        calls.append(getattr(node, "lineno", 0))
+            if calls:
+                problems.append("pack.py 第 %s 行仍有裸 zf.write()：会写入源文件 mtime，破坏可复现"
+                                % "、".join(str(n) for n in calls))
+        except SyntaxError as e:
+            problems.append("pack.py 语法错误，无法做可复现性静态检查：%s" % e)
+    else:
+        info("可复现构建：pack.py 不存在，跳过 (4)")
+
+    if problems:
+        err("可复现构建契约被破坏 %d 处：%s" % (len(problems), "；".join(problems)))
+    else:
+        info("可复现构建：基线标识内容派生、zip 条目时间戳固定（同版本重跑出包字节一致）")
+
+
+def check_gitignore():
+    """`.gitignore` 有效性守卫：防"行尾注释"写法让规则**静默失效**。
+
+    gitignore **不支持行尾注释**——`#` 只有位于**行首**才是注释；写在路径后面会被
+    当作路径的一部分（如 `core/x.json    # 说明` 匹配的是名为
+    `core/x.json    # 说明` 的文件）。规则于是形同虚设，**且不报任何错**。
+    V3.11.8 实测踩到：三条生成物规则（`.integrity.json` / `_rules-baseline.json` /
+    `_smoke-baseline.json`）因此长期失效，直到有人 `git add -A` 才发现。
+
+    本守卫断言：.gitignore 中每条**非注释、非空**行都不得含 `#`。
+    """
+    p = os.path.join(os.path.dirname(ROOT), ".gitignore")
+    if not os.path.exists(p):
+        info("gitignore：仓库根无 .gitignore，跳过")
+        return
+    bad = []
+    for i, line in enumerate(_read(p).splitlines(), 1):
+        s = line.strip()
+        if not s or s.startswith("#"):
+            continue
+        if "#" in s:
+            bad.append("第 %d 行含行尾注释（# 后被当路径一部分，规则会静默失效）：%s"
+                       % (i, s[:56]))
+    if bad:
+        err("gitignore 写法有误 %d 处：%s" % (len(bad), "；".join(bad[:3])))
+    else:
+        info("gitignore：无行尾注释写法（规则不会静默失效）")
+
+
 def check_sample_baseline():
     """样例级人工基线台账：结构、样例路径、规则 ID 是否真实存在（防台账写错而不自知）。"""
     p = os.path.join(ROOT, "core", "_sample-baseline.json")
@@ -1092,6 +1190,8 @@ def main():
         check_package_fields()
         check_platform_limit()
         check_sample_baseline()
+        check_reproducible_build()
+        check_gitignore()
         check_version_consistency()
         check_config()
         check_hardcoded_paths()

@@ -1,12 +1,23 @@
 __pycache__/
 *.pyc
 .DS_Store
+
 # 运行侧生成物：开发侧一律不留存，否则 publish 的镜像同步会把陈旧副本覆盖回运行实例
-.integrity.json                     # scripts/ - check.py --sign 生成的脚本指纹台账
-core/_rules-baseline.json           # rule-baseline.py --update 生成的规则回归基线条账
-core/_smoke-baseline.json           # smoke-test.py 跑完自动记账的冒烟结果台账
+#   · .integrity.json        scripts/ - check.py --sign 生成的脚本指纹台账
+#   · _rules-baseline.json   rule-baseline.py --update 生成的规则回归基线条账
+#   · _smoke-baseline.json   smoke-test.py 跑完自动记账的冒烟结果台账
+#
+# ⚠ 注意：gitignore **不支持行尾注释** —— `#` 只有位于**行首**才是注释，
+#   写在路径后面会被当作路径的一部分，规则静默失效（V3.11.8 实测踩到：
+#   旧写法 `core/_rules-baseline.json    # 说明` 使三条规则全部形同虚设，
+#   直到有人 `git add -A` 才暴露）。故本文件的说明注释一律**独立成行**。
+.integrity.json
+doc-compliance-review/core/_rules-baseline.json
+doc-compliance-review/core/_smoke-baseline.json
+
 # 本机工具路径覆盖层：由 detect-tools.py --write 生成，只对当前这台机器有意义，
 # 既不得进 git 也不得随发布包（见 scripts/pack.py 的 EXCLUDE_FILES）。
 config.local.json
+
 # 注：core/_sample-baseline.json 是**人工登记**台账（--add/--confirm 逐例录入），
 #     不可由代码重建，属开发资产，须正常纳入 git 跟踪，切勿加入此文件。
