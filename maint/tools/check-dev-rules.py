@@ -689,7 +689,11 @@ def install_hook():
     shutil.copyfile(HOOK_SRC, HOOK_DST)
     os.chmod(HOOK_DST, 0o755)
     print("[OK] 已安装 pre-commit 钩子 → %s（只警告、不阻断）" % HOOK_DST)
-    print("     作用：提交涉及 DEV-RULES.md 时自动跑本脚本并打印结果；不阻止提交。")
+    print("     一档：提交涉及 DEV-RULES.md → 自动跑本脚本（十一维自检）。")
+    print("     二档：提交涉及守卫本体（check-dev-rules.py／smoke-dev-rules.py）")
+    print("          → 自动跑 maint/tools/smoke-dev-rules.py 全量冒烟，")
+    print("            用注入测试证明守卫**仍然拦得住**（铁律 17.2）。")
+    print("     均不阻止提交；要强制门禁请手动运行并看退出码。")
     print("     卸载：删除该文件即可。换机器：重跑本命令一装即可。")
     return 0
 
