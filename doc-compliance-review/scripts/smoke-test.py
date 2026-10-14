@@ -545,7 +545,7 @@ def main():
     try:
         v = run([PY, os.path.join(HERE, "version.py")])
         check("version.py 版本身份证（含版本号与规模）",
-              v.returncode == 0 and "V3." in (v.stdout or ""), (v.stdout or "")[:90])
+              v.returncode == 0 and "v3." in (v.stdout or ""), (v.stdout or "")[:90])
         me = os.path.dirname(HERE)          # 与自身比对：应判「已是最新版」
         c = run([PY, os.path.join(HERE, "version.py"), "--check", me])
         check("version.py --check 自身（应判已是最新）",

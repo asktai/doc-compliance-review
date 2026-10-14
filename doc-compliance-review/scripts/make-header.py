@@ -518,7 +518,7 @@ def read_version():
         m = re.search(r"(?m)^version:\s*([0-9][0-9A-Za-z.\-]*)", head)
         if m:
             v = m.group(1).strip()
-            return v if v.upper().startswith("V") else "V" + v
+            return v if v.lower().startswith("v") else "v" + v
     except OSError:
         pass
     return None

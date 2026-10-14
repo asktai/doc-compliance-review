@@ -28,7 +28,7 @@ OUT = os.path.join(ROOT, "产出物台账.md")
 CST = timezone(timedelta(hours=8))
 
 # 分发包四段式：中文产品名_版本号_日期_(技能ID).扩展名
-PKG_RE = re.compile(r"^(?P<name>.+?)_(?P<ver>V\d+\.\d+\.\d+)_(?P<date>\d{8})_\((?P<slug>[^)]+)\)\.(?P<ext>skill|zip)$")
+PKG_RE = re.compile(r"^(?P<name>.+?)_(?P<ver>v\d+\.\d+\.\d+)_(?P<date>\d{8})_\((?P<slug>[^)]+)\)\.(?P<ext>skill|zip)$")
 
 
 def sha256(path):
@@ -40,7 +40,7 @@ def sha256(path):
 
 
 def ver_key(v):
-    return tuple(int(x) for x in v.lstrip("V").split("."))
+    return tuple(int(x) for x in v.lstrip("Vv").split("."))
 
 
 def scan_dist():
@@ -79,7 +79,7 @@ def read_dev_rules_version():
         return None
     with open(p, encoding="utf-8") as f:
         for line in f:
-            m = re.search(r"\*\*版本 (V\d+\.\d+\.\d+)\*\*", line)
+            m = re.search(r"\*\*版本 (v\d+\.\d+\.\d+)\*\*", line)
             if m:
                 return m.group(1)
     return None
@@ -92,7 +92,7 @@ def read_skill_version():
     with open(p, encoding="utf-8") as f:
         head = f.read(4000)
     m = re.search(r"^version:\s*(\d+\.\d+\.\d+)", head, re.M)
-    return ("V" + m.group(1)) if m else None
+    return ("v" + m.group(1)) if m else None
 
 
 def scan_skill_files():

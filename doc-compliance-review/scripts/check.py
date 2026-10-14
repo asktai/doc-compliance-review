@@ -568,7 +568,7 @@ def check_header_version():
     """
     base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     m = re.search(r"(?m)^version:\s*([0-9][0-9.]*)\s*$", _read(os.path.join(base, "SKILL.md")))
-    cur = ("V" + m.group(1)) if m else None
+    cur = ("v" + m.group(1)) if m else None
     adir = os.path.join(base, "assets")
     if not cur or not os.path.isdir(adir):
         return
@@ -891,8 +891,8 @@ def check_package_fields():
         for ver, seg in re.findall(pat, _read(p)):
             if ver.lstrip("Vv") != tag.lstrip("Vv"):
                 stale.append("%s 里的示例仍是 %s（当前 %s）" % (rel, ver, tag))
-            if not ver.startswith("V"):
-                stale.append("%s 里的示例版本号未带大写 V：%s" % (rel, ver))
+            if not ver.startswith("v"):
+                stale.append("%s 里的示例版本号未带小写 v：%s" % (rel, ver))
             if " " in seg or "（" in seg or "）" in seg:
                 stale.append("%s 里的示例技能ID 段仍是旧形态（应为 slug + 半角括号）：%s"
                              % (rel, seg))
@@ -919,7 +919,7 @@ def check_version_consistency():
         err("SKILL.md frontmatter 缺 version 字段")
         return
     ver = m.group(1)
-    v = "V" + ver
+    v = "v" + ver
     bad = []
     # SKILL 正文标题里的版本串
     if not re.search(r"\*\*%s\*\*" % re.escape(v), t):

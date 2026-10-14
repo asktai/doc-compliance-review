@@ -402,7 +402,7 @@ def render_card(version, f_serif, f_sans, f_sansb, f_seal, ss=2, verbose=False):
     put((PAD * U + cap_w + 18 * U, sub_base), SUB_TEXT, f_sub, GOLD_LT, "ls")
     xb = PAD * U + cap_w + 18 * U + d.textlength(SUB_TEXT, font=f_sub) + 26 * U
 
-    badge = version if version.upper().startswith("V") else "V" + version
+    badge = version if version.lower().startswith("v") else "v" + version
     f_badge = font(f_sansb, 22 * U)
     bw = d.textlength(badge, font=f_badge) + 44 * U
     d.rounded_rectangle([xb, sub_ink_mid - 22 * U, xb + bw, sub_ink_mid + 22 * U], radius=17 * U,
@@ -542,7 +542,7 @@ def read_version():
             m = re.search(r"(?m)^version:\s*([0-9][0-9A-Za-z.\-]*)", f.read(12000))
         if m:
             v = m.group(1).strip()
-            return v if v.upper().startswith("V") else "V" + v
+            return v if v.lower().startswith("v") else "v" + v
     except OSError:
         pass
     return None

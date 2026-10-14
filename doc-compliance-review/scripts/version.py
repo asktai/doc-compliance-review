@@ -146,7 +146,7 @@ def watch(src):
     d.update({"path": src, "registered_at": datetime.datetime.now().isoformat(timespec="seconds")})
     d.pop("checked_at", None)
     _save_src_cfg(d)
-    print("[version] 已登记更新源：%s（源版本 V%s）" % (src, sver))
+    print("[version] 已登记更新源：%s（源版本 v%s）" % (src, sver))
     print("[version] 以后直接跑 python scripts/version.py --check 即可比对；"
           "--notice 会静默检查只在有新版本时提示一次。")
     return 0
@@ -175,12 +175,12 @@ def show_source():
         cur = vkey(i["version"])
         tgt = vkey(sver) if sver else (0, 0, 0)
         if sver and tgt > cur:
-            print("[version] 源版本 V%s ＞ 当前 V%s：**有更新可用**（是否升级由使用者决定）"
+            print("[version] 源版本 v%s ＞ 当前 v%s：**有更新可用**（是否升级由使用者决定）"
                   % (sver, i["version"]))
         elif sver and tgt < cur:
-            print("[version] 源版本 V%s ＜ 当前 V%s：这个源比本机旧，装它会回退。" % (sver, i["version"]))
+            print("[version] 源版本 v%s ＜ 当前 v%s：这个源比本机旧，装它会回退。" % (sver, i["version"]))
         elif sver:
-            print("[version] 源版本 V%s ＝ 当前 V%s：已是最新。" % (sver, i["version"]))
+            print("[version] 源版本 v%s ＝ 当前 v%s：已是最新。" % (sver, i["version"]))
     print("[version] 登记时间：%s" % d.get("registered_at", "未知"))
     if d.get("checked_at"):
         print("[version] 上次检查：%s" % d["checked_at"])
@@ -201,7 +201,7 @@ def set_dismiss(ver, undo=False):
     else:
         if ver not in arr:
             arr.append(ver)
-        print("[version] 已忽略 V%s 的更新提醒（本机仍可随时手动检查或升级）。" % ver)
+        print("[version] 已忽略 v%s 的更新提醒（本机仍可随时手动检查或升级）。" % ver)
     d["dismissed"] = arr
     _save_src_cfg(d)
     return 0
@@ -231,7 +231,7 @@ def notice(quiet=True):
         _save_src_cfg(d)
     except Exception:
         pass
-    print("[version] 检测到新版本：当前 V%s → 可用 V%s（更新源：%s）"
+    print("[version] 检测到新版本：当前 v%s → 可用 v%s（更新源：%s）"
           % (i["version"], sver, p))
     print("[version] 这只是一个提示，**不会自动升级**。要看看改了什么："
           "python scripts/version.py --changelog %s" % p)
@@ -334,7 +334,7 @@ def show():
     i = identity()
     print("[version] 位置：%s" % ROOT)
     print("[version] 名称：%s" % i["name"])
-    print("[version] 版本：V%s" % i["version"])
+    print("[version] 版本：v%s" % i["version"])
     if i["author"]:
         print("[version] 作者：%s" % i["author"])
     print("[version] 许可：%s" % i["license"])
@@ -355,16 +355,16 @@ def check(src):
         print("[version] 更新源应是：解开的技能目录、或未解开的 .zip 发布包。")
         return 2
     tgt = vkey(sver)
-    print("[version] 当前：V%s　更新源：V%s（%s）" % (i["version"], sver, kind))
+    print("[version] 当前：v%s　更新源：v%s（%s）" % (i["version"], sver, kind))
     if tgt == cur:
         print("[version] 已是最新版，无需升级。")
         return 0
     if tgt > cur:
-        print("[version] 有更新：V%s → V%s" % (i["version"], sver))
+        print("[version] 有更新：v%s → v%s" % (i["version"], sver))
         print("[version] 先看改了什么：python scripts/version.py --changelog %s" % src)
         print("[version] 再预演升级：python scripts/version.py --upgrade %s --target <安装目录>" % src)
         return 0
-    print("[version] 更新源版本 **低于** 当前版本（V%s < V%s）——确认是否拿错了包；"
+    print("[version] 更新源版本 **低于** 当前版本（v%s < v%s）——确认是否拿错了包；"
           "继续安装会**回退**功能。" % (sver, i["version"]))
     return 3
 
@@ -408,9 +408,9 @@ def changelog(src, limit=40):
     lo, hi = (cur, tgt) if tgt >= cur else (tgt, cur)
     hit = [r for r in rows if lo < r[0] <= hi]
     if not hit and tgt == cur:
-        print("[version] 当前 V%s 与源版本相同，无区间沿革。" % i["version"])
+        print("[version] 当前 v%s 与源版本相同，无区间沿革。" % i["version"])
         return 0
-    print("[version] 区间沿革 V%s → V%s（%d 个版本条目，取自 %s）："
+    print("[version] 区间沿革 v%s → v%s（%d 个版本条目，取自 %s）："
           % (vstr(lo), vstr(hi), len(hit), src_of_rows))
     if not hit:
         print("    （CHANGELOG 中未找到该区间的版本标题，可能两侧版本同属于一个大版本块）")
@@ -501,7 +501,7 @@ def upgrade(src_dir, target, apply=False, overwrite_cfg=False):
         return 0
 
     stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M")
-    bak = "%s_bak-V%s-%s" % (target.rstrip("\\/"), cur_ver.replace(".", ""), stamp)
+    bak = "%s_bak-v%s-%s" % (target.rstrip("\\/"), cur_ver.replace(".", ""), stamp)
     print("[version] 备份中：%s" % bak)
     n = 0
     for r, ds, fs in os.walk(target):
