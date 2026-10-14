@@ -212,12 +212,12 @@ def build(no_files=False):
     # ⚠ 在线链接与 file_id 来自外部上传，无法自动派生：每次重传后须同步更新以下两端。
     _online_ver = latest or "—"
     A("| 产出物台账（本文档的在线版） | 腾讯文档 | "
-      "https://docs.qq.com/markdown/DRGhzeHBSZ0FXRUNP ｜ **以最新导入为准** |")
-    A(f"| 技能包 {_online_ver}（`.skill`） | 腾讯文档 · 文件 | https://docs.qq.com/document/DRHRMSUNHdmFRS0FS |")
-    A(f"| 技能包 {_online_ver}（`.zip`） | 腾讯文档 · 文件 | https://docs.qq.com/document/DRG5OdXJDVkZ3VENS |")
+      "https://docs.qq.com/markdown/DRGJ2ektkZGJicXFz ｜ **以最新导入为准** |")
+    A(f"| 技能包 {_online_ver}（`.skill`） | 腾讯文档 · 文件 | https://docs.qq.com/document/DRFF6eVZ1enpxWk1q |")
+    A(f"| 技能包 {_online_ver}（`.zip`） | 腾讯文档 · 文件 | https://docs.qq.com/document/DREFRUElaTFFySE14 |")
     A("")
     A("**导入溯源**（腾讯文档侧 `file_id`，便于核对）："
-      "台账 `DhsxpRgAWECO`／`.skill` `DtLICGvaQKAR`／`.zip` `DnNurCVFwTCR`。")
+      "台账 `DbvzKddbbqqs`／`.skill` `DQzyVuzzqZMj`／`.zip` `DAQPIZLQrHMx`。")
     A("")
     A("> **维护提示**：腾讯文档导入**只新建、不覆盖**，故台账自指的「在线版」链接天然差一代——"
       "本节链接与 `file_id` 仅供溯源，**以最新导入的那一份为准**。技能包链接反之稳定，可长期引用。")
