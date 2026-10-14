@@ -31,9 +31,16 @@
 > 预演（dry-run），只列出会覆盖/新增/保留什么，一个字节都不动。发现新版就自动替使用者升级，
 > 是明确排除的行为——版本换季可能改变审查口径与产出形态，必须由人判断何时切。
 
-**零联网**：本脚本只读本地文件与本地 zip，**不访问任何网络**。
-更新源由使用者自己给（U 盘、内网共享、发布目录），因此"检测更新"不需要、也不会联网。
-判定依据＝两侧 `SKILL.md` frontmatter 的 `version` 字段。
+**联网口径（分级，2026-10-14 起）**——本脚本把"查更新"与"拿更新"分成两件事：
+  · **查有无新版**：**默认联网**（读 config.json 的 `update.manifest_url`，一个公开的
+    `version.json` 清单）。**只读、不上传任何信息**；离线／连不上／未配置时**静默降级**，
+    退回本地已登记的更新源，绝不报错、绝不卡住。想完全离线：把 `manifest_url` 留空即关闭。
+  · **下载新版包**：**由使用者手动**——工具只给出"下载页地址"，包由使用者在浏览器里自己下。
+    工具**从不自动下载、从不自动安装**。
+  · **本地方式始终可用**：更新源也可以是本地目录或已下载的 zip（`--watch` 登记），
+    该路径**完全不联网**，适合内网／离网环境。
+  两条路径在"装"这一步完全同构：接到的都是一个本地目录或本地 zip，故走同一套校验／预演／
+  备份／升级链。判定依据＝两侧 `SKILL.md` frontmatter 的 `version` 字段。
 
 保护规则（升级时）：
 - `private/` **永不覆盖**（脱敏词表、映射表属本机私有数据）；
@@ -78,6 +85,154 @@ SKIP_PAT = ("__pycache__", "*.pyc", "_*.log.txt", ".DS_Store")
 # 与映射表、备份同思路——不落在技能目录内，免得整目录外发时把使用者的更新来源一并带出去。
 UPDATE_DIR = os.environ.get("DCR_UPDATE_DIR") or os.path.join(os.path.expanduser("~"), ".dcr-updates")
 SOURCE_FILE = os.path.join(UPDATE_DIR, "source.json")
+
+# 在线检查更新的网络超时（秒）。**刻意短**：这个检查是可选的锦上添花，
+# 绝不能因为对方站点慢/不通就把使用者的命令卡在那里。
+ONLINE_TIMEOUT = 6
+
+
+def _load_update_cfg():
+    """读在线更新配置（config.json 的 update 段）。
+
+    三层叠加交给 _config.load() 处理；这里只取 update 段。
+    未配置、解析失败、字段缺失一律返回空 dict——**在线检查是可选增强**，
+    配置缺失时自动退回纯本地模式，不报错、不打扰。
+    """
+    try:
+        cfg = _cfgmod.load()
+        u = cfg.get("update") or {}
+        if not isinstance(u, dict):
+            return {}
+        return u
+    except Exception:
+        return {}
+
+
+def _online_enabled(u):
+    """在线检查是否可用：须有清单地址，且开关未显式关闭。"""
+    url = (u.get("manifest_url") or "").strip()
+    if not url or "<your-org>" in url:      # 占位地址＝尚未配置真源，等同于关闭
+        return False
+    if u.get("check_online_by_default") is False:
+        return False
+    return True
+
+
+def _fetch_manifest(url):
+    """只读拉取在线版本清单（version.json）。**任何异常都吞掉、返回 None**。
+
+    设计取向（与 --notice 一致）：这是"顺带查一下"，不是关键路径。
+    离线、被墙、DNS 失败、超时、返回不是 JSON、字段缺失——一律静默降级，
+    绝不把网络错误抛给使用者。**只做 GET 读一个公开清单，不上传任何信息。**
+    """
+    import json
+    import urllib.request
+    try:
+        req = urllib.request.Request(url, headers={
+            # 只声明"谁能取"，不带任何使用者标识；UA 便于对方站点统计
+            "User-Agent": "doc-compliance-review/version-check",
+            "Accept": "application/json",
+        })
+        with urllib.request.urlopen(req, timeout=ONLINE_TIMEOUT) as resp:
+            raw = resp.read(200000)          # 清单很小，设上限防异常大包
+        d = json.loads(raw.decode("utf-8"))
+        return d if isinstance(d, dict) else None
+    except Exception:
+        return None
+
+
+def _manifest_latest(m):
+    """从清单里取 latest 段，规整成 (版本串, 日期, 摘要, 要点列表, 下载页, 文件直链)。"""
+    if not isinstance(m, dict):
+        return None
+    lat = m.get("latest") or {}
+    ver = str(lat.get("version") or "").strip()
+    if not re.search(r"\d+\.\d+\.\d+", ver):
+        return None
+    ch = lat.get("changes") or []
+    if not isinstance(ch, list):
+        ch = []
+    files = lat.get("files") or {}
+    if not isinstance(files, dict):
+        files = {}
+    return {
+        "version": ver,
+        "date": str(lat.get("date") or "").strip(),
+        "summary": str(lat.get("summary") or "").strip(),
+        "changes": [str(x).strip() for x in ch if str(x).strip()],
+        "page": str(lat.get("download_page") or m.get("download_page") or "").strip(),
+        "files": {k: str(v).strip() for k, v in files.items() if str(v).strip()},
+    }
+
+
+def online_check(quiet=False):
+    """在线检查更新：**展示新版版本号 + 更新了哪些内容 + 下载指引**。
+
+    返回：0＝已是最新（或在线不可用，静默）／1＝有新版本（已展示指引）／2＝未配置在线源。
+
+    quiet=True 时（供 --notice 用）：
+      · 已是最新 → 一个字都不输出，退 0；
+      · 在线不可用 → 一个字都不输出，退 0（**静默降级，交给本地链**）；
+      · 有新版 → 输出完整信息（版本号／内容／下载指引），退 1。
+    quiet=False 时（供 --check-online 用）：把"已是最新""在线不可用"也说明白。
+    """
+    u = _load_update_cfg()
+    if not _online_enabled(u):
+        if not quiet:
+            print("[version] 未配置在线更新清单（config.json 的 update.manifest_url），"
+                  "在线检查已关闭。")
+            print("[version] 想启用：把 manifest_url / download_page 填成你自己的在线地址；"
+                  "留空即纯本地模式。")
+        return 2
+    m = _fetch_manifest(u["manifest_url"])
+    if m is None:
+        if not quiet:
+            print("[version] 在线检查不可用（离线、连不上或清单读取失败）——已静默降级，"
+                  "不影响本地使用。")
+            print("[version] 可改用纯本地方式：--watch <目录或 zip>。")
+        return 0
+    lat = _manifest_latest(m)
+    if lat is None:
+        if not quiet:
+            print("[version] 在线清单格式无法识别，已忽略。")
+        return 0
+    i = identity()
+    cur, tgt = vkey(i["version"]), vkey(lat["version"])
+    if tgt <= cur:
+        if not quiet:
+            print("[version] 已是最新版：v%s。" % i["version"])
+        return 0
+    if lat["version"] in (_load_src_cfg().get("dismissed") or []):
+        return 0
+    # 清单里的版本号可能带 v 也可能不带，统一成"小写 v + 数字"再展示（防止 vv3.12.0）
+    tver = "v" + lat["version"].lstrip("vV")
+    # dismissed 里存的是**裸号**（--dismiss 3.12.0），故用裸号比对，避免带不带 v 对不上
+    if tver.lstrip("v") in (_load_src_cfg().get("dismissed") or []):
+        return 0
+    # —— 有新版本：完整展示（版本号 / 更新内容 / 下载指引）——
+    print("[version] **有新版可用：当前 v%s → 最新 %s**%s"
+          % (i["version"], tver, ("（%s 发布）" % lat["date"]) if lat["date"] else ""))
+    if lat["summary"]:
+        print("[version] 一句话：%s" % lat["summary"])
+    if lat["changes"]:
+        print("[version] 新版更新了哪些内容：")
+        for c in lat["changes"]:
+            print("           · %s" % c)
+    print("[version] **要不要更新由你定**——本工具只提示，绝不自动升级，也不会替你下载。")
+    print("[version] 愿意更新的话，按三步走：")
+    if lat["page"]:
+        print("[version]   第一步 · 打开下载页：%s" % lat["page"])
+    else:
+        print("[version]   第一步 · 打开项目的下载页（见 README／版本清单）")
+    for k, label in (("skill", ".skill 包"), ("zip", ".zip 包")):
+        if lat["files"].get(k):
+            print("[version]   　　　　（%s 直链）：%s" % (label, lat["files"][k]))
+    print("[version]   第二步 · 下载到本机（浏览器里下，地址与进度都看得见），记住存到哪了")
+    print("[version]   第三步 · 装上去（先预演、确认无误再执行）：")
+    print("[version]   　　　python scripts/version.py --upgrade <刚下载的包> --target <安装目录>")
+    print("[version]   　　　python scripts/version.py --upgrade <刚下载的包> --target <安装目录> --apply")
+    print("[version]   不想再看到这个版本的提醒：--dismiss %s" % tver.lstrip("v"))
+    return 1
 
 
 def _read(path):
@@ -190,15 +345,22 @@ def show_source():
 
 
 def set_dismiss(ver, undo=False):
-    d = _load_src_cfg()
-    if not d.get("path") and not undo:
-        print("[version] 尚未登记更新源，无从忽略。")
+    """忽略/恢复某版本的提醒。
+
+    注意：**不要求已登记本地更新源**——2026-10-14 起更新检查默认走在线清单，
+    使用者可能从未 `--watch` 过任何本地源，但仍需要"这个版本先别提醒了"。
+    故此处只校验版本号形态，不再以"有无本地源"作前置（否则在线路径下无法忽略）。
+    """
+    if not undo and not re.match(r"^\d+\.\d+\.\d+$", (ver or "").strip()):
+        print("[version] --dismiss 需要版本号，如：--dismiss 3.7.0")
         return 2
+    d = _load_src_cfg()
     arr = list(d.get("dismissed") or [])
     if undo:
         arr = []
         print("[version] 已恢复所有版本的更新提醒。")
     else:
+        ver = ver.strip()
         if ver not in arr:
             arr.append(ver)
         print("[version] 已忽略 v%s 的更新提醒（本机仍可随时手动检查或升级）。" % ver)
@@ -208,11 +370,24 @@ def set_dismiss(ver, undo=False):
 
 
 def notice(quiet=True):
-    """静默检查有没有新版本：**无新版、无登记源、源不可访问，一律不输出、退 0**。
+    """静默检查有没有新版本：**无新版、无更新源、源不可访问，一律不输出、退 0**。
 
     设计取向：这个命令是给 AI 每次会话开头悄悄跑一次的，绝不能变成噪音。
-    只在"确实有更高版本、且使用者没说过忽略"时才输出一行，退 1。
+    只在"确实有更高版本、且使用者没说过忽略"时才输出，退 1。
+
+    **两条腿走路**（2026-10-14 起）：
+      1. **在线优先**：若配置了在线清单（config.json 的 update 段），先联网读它——
+         这是**默认**路径，使用者不必先登记任何本地源就能知道有没有新版；
+      2. **本地兜底**：在线不可用（离线／被墙／未配置）时，静默降级到本地已登记的更新源。
+    两条路都走不通＝一个字都不输出（退 0），使用者完全无感。
     """
+    # —— 第一条腿：在线（默认）——
+    if quiet:
+        rc = online_check(quiet=True)
+        if rc == 1:
+            return 1                      # 在线明确报告有新版，已展示完整指引
+        # rc == 0（已最新／在线不可用）、rc == 2（未配置）→ 继续看本地源
+    # —— 第二条腿：本地已登记的源（静默兜底）——
     d = _load_src_cfg()
     p = d.get("path") or ""
     if not p or not os.path.exists(p):
@@ -231,7 +406,7 @@ def notice(quiet=True):
         _save_src_cfg(d)
     except Exception:
         pass
-    print("[version] 检测到新版本：当前 v%s → 可用 v%s（更新源：%s）"
+    print("[version] 检测到新版本：当前 v%s → 可用 v%s（本地更新源：%s）"
           % (i["version"], sver, p))
     print("[version] 这只是一个提示，**不会自动升级**。要看看改了什么："
           "python scripts/version.py --changelog %s" % p)
@@ -533,7 +708,8 @@ def upgrade(src_dir, target, apply=False, overwrite_cfg=False):
 
 
 def main():
-    ap = argparse.ArgumentParser(description="版本身份证 · 更新检测 · 本地升级（零联网）")
+    ap = argparse.ArgumentParser(
+        description="版本身份证 · 更新检测 · 升级（检查可联网、下载升级包由使用者手动）")
     ap.add_argument("--check", metavar="源", nargs="?", const="__registered__", default=None,
                     help="与更新源比对版本（目录或 zip；省略源时用已登记的更新源）")
     ap.add_argument("--changelog", metavar="源", nargs="?", const="__registered__", default=None,
@@ -547,6 +723,8 @@ def main():
     ap.add_argument("--source", action="store_true", help="显示当前登记的更新源与版本关系")
     ap.add_argument("--notice", action="store_true",
                     help="静默检查是否有新版本（无新版不输出、退 0；有新版输出一行、退 1）")
+    ap.add_argument("--check-online", action="store_true",
+                    help="显式在线检查更新（显示最新版本号、更新内容与下载指引；只读公开清单）")
     ap.add_argument("--dismiss", metavar="版本", help="忽略某版本的更新提醒（如 --dismiss 3.7.0）")
     ap.add_argument("--undismiss", action="store_true", help="恢复所有版本的更新提醒")
     a = ap.parse_args()
@@ -574,6 +752,8 @@ def main():
         return show_source()
     if a.notice:
         return notice()
+    if a.check_online:
+        return online_check(quiet=False)
     if a.dismiss:
         return set_dismiss(a.dismiss)
     if a.undismiss:

@@ -81,7 +81,11 @@ FULL_FILES = ["SKILL.md", "README.md", "安装使用教程.md", "LICENSE.md", "V
               "文档合规审查助手AI合同审核提示词版.md", "SECURITY.md",
               # 按需加载的三份专项口径：SKILL 里只留索引段，命中对应入口时才读这几份，
               # 以此压住 SKILL 的常驻体积。必须随包，否则索引指向包外不存在的文件。
-              "permissions-and-libraries.md", "drafting-guide.md", "template-guide.md"]
+              "permissions-and-libraries.md", "drafting-guide.md", "template-guide.md",
+              # 对外版本清单（供在线检查更新）。随包是为了让使用者能**离线核对**
+              # "本包自称是哪一版、官方最新是哪一版"；也是发布时随包上传到仓库的那一份。
+              # 版本一致性由 check.py 的 check_manifest_version() 守卫（铁律 13.3）。
+              "version.json"]
 # assets/ 必须随包（README/SKILL 顶部引用了头标，缺了就是裂图）；private/ 仍默认排除
 # samples/ 下**只带顶层文件**（即自检样本）；samples/输出样例、公开范本、通用样例属
 # 开发侧素材，一律不随包。

@@ -7,7 +7,7 @@ description_zh: "对合同、协议及授权书、承诺函、告知书、声明
 description_en: "Desensitize, review clause by clause, grade risks in three colors and produce redline revisions, comparison ledgers and opinion reports for contracts, agreements and business documents (authorization letters, commitment letters, notices, policies, NDAs, SLAs, DPAs and more); coverage includes payment and liquidated damages, delivery and acceptance, IP, confidentiality and non-compete, jurisdiction clauses, arbitration, dispute resolution, limitation of action, contract validity, standard terms and personal information protection; accepts background materials (files, images, photos or plain text) to sharpen the review, and adapts the review stance to a strong or weak bargaining position; drafts contracts and reusable templates, and converts existing documents into templates. Nine industry rule sets included; handles Word, PDF, images and scanned files. Advisory only, not legal advice; review by a licensed lawyer is required."
 category: writing
 argument-hint: "<文档路径或文本> [版本/角色/尺度] | 审查 | 起草 | 比对 | 背景资料 | 脱敏 | 向导 | 撰写合同 | 撰写模板 | 文档转模板 | 合同转模板 | 技能版本 | 技能更新 | 技能升级 | 立查得 | 小查 | 帮助|help|? | 教程 | 私有库维护/备份/回溯/导入/导出 | 行业库维护/备份/回溯/导入/导出"
-version: 3.11.10
+version: 3.11.11
 license: 个人使用授权 · 商业使用须取得书面授权（见 `LICENSE.md`）
 author: 胡皓
 examples_zh:
@@ -26,7 +26,7 @@ examples_en:
 
 ![文档合规审查助手AI合同审核全能版 · 合同与商务文档逐条审查 · 风险三色分级](assets/banner-dark.png)
 
-**v3.11.10** ｜ 作者：胡皓 ｜ 许可：个人使用授权 · 商业使用须取得书面授权（详见 `LICENSE.md`）
+**v3.11.11** ｜ 作者：胡皓 ｜ 许可：个人使用授权 · 商业使用须取得书面授权（详见 `LICENSE.md`）
 
 > **免责声明**：本技能仅作辅助法律工作，**不构成法律意见**，输出内容须经**执业律师复核**；**同一对话内首次使用时由技能先输出全文**（同一对话只此一次）——见**步骤 0.0**，全文亦见 `LICENSE.md`。
 
@@ -555,14 +555,28 @@ python scripts/guard.py check <路径> --op <read|write|delete|copy|export|impor
 ## 十八、技能版本与更新（提示归提示，升级由人定）
 
 > **入口**：输入 **技能版本** ／ **技能更新** ／ **技能升级**（同义：什么版本 / 检查更新 / 有没有新版 / 升级技能）。
-> **零联网**：不访问网络、不回传任何信息。更新源是**使用者自己指定的本地目录或 zip**（U 盘、内网共享、发布目录）；版本比对读的是两侧 `SKILL.md` 的 version 字段。
+
+**联网边界（分级，2026-10-14 起）**：**"查"可以联网，"拿"必须由你**。
+
+| 环节 | 联网？ | 说明 |
+|---|---|---|
+| **查有无新版** | **会联网**（可关） | **只读**一份公开的版本清单（版本号／日期／更新内容／下载页），**只做 GET、不上传任何信息**。离线／连不上**静默降级**，退回本地源，不报错不卡住 |
+| **下载新版包** | **不联网** | 工具**只给下载指引**；包由**你自己在浏览器下载**，**从不自动下载** |
+| **安装新版** | **不联网** | 接到的都是一个本地目录或本地 zip，走同一套校验／预演／备份／装 |
+
+**不想联网**：把 `scripts/config.json` 的 `update.manifest_url` 留空即关闭在线检查，退回纯本地模式
+（用 `--watch` 登记本地目录或已下载 zip 作更新源），**功能不降级**。
+
+**有新版时会看到什么**：**当前版 → 最新版**、**新版更新了哪些内容**、**下载指引（下载页地址）**——
+知道了再决定要不要升。**是否升级由你定，工具绝不自动升级、也绝不替你下载。**
 
 ```powershell
 python scripts/version.py                      # 版本身份证（版本／脚本数／规则数／行业库数）
-python scripts/version.py --watch <目录或 zip>  # 登记更新源（本机记住路径，以后不必手打）
-python scripts/version.py --notice             # 静默检查：**无新版一个字都不输出**；有新版才提示一行
+python scripts/version.py --check-online       # **在线检查更新**：显示最新版、更新内容、下载指引
+python scripts/version.py --notice             # 静默检查：**无新版一个字都不输出**；有新版才提示
+python scripts/version.py --watch <目录或 zip>  # 登记本地更新源（不联网，适合内网/离网）
 python scripts/version.py --source             # 看登记的是哪个源、源版本是更高还是更低
-python scripts/version.py --check              # 与登记源比对（也可 --check <指定的源>）
+python scripts/version.py --check              # 与本地源比对（也可 --check <指定的源>）
 python scripts/version.py --changelog <源>      # 看从这个版本到那个版本之间改了什么
 python scripts/version.py --upgrade <源> --target <安装目录>            # **预演**（不改任何文件）
 python scripts/version.py --upgrade <源> --target <安装目录> --apply    # 真正升级（先整目录备份）
@@ -571,12 +585,13 @@ python scripts/version.py --dismiss 3.8.1      # 忽略某版本的提醒（本�
 
 **四条规矩（写死）**：
 
-1. **只提示，绝不自动升级。** `--notice` 与 `--check` 都只读不写；发现新版后**问一句再动**，使用者没点头就不能升级。
+1. **只提示，绝不自动升级、绝不自动下载。** `--notice`／`--check-online`／`--check` 都只读不写；发现新版后**问一句再动**，使用者没点头就不能升级；包永远由使用者自己下。
 2. **升级必须先预演。** `--upgrade` 不带 `--apply` 就是 dry-run，只列出"覆盖哪些／新增哪些／保留哪些"；确认无误才加 `--apply`。
-3. **升级前自动整目录备份**到 `<安装目录>_bak-V<旧版本>-<时间戳>`；`private/` **永不覆盖**，`config.json` 默认保留，目标独有的文件一律不删。
+3. **升级前自动整目录备份**到 `<安装目录>_bak-v<旧版本>-<时间戳>`；`private/` **永不覆盖**，`config.json` 默认保留，目标独有的文件一律不删。
 4. **版本不是越新越好用。** 跨版本可能改变审查口径与产出形态；手上有正在进行的审查任务时，**建议做完再升**。
 
-> 建议用法：把发布目录登记为更新源（`--watch`），之后会话开头跑一次 `--notice`——**有新版才提一句**，没有就当无事发生；想忽略某版本用 `--dismiss`，不再反复念叨。
+> 建议用法：会话开头跑一次 `--notice`——**有新版才提一句**（含更新内容与下载指引），没有就当无事发生；
+> 内网/离网环境把发布目录登记为本地源（`--watch`）；想忽略某版本用 `--dismiss`，不再反复念叨。
 
 ---
 

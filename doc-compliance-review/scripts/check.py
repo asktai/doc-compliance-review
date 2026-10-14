@@ -944,6 +944,45 @@ def check_version_consistency():
         info("版本一致性: %s（frontmatter / 正文 / README / SECURITY / 提示词版）一致；脚本数 %d 口径同步" % (v, n_py))
 
 
+def check_manifest_version():
+    """对外版本清单（version.json）的版本号须与 SKILL.md 一致。
+
+    为什么这条重要：`version.json` 是**对外公布**的清单——在线检查更新时，
+    使用者看到的就是它。**它错一位，所有使用者都会被引向旧版**（铁律 13.3 / 13.4.5）。
+    故把它纳入同一套版本一致性守卫：清单里的 latest.version 必须等于 frontmatter 的 version。
+
+    真源仍是 `SKILL.md` frontmatter；清单是**派生公布物**，不是真源（铁律 21.1.1）。
+    文件不存在时跳过（未启用在线分发的项目不受此约束）。
+    """
+    skill = os.path.join(ROOT, "SKILL.md")
+    man = os.path.join(ROOT, "version.json")
+    if not (os.path.exists(skill) and os.path.exists(man)):
+        return
+    m = re.search(r"(?m)^version:\s*([\d.]+)\s*$", _read(skill))
+    if not m:
+        return
+    truth = m.group(1)
+    try:
+        import json
+        d = json.loads(_read(man))
+    except Exception as e:
+        err("version.json 无法解析为 JSON：%s" % e)
+        return
+    lat = (d or {}).get("latest") or {}
+    got = str(lat.get("version") or "").strip().lstrip("vV")
+    if got != truth:
+        err("version.json 的 latest.version=%r 与 SKILL.md 版本 %s 不一致——"
+            "对外清单错一位，使用者会被引向旧版（铁律 13.3）" % (lat.get("version"), truth))
+        return
+    # 顺带核：下载页与文件直链不能留占位（占位＝尚未配置真源）
+    page = str(lat.get("download_page") or "")
+    if "<your-org>" in page:
+        warn("version.json 的 download_page 仍是占位地址（<your-org>）——"
+             "正式发布前须替换为真实仓库地址")
+    else:
+        info("对外版本清单 version.json：latest=%s 与 SKILL.md 一致；下载页已配置" % truth)
+
+
 def check_platform_limit():
     """平台上限口径：文档里写的 zip 体积上限，必须等于 `pack.py` 的 `PLATFORM_MAX_MB`。
 
@@ -1244,6 +1283,7 @@ def main():
         check_gitignore()
         check_skill_ext_lowercase()
         check_version_consistency()
+        check_manifest_version()
         check_config()
         check_hardcoded_paths()
         check_security()

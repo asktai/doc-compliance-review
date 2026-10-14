@@ -1,0 +1,40 @@
+{
+  "_说明": "在线版本清单。技能侧 `scripts/version.py --notice`（默认联网检查）会读取本文件，向使用者展示：最新版本号、发布日期、更新了哪些内容、下载指引页。字段口径：version＝最新版本号（小写 v 前缀，与 SKILL.md frontmatter 一致）；date＝该版本发布日期（YYYY-MM-DD）；summary＝一句话概述；changes＝本版要点列表；download_page＝人去看的下载指引页；files＝分发包直链（.skill／.zip）。本文件只描述'有哪些版本、去哪儿下载'，不含任何使用者信息，工具读取时也不会上传任何数据。",
+  "product": "文档合规审查助手AI合同审核全能版",
+  "skill_id": "doc-compliance-review",
+  "latest": {
+    "version": "v3.11.11",
+    "date": "2026-10-14",
+    "summary": "新增「在线检查更新」：一查就知道有没有新版、新版改了什么、去哪下载",
+    "changes": [
+      "在线检查更新：跑一次即显示 当前版 → 最新版、新版更新内容、下载指引（只读公开清单，不上传任何信息）",
+      "离线/连不上时静默降级为纯本地模式，不报错、不打扰",
+      "升级包仍由使用者自行下载（工具不做自动下载），下载后交给 version.py 预演、确认后安装",
+      "版本号写法统一小写 v（与开发规范同步）"
+    ],
+    "download_page": "https://github.com/<your-org>/doc-compliance-review/releases",
+    "files": {
+      "skill": "https://github.com/<your-org>/doc-compliance-review/releases/download/v3.11.11/文档合规审查助手AI合同审核全能版_v3.11.11_20261014_(doc-compliance-review).skill",
+      "zip": "https://github.com/<your-org>/doc-compliance-review/releases/download/v3.11.11/文档合规审查助手AI合同审核全能版_v3.11.11_20261014_(doc-compliance-review).zip"
+    }
+  },
+  "history": [
+    {
+      "version": "v3.11.10",
+      "date": "2026-10-14",
+      "summary": "版本号写法统一为小写 v"
+    },
+    {
+      "version": "v3.11.9",
+      "date": "2026-10-14",
+      "summary": "封装扩展名统一小写 .skill"
+    },
+    {
+      "version": "v3.11.8",
+      "date": "2026-10-13",
+      "summary": "可复现构建：同版本重跑产出字节一致的包"
+    }
+  ],
+  "_维护说明": "出包后请同步更新本文件（latest 段与 history）。真源是 SKILL.md 的 version 与 VERSION.md 的沿革；本文件是'对外公布的清单'，须与真源一致，否则使用者会被引向旧版。",
+  "schema": 1
+}
