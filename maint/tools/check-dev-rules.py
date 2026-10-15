@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-开发工程规范（铁律）· 全文自检（六维）
+开发工程规范（铁律）· 全文自检（十二维）
 ==============================================================================
-对 `dev/DEV-RULES.md` 做机械自检，覆盖六个维度：
+对 `dev/DEV-RULES.md` 做机械自检，覆盖十二个维度：
 
   (1) 结构        条号连续、**条标题格式统一**、章序号连续、章区间声明与覆盖
   (2) 导读表      文首"三条铁律"导读表的条号与名称，须与正文标题一致（双源比对）
@@ -11,6 +11,12 @@
   (4) 用词        已废止词（维护侧／开发端／实例侧等）不得在正文残留；术语说明语境除外
   (5) 表述        不得使用相对引用（"见下方"等）；日期月／日须补零；编号须可键入；条以下用十进制路径（禁 1.／(N)）；路径须连号；「表述纪律」条自身反例除外
   (6) 路径真实性  正文反引号中的文件／目录引用必须真实存在
+  (7) 版本串      开发侧各文档文件头的"铁律版本"须与真源（本文件文件头）一致
+  (8) 跨侧一致    开发侧技能目录 ↔ 运行实例逐文件比对（排除运行侧生成物）
+  (9) 目录锚点    目录中每条标题与其 GitHub 锚点须同步（标题改则锚点重生成）
+  (10) 引用锚点    表格内的"第 N 行"引用须带父级路径
+  (11) 加粗编号    凡加粗行首段落，必须带 `N.M` 编号，不得以加粗冒充小标题
+  (12) 元规则归属  编号体系／书写／表格例外／字符须在正文条文中成文，不得退回文首导读区
 
 归属说明
     · 本脚本属于**维护侧**（`/workspace/dev/maint/tools/`），**不随技能包分发**；
@@ -26,7 +32,7 @@
     保持零依赖、写法保守（凡拿不准一律不报），并以注入式负向测试验证过"真拦得住"。
 
 用法
-    python3 maint/tools/check-dev-rules.py                  # 六维检查
+    python3 maint/tools/check-dev-rules.py                  # 十二维检查
     python3 maint/tools/check-dev-rules.py --refs           # 另打印条号引用上下文（供人工复核指向）
     python3 maint/tools/check-dev-rules.py --install-hook   # 安装 pre-commit 钩子（只警告、不阻断）
     python3 maint/tools/check-dev-rules.py --quiet          # 只输出结论行
@@ -676,6 +682,76 @@ def check_bold_heading(s):
         info("加粗行首段落／编号列表项均带编号（放行续行／导读区／元信息／围栏／游离声明段）")
 
 
+# ──────────────── (12) 编号元规则须在正文条文中成文 ────────────────
+
+# 元规则的"特征短句"——这些是**全文唯一成文处**的独有措辞。
+# 每项 = (说明, 必须出现的特征子串)。任一缺失即判该规则"掉出正文"。
+META_RULES = [
+    ("编号体系", "条以下一律十进制路径"),
+    ("编号总述位例外", "总述位"),
+    ("书写规范", "行首加粗即声明"),
+    ("表格例外", "表内行不编号"),
+    ("字符规则", "可直接键入"),
+]
+
+
+def check_meta_rules(s):
+    """(12) 编号元规则须在**正文条文**里成文，不得退回导读区"裸段"。
+
+    **本条守卫的是一件历史事故**：编号体系／书写／表格例外／字符四段，
+    2026-10-14 之前只存在于**导读区**——无条号、不可引用、不受任何守卫覆盖，
+    长得就像"多余的导读"（开发者当天即质疑"这个导读是不是多余的"），
+    删掉它**不会有任何一个守卫报警**，因为**它本就在守卫视野之外**。
+
+    故本守卫做两件事（缺一不可）：
+      A. **正向**：这五条元规则的"特征短句"必须能在**带编号的正文单元**里找到；
+      B. **反向**：它们**不得**以无编号裸段的形式出现在 `### 第 1 条` 之前的导读区
+         （即"退回导读区"这一具体病征须能被抓住）。
+
+    归属：正文 = 第 1 条（文档结构与编号）。若将来挪号，须同步改本条守卫——
+    这正是"守卫自身也要被验证"（16 条 16.2）的又一实例。
+    """
+    head("(12) 编号元规则须在正文条文中成文")
+    lines = s.splitlines()
+    fenced = in_fence_lines(s)
+
+    # 正文起点：第 1 条标题行
+    first_art = None
+    for i, l in enumerate(lines, 1):
+        if re.match(r"^### 第 1 条", l):
+            first_art = i
+            break
+    if first_art is None:
+        err("未找到「第 1 条」标题——编号元规则的归属条缺失")
+        return
+
+    body = "\n".join(l for i, l in enumerate(lines, 1)
+                     if i > first_art and i not in fenced)
+    head_area = "\n".join(l for i, l in enumerate(lines, 1)
+                          if i < first_art and i not in fenced)
+
+    bad = 0
+    for name, phrase in META_RULES:
+        # A. 正向：特征短句须在正文出现
+        if phrase not in body:
+            err("元规则「%s」未在正文成文（正文中找不到特征短句：%s）"
+                % (name, phrase))
+            bad += 1
+            continue
+        # B. 反向：不得同时以无编号裸段留在导读区
+        if phrase in head_area:
+            # 只有在导读区**未加粗编号**时才算"退回"
+            err("元规则「%s」退回导读区（特征短句同时出现在第 1 条之前的裸段中）" % name)
+            bad += 1
+
+    # C. 导读区不得再声明"四段不属编号单元"这类自我豁免（正是退回的病征）
+    if re.search(r"以上.{0,6}段为\**导读说明", head_area):
+        err("导读区出现「以上…段为导读说明」式自我豁免——编号元规则又退回裸段了")
+
+    if bad == 0:
+        info("编号元规则（编号体系／书写／表格例外／字符）均在正文条文中成文，导读区无裸段残留")
+
+
 # ────────────────────────────── 钩子 ──────────────────────────────
 
 def install_hook():
@@ -689,7 +765,7 @@ def install_hook():
     shutil.copyfile(HOOK_SRC, HOOK_DST)
     os.chmod(HOOK_DST, 0o755)
     print("[OK] 已安装 pre-commit 钩子 → %s（只警告、不阻断）" % HOOK_DST)
-    print("     一档：提交涉及 DEV-RULES.md → 自动跑本脚本（十一维自检）。")
+    print("     一档：提交涉及 DEV-RULES.md → 自动跑本脚本（十二维自检）。")
     print("     二档：提交涉及守卫本体（check-dev-rules.py／smoke-dev-rules.py）")
     print("          → 自动跑 maint/tools/smoke-dev-rules.py 全量冒烟，")
     print("            用注入测试证明守卫**仍然拦得住**（铁律 17.2）。")
@@ -727,6 +803,7 @@ def main():
     check_toc_anchor(s)
     check_ref_anchor(s)
     check_bold_heading(s)
+    check_meta_rules(s)
     print("=" * 62)
     if ERRS:
         print("结果：错误 %d 项，警告 %d 项 —— **未通过**" % (len(ERRS), len(WARNS)))
