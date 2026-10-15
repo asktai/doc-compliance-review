@@ -1,0 +1,58 @@
+{
+  "_说明": "素材准入清单（开发侧，**不随包**——见铁律第 7.4 条）。技能目录内的测试／验证素材采用准入制：默认拒绝随包，须在本清单逐条登记「许可随包 ＋ 理由」；未登记的新素材由维护侧守卫 check-separation.py 报错阻断。本文件放开发侧而非技能侧，理由是它属工程管理凭据、使用者不需要，技能包因此保持干净（决策见 DEVLOG 2026-10-14 条目）。",
+  "_维护说明": "新增／删除技能目录 samples/ 下的素材时必须同步本清单，否则守卫报错。登记须写明 purpose（检验什么链路）与 reason（为何使用者必须拿到它）。sha256 由守卫 --seal 实算回填并核对，文件被替换而不更新清单会被当场发现。",
+  "schema": 1,
+  "directory": "doc-compliance-review/samples",
+  "policy": "deny_by_default",
+  "entries": [
+    {
+      "file": "README.md",
+      "purpose": "样本目录说明（七份样本各自检验什么链路、比对差异设置、内容虚构声明）",
+      "reason": "使用者需据此理解样本用途与「内容全部虚构」的边界；缺了会不知这些文件作何用",
+      "sha256": "84198b0edd0a471eda74db92feb3db7b59c95b7e5ba214dc66d8c1d71cd8146e"
+    },
+    {
+      "file": "敏感信息示例.docx",
+      "purpose": "Word → 文本提取链路（校验提取成功且含合同主体与金额）",
+      "reason": "smoke-test.py 装机自检的真实文件链路需要它；同时供 sample-baseline 用例 S1",
+      "sha256": "48d5e813939b43a95bdbf6ba124ff51b8a41bbe6bcdea2377ae4b2339212d2c3"
+    },
+    {
+      "file": "扫描件示例.pdf",
+      "purpose": "图片型 PDF → pdftoppm → OCR 链路（校验无文字层仍能取出可审文本）",
+      "reason": "OCR 链路是使用者最可能踩坑的一环（缺 Poppler／Tesseract 时要 SKIP 而非 FAIL），自检须能验到",
+      "sha256": "de8d50a047ecdc8f8d92dd48b5578fc840abe30b37a62a8ce9ea29abd3d50991"
+    },
+    {
+      "file": "图片合同示例.jpg",
+      "purpose": "图片 → OCR 链路（校验图格式合同可取出可审文本）",
+      "reason": "与扫描件 PDF 覆盖不同入口（拍照合同），使用者场景常见",
+      "sha256": "002f44a75aa111fb27d0539f26f0be17e02e92af1df066adc6079f8688482782"
+    },
+    {
+      "file": "合同比对A版.docx",
+      "purpose": "Word → 文本提取 ＋ 与 B 版配对比对（检出既定 8 处差异）",
+      "reason": "比对功能的自检须有真实配对样本，否则使用者无法验证比对链路",
+      "sha256": "389838720d0291eb5ab80daf99f66fa80b7dd64e5941cb1d9e6cd764cd53c349"
+    },
+    {
+      "file": "合同比对B版.doc",
+      "purpose": "老格式 .doc → LibreOffice → 文本提取（校验老格式可提取且与 A 版差异可检出）",
+      "reason": ".doc 是使用者手里的常见老格式，缺依赖时须能 SKIP 并提示补 LibreOffice",
+      "sha256": "a1a40c2d4376b93f74d8267d685865e6461b5a64dfd42c9791efa88c2f02c438"
+    },
+    {
+      "file": "制度类示例-员工个人信息保护管理制度.docx",
+      "purpose": "非合同类（内部制度）路径，供基线用例 S4",
+      "reason": "覆盖「制度类文档」这一非合同入口，使用者会拿制度来审",
+      "sha256": "0d95f34a8d64481d6c3c21c7b6da1b92b92650b4dd1891889e234bfd90200895"
+    },
+    {
+      "file": "格式条款类示例-用户注册须知与免责告知.docx",
+      "purpose": "单方告知 ＋ 格式条款路径，供基线用例 S5",
+      "reason": "覆盖格式条款这一高风险场景，使用者高频遇到",
+      "sha256": "918909da46319aeeaa9f3cceeecd8358dc2b784897f7f8e17a1a1a4159260186"
+    }
+  ],
+  "notes": "sha256 为文件内容指纹，由 check-separation.py --seal 实算写入；守卫每次核验。"
+}

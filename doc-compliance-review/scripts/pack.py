@@ -362,6 +362,59 @@ def write_skill(zp, out, product, sid, version, date):
     return meta, len(head)
 
 
+def verify_admission_manifest(base):
+    """素材准入硬拒（铁律第 7.4 条）：**默认拒绝随包**，未登记即**拒绝出包**。
+
+    背景：FULL_DIRS 是**整体递归打包**，`samples/` 里多出来的东西会被**照单全收**。
+    更早以前是"白名单外的顶层条目静默丢弃"——于是"忘了登记"的失败方向是
+    **包静默少一个样本**，使用者那边冒烟只会 SKIP、不会报错，**无人知晓**。
+    准入制把这方向反过来：**多出来的东西 → 出包直接失败**，逼你先登记。
+
+    准入清单在**开发侧** `maint/samples-manifest.json`（不随包，属工程管理凭据）。
+    核验两个方向：
+      · 包内有、册上无 → 拒绝（未许可即随包，违反默认拒绝）；
+      · 册上有、包内无 → 拒绝（使用者会缺样本）。
+    清单缺失时**不拒绝**（旧包/无清单项目的兼容），但打醒目警告。
+
+    返回 (list_of_errors, list_of_warnings)。
+    """
+    bad, warns = [], []
+    # 清单在**开发侧** `dev/maint/`，而 base 是 `dev/doc-compliance-review`
+    # （也可能是运行实例 ~/.codebuddy/skills/…）。故：向上找到含 maint/ 的那一级。
+    # ⚠ 早期版本用 `dirname(dirname(base))` —— 多算一层，路径永远错，
+    #   于是每次都走"清单缺失 → 仅警告"分支，**静默放行**（负测试当场暴露）。
+    manifest = None
+    cur = os.path.abspath(base)
+    for _ in range(3):
+        cur = os.path.dirname(cur)
+        cand = os.path.join(cur, "maint", "samples-manifest.json")
+        if os.path.exists(cand):
+            manifest = cand
+            break
+    sdir = os.path.join(base, SELFTEST_DIR)
+    if not os.path.isdir(sdir):
+        return bad, warns
+    if manifest is None:
+        warns.append("未找到素材准入清单（在 %s 上溯 3 级未命中 maint/samples-manifest.json）"
+                     "——无法核验 samples/ 的随包许可（铁律 7.4 准入制）" % base)
+        return bad, warns
+    try:
+        man = json.load(open(manifest, encoding="utf-8"))
+    except Exception as e:
+        bad.append("素材准入清单解析失败：%s（%s）" % (e, manifest))
+        return bad, warns
+    reg = {e.get("file") for e in (man.get("entries") or [])}
+    actual = {f for f in os.listdir(sdir)
+              if os.path.isfile(os.path.join(sdir, f))}
+    for fn in sorted(actual - reg):
+        bad.append("samples/ 内含未登记素材「%s」——准入制为默认拒绝，"
+                   "须先在 maint/samples-manifest.json 登记「许可随包 ＋ 理由」" % fn)
+    for fn in sorted(reg - actual):
+        bad.append("准入清单登记了「%s」，但 samples/ 内没有此文件"
+                   "——使用者将缺该样本（冒烟相关项会 SKIP 而非 FAIL）" % fn)
+    return bad, warns
+
+
 def build(base, outdir, include_private=False, tag="v3.0.0", keep_tools=False, fmt="both",
           date=None):
     os.makedirs(outdir, exist_ok=True)
@@ -375,6 +428,23 @@ def build(base, outdir, include_private=False, tag="v3.0.0", keep_tools=False, f
             print("  [FAIL] " + b)
         print("  [x] 文件名不合四段式规范，已中止出包（勿手工改名绕过，去修 package_stem）。")
         return False
+    # 素材准入硬拒（铁律 7.4）：未登记即拒绝出包，杜绝"包静默少一个样本"
+    _adm_bad, _adm_warn = verify_admission_manifest(base)
+    if _adm_bad:
+        for b in _adm_bad:
+            print("  [FAIL] " + b)
+        print("  [x] 素材准入核验未通过，已中止出包"
+              "（登记后重跑；勿删样本绕过，去补 maint/samples-manifest.json）。")
+        # **清理本次目标文件**：留下上一次的旧包会被误当成"本次已生成"
+        for _ext in set(FMT_EXT.values()):
+            _stale = os.path.join(outdir, "%s.%s" % (stem, _ext))
+            if os.path.exists(_stale):
+                os.remove(_stale)
+                print("  [i] 已删除上次残留的 %s（避免误当成新产物）"
+                      % os.path.basename(_stale))
+        return False
+    for w in _adm_warn:
+        print("  [警告] " + w)
     for files, dirs, name in [
         (FULL_FILES, list(FULL_DIRS), "%s.%s" % (stem, FMT_EXT["zip"])),
     ]:

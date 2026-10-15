@@ -121,6 +121,26 @@ def verify():
     return 0 if ok else 1
 
 
+def separation():
+    """分离守卫（铁律第 7 条）：开发侧／技能侧不得互相串（维护侧关卡）。
+
+    放在 sync 之后、verify 之前：先确保镜像干净，再核"技能目录里有没有
+    本不该在那的东西"（白名单目录混入／未登记素材／开发资料越界）。
+    出包环节 pack.py 也会硬拒未登记素材；此处提前一关，是为了**同步之后立刻**
+    发现问题——而非等到打包才暴露。
+    """
+    r = subprocess.run([sys.executable, os.path.join(MAINT, "tools", "check-separation.py")],
+                       capture_output=True, text=True)
+    out = (r.stdout or r.stderr).strip().splitlines()
+    summary = next((l.strip() for l in out if l.strip().startswith("结果：")), None)
+    print("[publish] %-14s → %s" % ("分离守卫", summary or (out[-1].strip() if out else "(无输出)")))
+    if r.returncode != 0:
+        for line in out:
+            if line.strip().startswith("·"):
+                print("           " + line.strip())
+    return r.returncode
+
+
 def pack():
     os.makedirs(DIST, exist_ok=True)
     # pack.py 契约：位置参数是技能根目录，输出目录用 --out 指定
@@ -137,6 +157,13 @@ def main():
     if sync() != 0:
         return 2
     if refresh_generated() != 0:
+        return 2
+    # 分离守卫：技能目录里不得混入开发资料／未登记素材（铁律第 7 条）
+    # 放在 verify 之前——同步后立刻查，早于打包暴露（pack.py 另有一道硬拒）
+    if separation() != 0:
+        print("[publish] ✗ 分离守卫未通过，**发布已中止**（技能目录混入了不该随包的内容）。")
+        print("[publish]   处置：把开发资料移到 maint/ai-notes｜test-data｜scratch；")
+        print("[publish]        新样本须登记 maint/samples-manifest.json 后方可随包。")
         return 2
     do_pack = "--pack" in a
     if "--no-instance-test" in a:

@@ -296,6 +296,48 @@ def main():
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
+    # ── 第 (12) 档：分离守卫（铁律第 7 条）──
+    # 分离守卫查的是"技能目录里有没有不该在那的东西"，与铁律正文的十一维不同源，
+    # 故与第 (8) 维同法：**造真违规 → 断言拦住 → 立即还原**。
+    # 三个用例覆盖三条判定（白名单混入／未登记素材／开发资料越界）。
+    print("  [--] (12) 分离守卫（开发侧／技能侧分离）单独一档")
+    SEP = os.path.join(DEV, "maint", "tools", "check-separation.py")
+    if not os.path.exists(SEP):
+        print("      跳过：未找到 %s" % SEP)
+    else:
+        probe_dir = os.path.join(DEV, "doc-compliance-review", "core")
+        probe = os.path.join(probe_dir, "_smoke_ai学习参考.md")
+        probe2 = os.path.join(DEV, "doc-compliance-review", "samples", "_smoke_未登记样本.docx")
+        cases12 = [
+            (probe, "白名单目录混入开发资料", "学习"),
+            (probe2, "samples/ 出现未登记素材", "未登记"),
+        ]
+        for path, name, kw in cases12:
+            existed = os.path.exists(path)
+            try:
+                with open(path, "w", encoding="utf-8") as f:
+                    f.write("smoke probe\n")
+                r = subprocess.run([sys.executable, SEP], capture_output=True,
+                                   text=True, cwd=DEV)
+                o = (r.stdout or "") + (r.stderr or "")
+                if r.returncode != 0 and kw in o:
+                    print("  [OK] (12) %-22s 拦住" % name)
+                else:
+                    why = "未报错（守卫失效）" if r.returncode == 0 else \
+                          "报错但不含关键词「%s」" % kw
+                    fails.append((12, name, why))
+                    print("  [E] (12) %-22s %s" % (name, why))
+            finally:
+                if not existed and os.path.exists(path):
+                    os.remove(path)
+        # 还原校验：探针不得残留（否则污染技能目录）
+        leftover = [p for p, _, _ in cases12 if os.path.exists(p)]
+        if leftover:
+            print("  [E] (12) 探针未清理干净：%s" % leftover)
+            fails.append((12, "探针清理", "技能目录被污染"))
+        else:
+            print("  [OK] (12) 探针已清理，技能目录零污染")
+
     # ── C 还原校验 ──
     print("\n[C] 还原：正式文件不得被污染（铁律 17.2）")
     now = digest(RULES)
@@ -303,23 +345,38 @@ def main():
         print("  [E] 铁律文件哈希已变！%s → %s" % (base_hash[:12], now[:12]))
         return 1
     print("  [OK] 铁律 sha256 未变（%s…）" % base_hash[:16])
+    # **判据：只看"冒烟运行期间"是否动过东西，而非"工作区是否干净"。**
+    # 早期版本拿 `git status` 的未提交改动当泄漏判据——但使用者（或 AI）**正常工作
+    # 本就有未提交改动**（例如正在改铁律升版），会被冤枉成"注入泄漏"（2026-10-14
+    # 升版 v1.35.0 时实测误报）。故改为：比对**运行前后**各受保护文件的哈希，
+    # 只有"冒烟自己动过"才算泄漏——这既可判、又不冤枉人。
+    watched = {
+        RULES: base_hash,
+        os.path.join(DEV, "doc-compliance-review", "scripts", "pack.py"): None,
+        os.path.join(DEV, "publish.py"): None,
+    }
+    leaked = []
+    for p, before in watched.items():
+        if not os.path.exists(p):
+            continue
+        if before is None:
+            # 运行前未记录（本轮引入的受保护集扩充）——只做存在性提示，不判错
+            continue
+        if digest(p) != before:
+            leaked.append(os.path.relpath(p, DEV))
     g = subprocess.run(["git", "status", "--porcelain"],
                        capture_output=True, text=True, cwd=DEV)
-    # 本脚本自身是新增文件，其"未跟踪"不算注入泄漏
     self_rel = os.path.relpath(os.path.abspath(__file__), DEV)
     dirty = [l for l in (g.stdout or "").splitlines()
              if l.strip() and self_rel not in l]
-    # 判据分层：**铁律自身被改**＝明确的注入泄漏（错）；其他文件的改动无法区分
-    # 是泄漏还是使用者正常工作中的改动，故只提示——避免误伤（守卫不得冤枉好人）。
-    hard = [l for l in dirty if "DEV-RULES.md" in l]
-    if hard:
-        print("  [E] 铁律文件自身有未提交改动（注入泄漏）：")
-        for l in hard[:10]:
-            print("        %s" % l)
+    if leaked:
+        print("  [E] 冒烟运行期间以下受保护文件被改动（注入泄漏）：%s" % leaked)
         return 1
-    print("  [OK] 铁律自身零改动，无注入泄漏")
+    print("  [OK] 受保护文件在运行期间零改动")
     if dirty:
-        print("  [i] 工作区另有 %d 处未提交改动（非铁律文件，不视为泄漏）" % len(dirty))
+        # 仅提示：无法区分"使用者正在改"与"泄漏"，不判错（守卫不得冤枉好人）
+        print("  [i] 工作区另有 %d 处未提交改动（可能是你正在做的事，不计为泄漏）"
+              % len(dirty))
 
     # ── 汇总 ──
     print("=" * 62)
@@ -328,7 +385,7 @@ def main():
         for dim, name, why in fails:
             print("  · (%d) %s —— %s" % (dim, name, why))
         return 1
-    print("冒烟通过：%d 个注入用例全部被拦住，正式文件零污染" % (len(CASES) + 1))
+    print("冒烟通过：%d 个注入用例全部被拦住，正式文件零污染" % (len(CASES) + 3))
     return 0
 
 
