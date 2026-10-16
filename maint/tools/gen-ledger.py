@@ -222,10 +222,15 @@ def build(no_files=False):
     A("| 内容 | 类型 | 在线地址 | 说明 |")
     A("|---|---|---|---|")
     A("| 产出物台账（本文档的在线版） | 腾讯文档 | "
-      "https://docs.qq.com/markdown/DRHdRdXZLRFJYd0hq | **以最新一次导入为准**，勿作长期引用目标 |")
+      "https://docs.qq.com/markdown/DRFdLZ1ZZVGdsUEZ6 | **以最新一次导入为准**，勿作长期引用目标 |")
+    A("| 开发工程规范（铁律 v1.39.0，开发侧） | 腾讯文档 | "
+      "https://docs.qq.com/markdown/DRGdTUnpOWUdKTm9N | **开发侧资产**，仅供查阅与留档；不入包、不对外分发 |")
+    A("| 开发日志（DEVLOG，开发侧） | 腾讯文档 | "
+      "https://docs.qq.com/markdown/DRGJrUHJ2T2pwdHNZ | **开发侧资产**，仅供查阅与留档；不入包、不对外分发 |")
     A("")
     A("**导入溯源**（腾讯文档侧 `file_id`，便于核对）："
-      "台账 `DwQuvKDRXwHj`／`.skill` `DQzyVuzzqZMj`／`.zip` `DAQPIZLQrHMx`。")
+      "台账 `DWKgVYTglPFz`／铁律 `DgSRzNYGJNoM`／DEVLOG `DbkPrvOjptsY`／"
+      "`.skill` `DQzyVuzzqZMj`／`.zip` `DAQPIZLQrHMx`。")
     A("")
     A("> **维护提示**（铁律 23.2.3）：腾讯文档导入**只新建、不覆盖**，故台账自指的"
       "「在线版」链接天然**差一代**——该链接与 `file_id` 仅供溯源，**以最新导入的那一份为准**。"
