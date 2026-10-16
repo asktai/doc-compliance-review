@@ -201,6 +201,10 @@ CASES = [
 # 单列一档：临时改运行实例一个文件 → 须报错 → 立即还原并校验哈希。
 CROSS_SIDE_PROBE = "VERSION.md"
 
+# 自检脚本应输出的维度数（十二维）。**用于防"自检没跑起来"被当成"全过"**——
+# 见 main() 里 A 段的那道防线。改自检增删维度时，这里要跟着改。
+EXPECTED_DIMS = 12
+
 
 def main():
     global CHECK
@@ -224,13 +228,31 @@ def main():
     src = open(RULES, encoding="utf-8").read()
 
     # ── A 基线 ──
-    print("\n[A] 基线：正式文件须全过")
+    # **第 (8) 维（跨侧一致性）不参与基线门槛**——它比的是"开发侧 ↔ 运行实例"，
+    # 反映的是**发布链走到哪一步**，不是"守卫自身能不能拦"。开发侧改了、尚未重出包时
+    # 它**必然**报错（这是正常中间态），拿它当基线门槛会让冒烟在这一步**根本跑不起来**。
+    # 故基线只要求"除第 8 维外全过"；第 8 维**照样要验**，验法是它自己那一档注入
+    # （CROSS_SIDE_PROBE：临时改运行实例一个文件 → 须报错 → 还原）。
+    print("\n[A] 基线：正式文件须全过（第 8 维除外——它反映发布进度，见下）")
     rc, out = run_check()
-    if rc != 0:
-        print("  [E] 基线未过（rc=%d）——先修正式文件，再谈冒烟" % rc)
+    dims = parse_dims(out)
+    # **防线：自检脚本得先"真的跑起来"**。曾踩过——被 --check 指定的脚本因路径不对
+    # 启动失败，输出里一个维度标题都没有，`dims` 为空 → "零个维度自然零个错误" →
+    # **假通过**。故要求：至少解析出 EXPECTED_DIMS 个维度，否则判失效。
+    if len(dims) < EXPECTED_DIMS:
+        print("  [E] 自检只解析出 %d 个维度（应 ≥ %d）——**自检脚本未正常运行**，"
+              "基线无从判定" % (len(dims), EXPECTED_DIMS))
         print(out)
         return 1
-    dims = parse_dims(out)
+    base_errs = {d: e for d, e in dims.items() if e and d != 8}
+    if base_errs:
+        print("  [E] 基线未过（除第 8 维外仍有错）——先修正式文件，再谈冒烟")
+        print(out)
+        return 1
+    if dims.get(8):
+        print("  [i] 第 8 维报错 %d 项（开发侧与运行实例不一致）——**不阻断**："
+              "属发布链中间态，出包后自会一致" % len(dims[8]))
+    base_dim8 = list(dims.get(8, []))          # 基线态第 8 维报错（供跨侧探针比对"是否新增"）
     covered = sorted(dims)
     print("  [OK] 基线通过；自检共 %d 维：%s" % (len(covered), covered))
 
@@ -277,6 +299,9 @@ def main():
                         print("        %s" % h)
 
         # ── 第 (8) 维：跨侧一致性 ──
+        # **判据是"新增"，不是"报错"**：基线态若已因发布进度不一致而报错（正常中间态），
+        # 拿"报错与否"当判据就**没有区分度**——注不注入都报错，等于没验。
+        # 故只认"注入后才出现、基线态没有"的那条含 CROSS_SIDE_PROBE 的告警。
         print("  [--] (8) 跨侧一致性（开发侧 ↔ 运行实例）单独一档")
         rp = os.path.join(RUN, CROSS_SIDE_PROBE)
         if not os.path.exists(rp):
@@ -288,11 +313,18 @@ def main():
                     f.write(bak + b"\n<!-- smoke-injected -->\n")
                 rc8, out8 = run_check()
                 d8 = parse_dims(out8)
+                # 报错文本只写"两侧不一致：<文件>"，不含内容差异——故**不能靠文本区分**。
+                # 判据：注入后第 8 维**报错里含 VERSION.md**，且**条数不少于基线态**。
+                # （基线态若已含它——发布中间态——条数持平；若不含，则 +1。两种都算拦住。）
                 hit8 = d8.get(8, [])
-                if rc8 != 0 and hit8 and CROSS_SIDE_PROBE in "".join(hit8):
-                    print("  [OK] (8) %-22s 拦住：%s" % ("跨侧漂移", hit8[0][:60]))
+                n8, n8b = len(hit8), len(base_dim8)
+                prop_hit = any(CROSS_SIDE_PROBE in h for h in hit8)
+                if rc8 != 0 and prop_hit and n8 >= n8b:
+                    print("  [OK] (8) %-22s 拦住（第 8 维报错 %d→%d 项，含探针文件）"
+                          % ("跨侧漂移", n8b, n8))
                 else:
-                    why = "未报错（守卫失效）" if rc8 == 0 else "第 8 维未报错"
+                    why = ("未报该文件（守卫失效）" if not prop_hit
+                           else "报错项反比基线少（守卫失效）")
                     fails.append((8, "跨侧漂移", why))
                     print("  [E] (8) %-22s %s" % ("跨侧漂移", why))
             finally:
