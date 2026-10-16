@@ -15,7 +15,11 @@
 条号 < START 者一律不动。
 
 **用法**：python3 insert-clause-4.py <输入> <输出>
+
+跑完后**务必**执行同步（否则别处引用会悬空）：
+  python3 maint/tools/sync-clause-refs.py --apply --map-file maint/scratch/.last-clause-map.txt
 """
+import os
 import re
 import sys
 
@@ -96,6 +100,22 @@ def gh_anchor(title):
     return "".join(keep).replace(" ", "-")
 
 
+def build_mapping(hi=40):
+    """旧号 → 新号：**仅 N ≥ START 的 +1**，与 `bump` 同规则。
+
+    注意与全体重排的区别：**短于此的条号不动**，故映射里**不含**它们——
+    同步工具据此改引用时，未在映射中的引用**原样保留**（正是所要的）。
+    """
+    m = {}
+    for n in range(START, hi + 1):
+        m[str(n)] = str(n + 1)
+        for k in range(1, 13):
+            m["%d.%d" % (n, k)] = "%d.%d" % (n + 1, k)
+            for j in range(1, 10):
+                m["%d.%d.%d" % (n, k, j)] = "%d.%d.%d" % (n + 1, k, j)
+    return m
+
+
 def main():
     if len(sys.argv) < 3:
         print(__doc__)
@@ -115,6 +135,36 @@ def main():
     nums = sorted(int(x) for x in re.findall(r"(?m)^### 第 (\d+) 条", out))
     print("[OK] 已写出 %s" % dst)
     print("     条号：%s" % nums)
+
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                    "..", "tools"))
+    mapping = build_mapping()
+
+    # **自校验**：第 1—3 条**不动**（标题应逐字相同）；第 ≥START 条整体 +1。
+    def titles(p):
+        return re.findall(r"(?m)^### 第 (\d+) 条 (.+)$",
+                          open(p, encoding="utf-8").read())
+    o = {int(n): t for n, t in titles(src)}
+    d = {int(n): t for n, t in titles(dst)}
+    bad = []
+    for old_n, title in sorted(o.items()):
+        new_n = bump(old_n)
+        if d.get(new_n) != title:
+            bad.append((old_n, new_n, title, d.get(new_n)))
+    if bad:
+        print("[E] 映射与产出正文**不一致**，拒绝导出（防拿错表搬引用）：")
+        for old_n, new_n, ot, nt in bad[:5]:
+            print("     旧第 %d 条 %r ≠ 新第 %d 条 %r" % (old_n, ot, new_n, nt))
+        return 1
+    print("[ok] 映射自校验通过（第 1—%d 条原地不动，其余整体 +1）" % (START - 1))
+
+    try:
+        import clause_map
+        clause_map.emit_map(mapping,
+                            "范围内 +1（第 %d 条起）" % START,
+                            "insert-clause-4.py")
+    except ImportError:
+        print("[!] 未能导入 clause_map 工具，映射未导出——**请手动同步别处引用**")
     return 0
 
 

@@ -15,7 +15,11 @@
 **不动**：其余各条、其余引用（经查全文无他处引用第 1／2 条）。
 
 用法：python3 swap-clause-1-2.py <输入> <输出>
+
+跑完后**务必**执行同步（否则别处引用会悬空）：
+  python3 maint/tools/sync-clause-refs.py --apply --map-file maint/scratch/.last-clause-map.txt
 """
+import os
 import re
 import sys
 
@@ -96,6 +100,36 @@ def main():
 
     open(dst, "w", encoding="utf-8").write("\n".join(out) + "\n")
     print("[OK] 已写出 %s" % dst)
+
+    # 映射极小：条号 1↔2 对调，小节号 1.x↔2.x 对调
+    mapping = {"1": "2", "2": "1"}
+    for k in range(1, 13):
+        mapping["1.%d" % k] = "2.%d" % k
+        mapping["2.%d" % k] = "1.%d" % k
+        for j in range(1, 10):
+            mapping["1.%d.%d" % (k, j)] = "2.%d.%d" % (k, j)
+            mapping["2.%d.%d" % (k, j)] = "1.%d.%d" % (k, j)
+
+    # **自校验**：两条对调后，标题应互换（旧第 1 条标题 == 新第 2 条标题，反之亦然）
+    def titles(p):
+        return re.findall(r"(?m)^### 第 (\d+) 条 (.+)$",
+                          open(p, encoding="utf-8").read())
+    o = {int(n): t for n, t in titles(src)}
+    d = {int(n): t for n, t in titles(out)}
+    ok = all(d.get(int(mapping[str(n)])) == t for n, t in o.items() if n in (1, 2))
+    if not ok:
+        print("[E] 映射与产出正文**不一致**（第 1／2 条标题未按预期互换），拒绝导出")
+        return 1
+    print("[ok] 映射自校验通过（第 1↔2 条标题已互换）")
+
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                    "..", "tools"))
+    try:
+        import clause_map
+        clause_map.emit_map(mapping, "第 1／2 条对调（含小节号）",
+                            "swap-clause-1-2.py")
+    except ImportError:
+        print("[!] 未能导入 clause_map 工具，映射未导出——**请手动同步别处引用**")
     return 0
 
 

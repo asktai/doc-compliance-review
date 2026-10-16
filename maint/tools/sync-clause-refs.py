@@ -21,16 +21,21 @@
 
 **两种用法**：
   `--capture`  重排**之前**跑：把当前各引用点原文记入基准（须先确认引用都是对的）；
-  `--apply`    重排**之后**跑：按给定映射把基准原文映射为新原文并落到各文件。
+  `--apply`    重排**之后**跑：按映射把基准原文映射为新原文并落到各文件。
 
-**映射怎么来**：由调用者以 `--map 7=9,7.4=9.4,...` 显式给出（旧号=新号）。
-**为什么不让它自己猜**：条号映射依赖"插入了哪条、对调了哪两条"这一**重排意图**，
-脚本从结果反推不出意图（且 `第 7 条` 可能指"条"也可能指别的）——**猜测即幻觉**（第 3 条）。
-故映射**必须由人明确给出**，脚本只做**忠实搬运**。
+**映射怎么来**（**首选映射文件，不手抄**）：
+  重排脚本跑完会**自动**写出映射文件 `maint/scratch/.last-clause-map.txt`
+  （见 `maint/tools/clause_map.py`），这里用 `--map-file` 读它：
+      python3 maint/tools/sync-clause-refs.py --apply --map-file maint/scratch/.last-clause-map.txt
+  也支持手写 `--map 旧=新,旧=新`（应急用）。
+  **为什么不让脚本自己猜**：条号映射依赖"插入了哪条、对调了哪两条"这一**重排意图**，
+  从结果反推不出（且 `第 7 条` 可能指"条"也可能指别的）——**猜测即幻觉**（第 3 条）。
+  故映射一律由**重排脚本自己声明**，本工具只做**忠实搬运**。
 
 用法：
   python3 maint/tools/sync-clause-refs.py --capture
-  python3 maint/tools/sync-clause-refs.py --apply --map 7=9,7.4=9.4,7.5=9.5,20=22
+  python3 maint/tools/sync-clause-refs.py --apply --map-file maint/scratch/.last-clause-map.txt
+  python3 maint/tools/sync-clause-refs.py --apply --map 7=9,7.4=9.4
 """
 
 import argparse
@@ -129,8 +134,21 @@ def _translate(old_ref, mapping):
     return text
 
 
-def apply_map(map_arg, dry_run=False):
+def apply_map(map_arg, map_file=None, dry_run=False):
     mapping = {}
+    if map_file:
+        # 读重排脚本自动写出的映射文件（**首选**，机器传机器、不经人手）
+        try:
+            import clause_map
+        except ImportError:
+            sys.path.insert(0, HERE)
+            import clause_map
+        try:
+            mapping.update(clause_map.parse_map_file(map_file))
+        except (OSError, ValueError) as e:
+            print("[E] 读映射文件失败：%s" % e)
+            return 1
+        print("[i] 已从映射文件读入 %d 条：%s" % (len(mapping), map_file))
     for pair in map_arg.split(","):
         pair = pair.strip()
         if not pair:
@@ -141,7 +159,7 @@ def apply_map(map_arg, dry_run=False):
         a, b = pair.split("=", 1)
         mapping[a.strip()] = b.strip()
     if not mapping:
-        print("[E] --map 为空")
+        print("[E] 映射为空——请用 --map-file 或 --map 提供（见用法）")
         return 1
 
     if not os.path.exists(BASELINE):
@@ -205,6 +223,8 @@ def main():
                     help="重排**后**跑：按 --map 改写各文件引用")
     ap.add_argument("--map", dest="map_arg", default="",
                     help="旧号=新号，逗号分隔，如 7=9,7.4=9.4,20=22")
+    ap.add_argument("--map-file", dest="map_file", default="",
+                    help="读重排脚本自动写出的映射文件（**首选**，免手抄）")
     ap.add_argument("--dry-run", action="store_true",
                     help="预演：只列出将改哪些，不落盘（**改前务必先跑一次**）")
     a = ap.parse_args()
@@ -215,7 +235,7 @@ def main():
     if a.capture:
         return capture()
     if a.apply:
-        return apply_map(a.map_arg, dry_run=a.dry_run)
+        return apply_map(a.map_arg, map_file=a.map_file, dry_run=a.dry_run)
     ap.print_help()
     return 1
 

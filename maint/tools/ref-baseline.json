@@ -2,7 +2,8 @@
   "CHANGELOG.md": [
     "铁律 15.2",
     "铁律 15.4.5",
-    "铁律第 22"
+    "铁律第 22",
+    "铁律第 7.4"
   ],
   "publish.py": [
     "铁律 12.5",
@@ -29,15 +30,6 @@
     "铁律 19.2",
     "铁律第 16"
   ],
-  "maint/tools/sync-clause-refs.py": [
-    "铁律 12",
-    "铁律 12.3.3",
-    "铁律 12.5",
-    "铁律 12.5.1",
-    "铁律 15.3",
-    "铁律 15.4.5",
-    "铁律第 9.4"
-  ],
   "maint/tools/check-separation.py": [
     "铁律 12.3",
     "铁律 19.1",
@@ -58,6 +50,18 @@
     "铁律 19.2",
     "铁律第 9"
   ],
+  "maint/tools/clause_map.py": [
+    "铁律 12"
+  ],
+  "maint/tools/sync-clause-refs.py": [
+    "铁律 12",
+    "铁律 12.3.3",
+    "铁律 12.5",
+    "铁律 12.5.1",
+    "铁律 15.3",
+    "铁律 15.4.5",
+    "铁律第 9.4"
+  ],
   "maint/plans/守卫补全-跨侧漂移与目录锚点.md": [
     "铁律 12.3.3",
     "铁律 12.5",
@@ -70,16 +74,16 @@
   "maint/test-data/README.md": [
     "铁律第 9"
   ],
-  "maint/scratch/insert-clause-4.py": [
-    "铁律第 3"
-  ],
-  "maint/scratch/swap-clause-1-2.py": [
-    "铁律第 1"
-  ],
   "maint/scratch/README.md": [
     "铁律第 9"
   ],
   "maint/scratch/renumber-clauses.py": [
     "铁律 17.2"
+  ],
+  "maint/scratch/insert-clause-4.py": [
+    "铁律第 3"
+  ],
+  "maint/scratch/swap-clause-1-2.py": [
+    "铁律第 1"
   ]
 }

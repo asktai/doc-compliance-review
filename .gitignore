@@ -21,3 +21,6 @@ config.local.json
 
 # 注：core/_sample-baseline.json 是**人工登记**台账（--add/--confirm 逐例录入），
 #     不可由代码重建，属开发资产，须正常纳入 git 跟踪，切勿加入此文件。
+
+# 重排映射临时产物：由重排脚本每次跑自动覆盖，属运行期产物，不入档
+maint/scratch/.last-clause-map.txt

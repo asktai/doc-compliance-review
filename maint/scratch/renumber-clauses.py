@@ -18,8 +18,12 @@
   否则改坏了正文，后面所有守卫都是在错的底稿上判对错。
 
 用法：python3 maint/scratch/renumber-clauses.py <输入> <输出>
+
+跑完后**务必**执行同步（否则别处引用会悬空，实测漏过 27 处）：
+  python3 maint/tools/sync-clause-refs.py --apply --map-file maint/scratch/.last-clause-map.txt
 """
 
+import os
 import re
 import sys
 
@@ -126,6 +130,52 @@ def shift_line(line):
     return shift_paths(line)
 
 
+def verify_mapping(src, dst, mapping):
+    """**自校验：映射必须与产出的正文对得上**（防"映射算错却照搬出去"）。
+
+    做法：对每条 `N → N+1`，比对**旧第 N 条的标题**与**新第 N+1 条的标题**是否相同。
+    相同 → 该条确实整体搬到了新位置；不同 → 映射或正文出了问题，**当场报错**。
+
+    **为什么非要这步**：映射会被同步工具拿去改**别处几十处引用**。
+    映射若与正文不符，等于**拿着错表去搬引用**——比不搬更糟（把对的改成错的）。
+    这是 19.2"守卫自身也要验证"用在**一次性脚本**上：脚本也得自证。
+    """
+    def titles(p):
+        return re.findall(r"(?m)^### 第 (\d+) 条 (.+)$",
+                          open(p, encoding="utf-8").read())
+
+    o = {int(n): t for n, t in titles(src)}
+    d = {int(n): t for n, t in titles(dst)}
+    bad = []
+    for old_n in sorted(o):
+        new_n = int(mapping[str(old_n)])
+        if d.get(new_n) != o[old_n]:
+            bad.append((old_n, new_n, o[old_n], d.get(new_n)))
+    return bad
+
+
+def build_mapping():
+    """产出**完整映射**（旧号 → 新号），供跨文件引用同步使用。
+
+    **为什么要它**：本脚本改动的是 `DEV-RULES.md` 正文；但条号**被别处引用着**
+    （脚本注释、随包文档、计划文档里写死的"（铁律第 N.M 条）"）。
+    不把这批引用一并搬走，它们**全部悬空**——2026-10-16 实测漏了 27 处，
+    其中含随包文件。故本脚本除改正文外，还**把映射吐给同步工具**（--emit-map）。
+
+    映射须**覆盖到与引用同粒度**：章区间用到整条号，正文用到 `N.M`，
+    引用里还出现过 `N.M.K`（如 19.4.7.3）——三级一律给出，短的由
+    同步工具按"前缀最长匹配"回退（见 sync-clause-refs.py）。
+    """
+    m = {}
+    for n in range(1, MAX_N + 1):
+        m[str(n)] = str(n + 1)
+        for k in range(1, 13):                      # 二级：实测最多到 .12
+            m["%d.%d" % (n, k)] = "%d.%d" % (n + 1, k)
+            for j in range(1, 10):                  # 三级：实测最多到 .8
+                m["%d.%d.%d" % (n, k, j)] = "%d.%d.%d" % (n + 1, k, j)
+    return m
+
+
 def main():
     if len(sys.argv) < 3:
         print(__doc__)
@@ -151,6 +201,33 @@ def main():
     nums = sorted(int(x) for x in re.findall(r"(?m)^### 第 (\d+) 条", out))
     print("[OK] 已写出 %s" % dst)
     print("     条号：%s" % ("1—23 连续" if nums == list(range(1, MAX_N + 2)) else nums))
+
+    # ── 导出映射：供 sync-clause-refs.py 把别处引用一并搬走（**必做**）──
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                    "..", "tools"))
+    mapping = build_mapping()
+
+    # **先自校验，再导出**——映射错了就不能放出去（见 verify_mapping 说明）
+    bad = verify_mapping(src, dst, mapping)
+    if bad:
+        print("[E] 映射与产出正文**不一致**，拒绝导出（防拿错表搬引用）：")
+        for old_n, new_n, ot, nt in bad[:5]:
+            print("     旧第 %d 条 %r ≠ 新第 %d 条 %r" % (old_n, ot, new_n, nt))
+        if len(bad) > 5:
+            print("     ……共 %d 处不符" % len(bad))
+        print("     可能原因：输入文件不是本脚本预期的形态"
+              "（须为「第 1 条＝文档结构与编号」的未重排态）")
+        return 1
+    print("[ok] 映射自校验通过（条标题与产出正文一一对应）")
+
+    try:
+        import clause_map
+        clause_map.emit_map(
+            mapping,
+            "全体 +1（第 1—%d 条 → 第 2—%d 条）" % (MAX_N, MAX_N + 1),
+            "renumber-clauses.py")
+    except ImportError:
+        print("[!] 未能导入 clause_map 工具，映射未导出——**请手动同步别处引用**")
     return 0
 
 
