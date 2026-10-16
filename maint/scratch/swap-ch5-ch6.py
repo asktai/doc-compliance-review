@@ -54,7 +54,15 @@ def build_mapping():
 
 # 条号／路径在文中的形态：`第 N 条`、行首 `**N.M`、列表 `- **N.M.K`、句中 `N.M.K`
 RE_TIAO = re.compile(r"第 (\d+) 条")
-RE_NUM = re.compile(r"(?<![\d.])(?<![vV])(\d{1,2})\.(\d)((?:\.\d+)*)(?![\d.])")
+# **一次抓满整串路径**，各自再 split——不要拆成多个捕获组。
+#   实证事故（2026-10-16）：原写法 `(\d{1,2})\.(\d)((?:\.\d+)*)` 的第 3 组
+#   **带前导点**（`.3.1`），与"前面组用点重拼"一叠加，就多出一个点：
+#   `16.4.3.1` → 拼出 `13.4..3.1`；再经 `group(0).replace(...)` 二次套用 →
+#   `13.4..3.1.3.1`。**两处错叠加**，把 36 处编号改成了四不像，
+#   而当时的自检十二维**一处都没抓到**（守卫看不见"编号自身被改坏"）。
+#   **教训**：正则分组的"点"归属必须在组内统一（要么都在组内、要么都在连接符），
+#   且替换时**直接返回新串**，**不要**拿 `group(0).replace()` 二次套用。
+RE_NUM = re.compile(r"(?<![\d.])(?<![vV])(\d{1,2}(?:\.\d+)+)(?![\d.])")
 
 # **章号引用**（正文里"见第 N 章"这类）：两章对调，章号也随之互换。
 #   ⚠ 本脚本**只在该两章对调的语境下**互换第五↔第六章——
@@ -74,13 +82,14 @@ def apply_map_to_text(line, mapping):
         return "第 %s 条" % mapping.get(n, n)
 
     def _num(mm):
-        groups = [g for g in mm.groups() if g]
-        for cut in range(len(groups), 0, -1):
-            old = ".".join(groups[:cut])
+        parts = mm.group(1).split(".")
+        for cut in range(len(parts), 0, -1):
+            old = ".".join(parts[:cut])
             if old in mapping:
-                tail = ".".join(groups[cut:])
-                new = mapping[old] + (("." + tail) if tail else "")
-                return mm.group(0).replace(old, new)
+                tail = ".".join(parts[cut:])
+                # **直接返回新串**——`mm.group(1)` 就是 `old(+.tail)`，不必也不该
+                # 再对 `group(0)` 做 `replace`（那会把尾巴重复一遍，见上方事故注）。
+                return mapping[old] + (("." + tail) if tail else "")
         return mm.group(0)
 
     line = RE_TIAO.sub(_tiao, line)
