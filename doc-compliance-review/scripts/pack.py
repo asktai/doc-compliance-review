@@ -84,7 +84,7 @@ FULL_FILES = ["SKILL.md", "README.md", "安装使用教程.md", "LICENSE.md", "V
               "permissions-and-libraries.md", "drafting-guide.md", "template-guide.md",
               # 对外版本清单（供在线检查更新）。随包是为了让使用者能**离线核对**
               # "本包自称是哪一版、官方最新是哪一版"；也是发布时随包上传到仓库的那一份。
-              # 版本一致性由 check.py 的 check_manifest_version() 守卫（铁律 15.3）。
+              # 版本一致性由 check.py 的 check_manifest_version() 守卫（铁律 19.3）。
               "version.json"]
 # assets/ 必须随包（README/SKILL 顶部引用了头标，缺了就是裂图）；private/ 仍默认排除
 # samples/ 下**只带顶层文件**（即自检样本）；samples/输出样例、公开范本、通用样例属
@@ -245,7 +245,7 @@ SKILL_FMT_VER = 1
 #   例：广告合规审查_v1.7.0_20260928_(advertising-compliance-review).zip
 # 四段定式（2026-09-29 定，V3.11.6 起生效）：
 #   · 版本号 **带小写 v** 前缀（`v1.7.0`，不是 `V1.7.0`、也不是裸 `1.7.0`）
-#     ——2026-10-14（v1.32.0）由大写 V 统一改为小写 v，与铁律 15.2／18.2 同步。
+#     ——2026-10-14（v1.32.0）由大写 V 统一改为小写 v，与铁律 19.2／15.2 同步。
 #   · 日期 **紧凑 8 位**（`%Y%m%d`，如 20260928）
 #   · 技能 ID 用 **半角括号**包裹，内容为 **slug**（`name` 字段，小写字母/数字/连字符）
 #   · 分隔符一律 **下划线**

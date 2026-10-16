@@ -3,7 +3,7 @@
   "product": "文档合规审查助手AI合同审核全能版",
   "skill_id": "doc-compliance-review",
   "latest": {
-    "version": "v3.11.12",
+    "version": "v3.11.13",
     "date": "2026-10-14",
     "summary": "新增「在线检查更新」：一查就知道有没有新版、新版改了什么、去哪下载",
     "changes": [
@@ -14,8 +14,8 @@
     ],
     "download_page": "https://github.com/asktai/doc-compliance-review/releases",
     "files": {
-      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.11.12/文档合规审查助手AI合同审核全能版_v3.11.12_20261016_(doc-compliance-review).skill",
-      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.11.12/文档合规审查助手AI合同审核全能版_v3.11.12_20261016_(doc-compliance-review).zip"
+      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.11.13/文档合规审查助手AI合同审核全能版_v3.11.13_20261016_(doc-compliance-review).skill",
+      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.11.13/文档合规审查助手AI合同审核全能版_v3.11.13_20261016_(doc-compliance-review).zip"
     }
   },
   "history": [
