@@ -84,7 +84,7 @@ FULL_FILES = ["SKILL.md", "README.md", "安装使用教程.md", "LICENSE.md", "V
               "permissions-and-libraries.md", "drafting-guide.md", "template-guide.md",
               # 对外版本清单（供在线检查更新）。随包是为了让使用者能**离线核对**
               # "本包自称是哪一版、官方最新是哪一版"；也是发布时随包上传到仓库的那一份。
-              # 版本一致性由 check.py 的 check_manifest_version() 守卫（铁律 13.3）。
+              # 版本一致性由 check.py 的 check_manifest_version() 守卫（铁律 15.3）。
               "version.json"]
 # assets/ 必须随包（README/SKILL 顶部引用了头标，缺了就是裂图）；private/ 仍默认排除
 # samples/ 下**只带顶层文件**（即自检样本）；samples/输出样例、公开范本、通用样例属
@@ -245,7 +245,7 @@ SKILL_FMT_VER = 1
 #   例：广告合规审查_v1.7.0_20260928_(advertising-compliance-review).zip
 # 四段定式（2026-09-29 定，V3.11.6 起生效）：
 #   · 版本号 **带小写 v** 前缀（`v1.7.0`，不是 `V1.7.0`、也不是裸 `1.7.0`）
-#     ——2026-10-14（v1.32.0）由大写 V 统一改为小写 v，与铁律 13.2／18.2 同步。
+#     ——2026-10-14（v1.32.0）由大写 V 统一改为小写 v，与铁律 15.2／18.2 同步。
 #   · 日期 **紧凑 8 位**（`%Y%m%d`，如 20260928）
 #   · 技能 ID 用 **半角括号**包裹，内容为 **slug**（`name` 字段，小写字母/数字/连字符）
 #   · 分隔符一律 **下划线**
@@ -363,7 +363,7 @@ def write_skill(zp, out, product, sid, version, date):
 
 
 def verify_admission_manifest(base):
-    """素材准入硬拒（铁律第 7.4 条）：**默认拒绝随包**，未登记即**拒绝出包**。
+    """素材准入硬拒（铁律第 9.4 条）：**默认拒绝随包**，未登记即**拒绝出包**。
 
     背景：FULL_DIRS 是**整体递归打包**，`samples/` 里多出来的东西会被**照单全收**。
     更早以前是"白名单外的顶层条目静默丢弃"——于是"忘了登记"的失败方向是
@@ -396,7 +396,7 @@ def verify_admission_manifest(base):
         return bad, warns
     if manifest is None:
         warns.append("未找到素材准入清单（在 %s 上溯 3 级未命中 maint/samples-manifest.json）"
-                     "——无法核验 samples/ 的随包许可（铁律 7.4 准入制）" % base)
+                     "——无法核验 samples/ 的随包许可（铁律 9.4 准入制）" % base)
         return bad, warns
     try:
         man = json.load(open(manifest, encoding="utf-8"))
@@ -428,7 +428,7 @@ def build(base, outdir, include_private=False, tag="v3.0.0", keep_tools=False, f
             print("  [FAIL] " + b)
         print("  [x] 文件名不合四段式规范，已中止出包（勿手工改名绕过，去修 package_stem）。")
         return False
-    # 素材准入硬拒（铁律 7.4）：未登记即拒绝出包，杜绝"包静默少一个样本"
+    # 素材准入硬拒（铁律 9.4）：未登记即拒绝出包，杜绝"包静默少一个样本"
     _adm_bad, _adm_warn = verify_admission_manifest(base)
     if _adm_bad:
         for b in _adm_bad:

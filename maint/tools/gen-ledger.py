@@ -238,13 +238,17 @@ def build(no_files=False):
       "正式发布后应改为「文件本体直链」（如 releases 附件），"
       "届时把不稳定链接整体降级为溯源备注。")
     A(">")
-    A("> **受限二 · 更新源仍为占位**：技能内 `version.json`／`config.json` 的更新源地址"
-      "仍为**占位** `<your-org>`（仓库未建立、`gh` 未登录），故「在线检查更新」实际**读不到清单**，"
-      "按 15.4.5.1 **静默降级为纯本地模式**（不报错、不卡住、不打扰使用者）。")
+    A("> **受限二 · 仓库已定、清单未推**（2026-10-16 更新）：正式仓库已确定为 "
+      "`https://github.com/asktai/doc-compliance-review`，技能侧 `version.json`／`config.json` "
+      "的地址**已由占位 `<your-org>` 填为真值**（随 v3.11.12 出包）。"
+      "**但本机 `gh` 未登录、GitHub API 对本环境返回 403**，故**清单文件尚未推送、releases 未建**"
+      "——此刻「在线检查更新」仍**读不到清单**，按 15.4.5.1 **静默降级纯本地**（不报错、不卡住、不打扰）。")
     A(">")
     A("> **当前可用取件通道**＝本节上表的腾讯文档链接（技能包为文件本体，**稳定级**）。"
-      "**开通后操作**＝建立仓库并填入真实地址 → 升版出包 → 把「稳定链接」改为 releases 附件直链，"
-      "并把本节不稳定链接整体降级为溯源备注。")
+      "**解除受限二的操作**（须开发者提供 GitHub 凭据后执行）："
+      "① `gh auth login` 授权 → ② 把 `version.json` 推到仓库默认分支 → "
+      "③ 建 v3.11.12 release 并上传 `dist/` 下 `.skill`／`.zip` 作附件 → "
+      "④ 把本节「稳定链接」改为 releases 附件直链，并把不稳定链接降级为溯源备注。")
     A("")
     A("---")
     A("")
@@ -261,7 +265,7 @@ def build(no_files=False):
         ("dev/publish.py", "发布链脚本（sync → 分离守卫 → 校验 → 打包）"),
         ("dev/maint/tools/check-dev-rules.py", "铁律自检守卫（十二维）"),
         ("dev/maint/tools/smoke-dev-rules.py", "铁律全量冒烟（注入测试，证明守卫拦得住）"),
-        ("dev/maint/tools/check-separation.py", "分离守卫（开发侧／技能侧分离，铁律第 7 条）"),
+        ("dev/maint/tools/check-separation.py", "分离守卫（开发侧／技能侧分离，铁律第 9 条）"),
         ("dev/maint/samples-manifest.json", "素材准入清单（samples/ 逐条许可登记）"),
     ]
     for rel, desc in dev_files:

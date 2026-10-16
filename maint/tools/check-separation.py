@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""开发侧／技能侧分离守卫（铁律第 7 条）。
+"""开发侧／技能侧分离守卫（铁律第 9 条）。
 
 **为什么要有它**：分离此前只有"机制"（`pack.py` 的白名单／排除表），没有"守卫"——
 机制写错、或有人往技能目录塞东西，出包五项自检照样"全过"，`check.py` 也零反应。
@@ -260,7 +260,7 @@ def main():
     if "--help" in sys.argv or "-h" in sys.argv:
         print(__doc__)
         return 0
-    print("开发侧／技能侧分离守卫（铁律第 7 条）")
+    print("开发侧／技能侧分离守卫（铁律第 9 条）")
     print("=" * 62)
 
     if not os.path.isdir(SKILL):
