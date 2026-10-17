@@ -223,7 +223,7 @@ def build(no_files=False):
     A("|---|---|---|---|")
     A("| 产出物台账（本文档的在线版） | 腾讯文档 | "
       "https://docs.qq.com/markdown/DRFdLZ1ZZVGdsUEZ6 | **以最新一次导入为准**，勿作长期引用目标 |")
-    A("| 开发工程规范（铁律 v1.40.0，开发侧） | 腾讯文档 | "
+    A("| 开发工程规范（铁律 v1.41.0，开发侧） | 腾讯文档 | "
       "https://docs.qq.com/markdown/DRGdTUnpOWUdKTm9N | **开发侧资产**，仅供查阅与留档；不入包、不对外分发 |")
     A("| 开发日志（DEVLOG，开发侧） | 腾讯文档 | "
       "https://docs.qq.com/markdown/DRGJrUHJ2T2pwdHNZ | **开发侧资产**，仅供查阅与留档；不入包、不对外分发 |")
@@ -268,7 +268,7 @@ def build(no_files=False):
         ("dev/CHANGELOG.md", "技能版本沿革（面向交付）"),
         ("dev/maint/DEVLOG.md", "开发日志（开发侧，含事故复盘）"),
         ("dev/publish.py", "发布链脚本（sync → 分离守卫 → 校验 → 打包）"),
-        ("dev/maint/tools/check-dev-rules.py", "铁律自检守卫（十二维）"),
+        ("dev/maint/tools/check-dev-rules.py", "铁律自检守卫（十三维）"),
         ("dev/maint/tools/smoke-dev-rules.py", "铁律全量冒烟（注入测试，证明守卫拦得住）"),
         ("dev/maint/tools/check-separation.py", "分离守卫（开发侧／技能侧分离，铁律第 9 条）"),
         ("dev/maint/samples-manifest.json", "素材准入清单（samples/ 逐条许可登记）"),

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-开发工程规范（铁律）· 全文自检（十二维）
+开发工程规范（铁律）· 全文自检（十三维）
 ==============================================================================
 对 `dev/DEV-RULES.md` 做机械自检，覆盖十二个维度：
 
@@ -32,7 +32,7 @@
     保持零依赖、写法保守（凡拿不准一律不报），并以注入式负向测试验证过"真拦得住"。
 
 用法
-    python3 maint/tools/check-dev-rules.py                  # 十二维检查
+    python3 maint/tools/check-dev-rules.py                  # 十三维检查
     python3 maint/tools/check-dev-rules.py --refs           # 另打印条号引用上下文（供人工复核指向）
     python3 maint/tools/check-dev-rules.py --install-hook   # 安装 pre-commit 钩子（只警告、不阻断）
     python3 maint/tools/check-dev-rules.py --quiet          # 只输出结论行
@@ -795,7 +795,7 @@ def install_hook():
     shutil.copyfile(HOOK_SRC, HOOK_DST)
     os.chmod(HOOK_DST, 0o755)
     print("[OK] 已安装 pre-commit 钩子 → %s（只警告、不阻断）" % HOOK_DST)
-    print("     一档：提交涉及 DEV-RULES.md → 自动跑本脚本（十二维自检）。")
+    print("     一档：提交涉及 DEV-RULES.md → 自动跑本脚本（十三维自检）。")
     print("     二档：提交涉及守卫本体（check-dev-rules.py／smoke-dev-rules.py）")
     print("          → 自动跑 maint/tools/smoke-dev-rules.py 全量冒烟，")
     print("            用注入测试证明守卫**仍然拦得住**（铁律 16.2）。")
@@ -805,6 +805,115 @@ def install_hook():
 
 
 # ────────────────────────────── 主流程 ──────────────────────────────
+
+# ──────────────── (13) 落实总表须覆盖全部条 ────────────────
+
+def check_closure_table(s):
+    """(13) 第 24.3「全文落实总表」须覆盖正文全部条，且落点取值合法。
+
+    **本条守卫的是一件真实缺陷**：24.3 表逐条登记"靠什么兜住"，但表是**手写的**——
+    新增一条后忘了登记，不会有人发现（表照样通过，只是少了一行）。
+    2026-10-17 质检时即由人工发现此缺口，此前无任何守卫覆盖。
+
+    三件事（缺一不可）：
+      A. **完整性**：正文第 1—N 条的条号集合，须与总表"条"列集合**完全相等**；
+      B. **落点合法**：每行落点须是四态之一（守卫／人工／流程／守卫＋人工）；
+      C. **表在**：找不到 24.3 表即报错（防止整表被删而无人知）。
+
+    注：本维**只比集合与词表**，不判断"标得对不对"——那属人工复核（16.4）。
+    """
+    head("(13) 落实总表须覆盖全部条")
+    lines = s.splitlines()
+
+    arts = [int(m.group(1)) for m in
+            (re.match(r"^### 第 (\d+) 条", l) for l in lines) if m]
+    if not arts:
+        err("未解析出任何条——无法校验落实总表")
+        return
+
+    # 定位 24.3 表：从"24.3 " 起，取到下一个非表格、非空行为止
+    start = None
+    for i, l in enumerate(lines, 1):
+        if re.match(r"^\*\*24\.3 ", l):
+            start = i
+            break
+    if start is None:
+        err("未找到 24.3「落实总表」——收束条款缺失，全文落实无从核对")
+        return
+
+    rows, header, i = [], None, start
+    while i < len(lines):
+        l = lines[i]
+        if l.startswith("|"):
+            # 表头：以「条」开头的那一行（如 `| 条 | 名称 | 落点 | 兜在何处 |`）
+            if header is None and re.match(r"^\|\s*条\s*\|", l):
+                header = [c.strip() for c in l.strip().strip("|").split("|")]
+            elif re.match(r"^\|\s*\d+\s*\|", l):
+                rows.append((i + 1, l))
+        elif rows:
+            break
+        i += 1
+
+    # **表体不得为空**：只留标题、把表删干净，同样算缺失——此前漏判（2026-10-17 复核发现）。
+    if header is None:
+        err("24.3 未找到表头（须为 `| 条 | 名称 | 落点 | 兜在何处 |`）——表可能已被删或改形")
+        return
+    if not rows:
+        err("24.3 表未解析出任何数据行——表体为空，等同缺失")
+        return
+
+    # **列序须与表头一致**：不写死"落点在第 3 列"，改为按表头定位。
+    # 此前写死 cols[2]，表头列序一改就查错列、且不报错（2026-10-17 复核发现）。
+    try:
+        i_name = header.index("名称")
+        i_state = header.index("落点")
+        i_where = header.index("兜在何处")
+    except ValueError:
+        err("24.3 表头缺必需列（须含 条／名称／落点／兜在何处）：%s" % "｜".join(header))
+        return
+
+    table_nums, bad_state = [], []
+    VALID_STATES = {"守卫", "人工", "流程", "守卫＋人工"}
+    for lineno, l in rows:
+        cols = [c.strip() for c in l.strip().strip("|").split("|")]
+        if len(cols) < len(header):
+            err("第 %d 行：24.3 表列数不足（表头 %d 列，此行 %d 列）"
+                % (lineno, len(header), len(cols)))
+            continue
+        try:
+            n = int(cols[0])
+        except ValueError:
+            err("第 %d 行：首列不是条号" % lineno)
+            continue
+        table_nums.append(n)
+        state = cols[i_state].replace("*", "").strip()
+        if state not in VALID_STATES:
+            bad_state.append("第 %d 行（第 %d 条）落点「%s」不合四态：%s"
+                             % (lineno, n, state, "／".join(sorted(VALID_STATES))))
+        if not cols[i_name].strip():
+            bad_state.append("第 %d 行（第 %d 条）「名称」为空" % (lineno, n))
+        if not cols[i_where].strip():
+            bad_state.append("第 %d 行（第 %d 条）「兜在何处」为空——须写明落点位置"
+                             % (lineno, n))
+
+    if bad_state:
+        for b in bad_state:
+            err(b)
+
+    missing = sorted(set(arts) - set(table_nums))
+    extra = sorted(set(table_nums) - set(arts))
+    dup = sorted({n for n in table_nums if table_nums.count(n) > 1})
+    if missing:
+        err("24.3 表漏登记以下条（新增条款须同时登记落点，见 24.3.1）：第 %s 条"
+            % "、".join(map(str, missing)))
+    if extra:
+        err("24.3 表登记了不存在的条：第 %s 条" % "、".join(map(str, extra)))
+    if dup:
+        err("24.3 表重复登记：第 %s 条" % "、".join(map(str, dup)))
+    if not (missing or extra or dup or bad_state):
+        info("24.3 落实总表覆盖全部 %d 条，落点均合法（守卫／人工／流程／守卫＋人工）"
+             % len(arts))
+
 
 def main():
     global QUIET, RULES
@@ -834,6 +943,7 @@ def main():
     check_ref_anchor(s)
     check_bold_heading(s)
     check_meta_rules(s)
+    check_closure_table(s)
     print("=" * 62)
     if ERRS:
         print("结果：错误 %d 项，警告 %d 项 —— **未通过**" % (len(ERRS), len(WARNS)))
