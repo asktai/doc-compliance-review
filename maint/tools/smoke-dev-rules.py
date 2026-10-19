@@ -320,6 +320,11 @@ def main():
     print("\n[B] 注入：逐维断言「必须拦住」")
     tmp = tempfile.mkdtemp(prefix="rules-smoke-")
     fails = []
+    # 单独档的用例数**从执行处累加**，不在结论行里手写常量——
+    # 2026-10-19 改：原结论行写死 `len(CASES) + 3`，而"3"是第 (8)×1 + 第 (14)×2 的
+    # 手算结果；第 (14) 维加到 3 个病征后这个数字就**立刻变成了谎报**。
+    # 同一事实两处写必漂（铁律第 12 条）——改为单处来源。
+    standalone_n = [0]
     try:
         for dim, name, fn, kw in CASES:
             bad = fn(src)
@@ -372,6 +377,7 @@ def main():
                 n8, n8b = len(hit8), len(base_dim8)
                 prop_hit = any(CROSS_SIDE_PROBE in h for h in hit8)
                 if rc8 != 0 and prop_hit and n8 >= n8b:
+                    standalone_n[0] += 1
                     print("  [OK] (8) %-22s 拦住（第 8 维报错 %d→%d 项，含探针文件）"
                           % ("跨侧漂移", n8b, n8))
                 else:
@@ -406,6 +412,7 @@ def main():
                 d14 = parse_dims(out14)
                 hit14 = [h for h in d14.get(14, []) if "不同步" in h]
                 if rc14 != 0 and hit14:
+                    standalone_n[0] += 1
                     print("  [OK] (14) %-22s 拦住（报「不同步」）" % "在线版陈旧")
                 else:
                     fails.append((14, "在线版陈旧", "未报「不同步」（守卫失效）"))
@@ -420,10 +427,42 @@ def main():
                 d14b = parse_dims(out14b)
                 hit14b = [h for h in d14b.get(14, []) if "锚点链接" in h]
                 if rc14b != 0 and hit14b:
+                    standalone_n[0] += 1
                     print("  [OK] (14) %-22s 拦住（报「仍有锚点链接」）" % "转换不彻底")
                 else:
                     fails.append((14, "转换不彻底", "未报「锚点链接残留」（守卫失效）"))
                     print("  [E] (14) %-22s 未报锚点残留（守卫失效）" % "转换不彻底")
+
+                # 病征三：**说明段折成多行的旧 bug 形态**（2026-10-19 实证过的真 bug）
+                # 旧转换只吃掉说明段第一行，剩下的半句「由 `…make-online-md.py` 派生…」
+                # 孤零零留在目录里。本项验"守卫认不认这个形态"。
+                # 注意：这个病征的两面**必须都验**——
+                #   · 守卫要报它（否则下次再出同样产物没人拦）；
+                #   · 归一化比对**不得**把「说明段行数不同」误算成正文漂移
+                #     （2026-10-19 曾因此报出"约 963 行有差异"的伪问题）。
+                ONELINE = "目录（在线版无锚点跳转，按条号定位；本地 Markdown 版保留可点击目录）"
+                broken = obak.decode("utf-8")
+                if ONELINE not in broken:
+                    print("      跳过病征三：在线版说明行已非预期形态（%s）" % ONELINE[:12])
+                else:
+                    broken = broken.replace(
+                        ONELINE, "目录（在线版无锚点跳转，按条号定位；\n由 `maint/tools/make-online-md.py` 派生，见第 23 条在线分发）", 1)
+                    with open(ONLINE, "w", encoding="utf-8") as f:
+                        f.write(broken)
+                    rc14c, out14c = run_check()
+                    d14c = parse_dims(out14c)
+                    hit14c = [h for h in d14c.get(14, []) if "说明段仍为多行" in h]
+                    # 且**不得**同时报「不同步」——那说明归一化把版式差异当成内容漂移
+                    noise = [h for h in d14c.get(14, []) if "不同步" in h]
+                    if rc14c != 0 and hit14c and not noise:
+                        standalone_n[0] += 1
+                        print("  [OK] (14) %-22s 拦住（报「说明段仍为多行」，且不误报不同步）"
+                              % "说明段折行")
+                    else:
+                        why = ("未报「说明段仍为多行」（守卫失效）" if not hit14c
+                               else "同时误报「不同步」（归一化区分度不足）")
+                        fails.append((14, "说明段折行", why))
+                        print("  [E] (14) %-22s %s" % ("说明段折行", why))
             finally:
                 with open(ONLINE, "wb") as f:
                     f.write(obak)
@@ -460,6 +499,7 @@ def main():
                                    text=True, cwd=DEV)
                 o = (r.stdout or "") + (r.stderr or "")
                 if r.returncode != 0 and kw in o:
+                    standalone_n[0] += 1
                     print("  [OK] (12) %-22s 拦住" % name)
                 else:
                     why = "未报错（守卫失效）" if r.returncode == 0 else \
@@ -524,7 +564,8 @@ def main():
         for dim, name, why in fails:
             print("  · (%d) %s —— %s" % (dim, name, why))
         return 1
-    print("冒烟通过：%d 个注入用例全部被拦住，正式文件零污染" % (len(CASES) + 3))
+    print("冒烟通过：%d 个注入用例全部被拦住，正式文件零污染"
+          % (len(CASES) + standalone_n[0]))
     return 0
 
 

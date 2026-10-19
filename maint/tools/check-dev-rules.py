@@ -930,6 +930,28 @@ def check_closure_table(s):
 
 ONLINE_MD = os.path.join(DEV, "maint", "scratch", "DEV-RULES.online.md")
 
+# 目录**说明段**：从「目录（」起头，吃满连续非空行（含跨行续写）。
+# 2026-10-19 修：旧版归一化用的 `^目录.*锚点.*$` 是**单行**正则，而源的说明段本就是
+# **两行**——于是归一化只吃掉第一行，第二行「由 `…make-online-md.py` 派生…」留了下来，
+# 与在线版（整段已被替换成单行）对不上，本维当场报「约 963 行有差异」。
+# 那次报错**报的是伪问题**（两版其实同步）：判据把「版式差异」误当成了「内容漂移」。
+RE_TOC_NOTE = re.compile(r"^目录（[^\n]*(?:\n(?!\n)[^\n]*)*", re.M)
+RE_TOC_LINK = re.compile(r"^(\s*)- \[([^\]]+)\]\(#[^)]+\)\s*$", re.M)
+
+
+def _normalize_for_compare(t):
+    """把「目录区两版必然不同的部分」抹平，只留可逐字比对的正文。
+
+    三步（次序有讲究）：
+      1. 整段删掉目录说明段（源为两三行、在线版为一行，段落边界才是可比单位）；
+      2. 目录条目 `[文字](#锚点)` → `文字`（源有链接、在线版无）；
+      3. 兜底删掉残余的「目录（…」行（若第 1 步因版式再变而漏网，这里不至于把说明
+         当正文比出假差异）。
+    """
+    t = RE_TOC_NOTE.sub("", t)
+    t = RE_TOC_LINK.sub(lambda m: "%s- %s" % (m.group(1), m.group(2)), t)
+    return re.sub(r"^目录（.*$", "", t, flags=re.M)
+
 
 def check_online_md(s):
     """(14) 在线版（目录去链接）须与源文件同步生成，不得陈旧。
@@ -943,9 +965,11 @@ def check_online_md(s):
     所以本维做三件事：
       A. 在线版**存在**（不存在先提示生成，不判错——可能还没上传过）；
       B. 在线版**零锚点链接残留**（转换必须彻底）；
-      C. 在线版去掉目录链接后，**逐字节等于源**（即"只改了目录"）。
+      C. 两版**归一化后逐字节相等**（即"除了目录区，正文一模一样"）。
 
     C 是关键：它同时防住"转发时误伤正文"与"源改了没重生成"。
+    **归一化只抹「两版必然不同」的部分**（目录说明段、目录链接形态）——抹多了，
+    本维就失去区分度；抹少了，又会把版式差异误报成内容漂移（2026-10-19 就栽在后者）。
     """
     head("(14) 在线版须与源同步")
     if not os.path.exists(ONLINE_MD):
@@ -962,20 +986,30 @@ def check_online_md(s):
             "`maint/tools/make-online-md.py`" % len(resid))
         return
 
-    # C：目录归一后与源比对（源侧把 `[文字](#锚点)` 拉平为 `文字`）
-    def strip_links(t):
-        t = re.sub(r"^(\s*)- \[([^\]]+)\]\(#[^)]+\)\s*$", r"\1- \2", t, flags=re.M)
-        return re.sub(r"^目录.*锚点.*$", "", t, flags=re.M)
+    # B2：说明段必须是**单行**。转换会把多行说明折成一行；若在线版里说明仍跨行，
+    # 要么转换只吃掉了第一行（旧 bug 的形态），要么有人手工改过。
+    note_block = RE_TOC_NOTE.search(online)
+    if note_block and "\n" in note_block.group(0):
+        err("在线版目录说明段仍为多行（%d 行）——转换未整段替换；重跑 "
+            "`maint/tools/make-online-md.py`" % (note_block.group(0).count("\n") + 1))
+        return
 
-    a, b = strip_links(s), strip_links(online)
+    # C：归一化后逐字节比对
+    a, b = _normalize_for_compare(s), _normalize_for_compare(online)
     if a == b:
         info("在线版与源同步（目录已去锚点，正文逐字节一致）")
     else:
-        # 只提示不一致的规模，不猜原因
+        # 只提示不一致的规模与**头一处**差异，不猜原因
         la, lb = a.splitlines(), b.splitlines()
         diff = sum(1 for x, y in zip(la, lb) if x != y) + abs(len(la) - len(lb))
+        first = next(((i + 1, x, y) for i, (x, y) in enumerate(zip(la, lb)) if x != y),
+                     None)
+        where = ""
+        if first:
+            where = "；头一处差异在第 %d 行：「%s」↔「%s」" % (
+                first[0], first[1].strip()[:40], first[2].strip()[:40])
         err("在线版与源**不同步**（约 %d 行有差异）——源改动后须重跑 "
-            "`maint/tools/make-online-md.py`，否则上传的是旧内容" % diff)
+            "`maint/tools/make-online-md.py`，否则上传的是旧内容%s" % (diff, where))
 
 
 def main():
