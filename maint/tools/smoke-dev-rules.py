@@ -306,12 +306,15 @@ def main():
     print("  [OK] 基线通过；自检共 %d 维：%s" % (len(covered), covered))
 
     # 覆盖性自检：脚本声称的每一维，用例表里都得有对应注入
-    cased = sorted({c[0] for c in CASES} | {8})
+    # 第 8 维（跨侧）、第 14 维（在线版）都要**改磁盘文件**才能注入，
+    # 无法用 CASES 的"只改字符串"机制表达，各自单列一档，故在此登记为已覆盖。
+    STANDALONE_DIMS = {8, 14}
+    cased = sorted({c[0] for c in CASES} | STANDALONE_DIMS)
     missing = [d for d in covered if d not in cased]
     if missing:
         print("  [E] 以下维度**无注入用例**（守卫未被验证）：%s" % missing)
         return 1
-    print("  [OK] 每一维都有注入用例（含第 8 维单独一档）")
+    print("  [OK] 每一维都有注入用例（第 8、14 维各单列一档）")
 
     # ── B 注入 ──
     print("\n[B] 注入：逐维断言「必须拦住」")
@@ -384,11 +387,56 @@ def main():
                 print("  [E] (8) 还原失败——**运行实例被污染**，请立即检查 %s" % rp)
             else:
                 print("  [OK] (8) 运行实例已逐字节还原")
+
+        # ── 第 (14) 维：在线版须与源同步 ──
+        # 与第 (8) 维同法：**造真"陈旧"→ 断言拦住 → 立即还原**。
+        # 病征：源改了、忘了重跑转换，在线版停在旧内容（上传出去的就是旧的）。
+        # 另含第二个病征：转换没做干净（在线版仍留锚点链接）。
+        print("  [--] (14) 在线版须与源同步　单独一档")
+        ONLINE = os.path.join(DEV, "maint", "scratch", "DEV-RULES.online.md")
+        if not os.path.exists(ONLINE):
+            print("      跳过：在线版尚未生成（未上传过，属正常）")
+        else:
+            obak = open(ONLINE, "rb").read()
+            try:
+                # 病征一：在线版正文里插入一行（模拟"源改过、在线版没重生成"）
+                with open(ONLINE, "ab") as f:
+                    f.write("\n<!-- smoke-injected: 在线版已陈旧 -->\n".encode("utf-8"))
+                rc14, out14 = run_check()
+                d14 = parse_dims(out14)
+                hit14 = [h for h in d14.get(14, []) if "不同步" in h]
+                if rc14 != 0 and hit14:
+                    print("  [OK] (14) %-22s 拦住（报「不同步」）" % "在线版陈旧")
+                else:
+                    fails.append((14, "在线版陈旧", "未报「不同步」（守卫失效）"))
+                    print("  [E] (14) %-22s 未报「不同步」（守卫失效）" % "在线版陈旧")
+
+                # 病征二：把目录改回锚点链接（模拟"转换没做干净"）
+                stale = obak.decode("utf-8").replace(
+                    "- 第 1 条 适用与效力", "- [第 1 条 适用与效力](#第-1-条-适用与效力)", 1)
+                with open(ONLINE, "w", encoding="utf-8") as f:
+                    f.write(stale)
+                rc14b, out14b = run_check()
+                d14b = parse_dims(out14b)
+                hit14b = [h for h in d14b.get(14, []) if "锚点链接" in h]
+                if rc14b != 0 and hit14b:
+                    print("  [OK] (14) %-22s 拦住（报「仍有锚点链接」）" % "转换不彻底")
+                else:
+                    fails.append((14, "转换不彻底", "未报「锚点链接残留」（守卫失效）"))
+                    print("  [E] (14) %-22s 未报锚点残留（守卫失效）" % "转换不彻底")
+            finally:
+                with open(ONLINE, "wb") as f:
+                    f.write(obak)
+            if digest(ONLINE) != hashlib.sha256(obak).hexdigest():
+                fails.append((14, "在线版", "还原失败：在线版哈希未复原"))
+                print("  [E] (14) 还原失败——**在线版被污染**，请立即检查 %s" % ONLINE)
+            else:
+                print("  [OK] (14) 在线版已逐字节还原")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
     # ── 第 (12) 档：分离守卫（铁律第 9 条）──
-    # 分离守卫查的是"技能目录里有没有不该在那的东西"，与铁律正文的十三维不同源，
+    # 分离守卫查的是"技能目录里有没有不该在那的东西"，与铁律正文的十四维不同源，
     # 故与第 (8) 维同法：**造真违规 → 断言拦住 → 立即还原**。
     # 三个用例覆盖三条判定（白名单混入／未登记素材／开发资料越界）。
     print("  [--] (12) 分离守卫（开发侧／技能侧分离）单独一档")

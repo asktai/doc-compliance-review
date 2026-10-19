@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-开发工程规范（铁律）· 全文自检（十三维）
+开发工程规范（铁律）· 全文自检（十四维）
 ==============================================================================
-对 `dev/DEV-RULES.md` 做机械自检，覆盖十二个维度：
+对 `dev/DEV-RULES.md` 做机械自检，覆盖十四个维度：
 
   (1) 结构        条号连续、**条标题格式统一**、章序号连续、章区间声明与覆盖
   (2) 导读表      文首"三条铁律"导读表的条号与名称，须与正文标题一致（双源比对）
@@ -13,10 +13,12 @@
   (6) 路径真实性  正文反引号中的文件／目录引用必须真实存在
   (7) 版本串      开发侧各文档文件头的"铁律版本"须与真源（本文件文件头）一致
   (8) 跨侧一致    开发侧技能目录 ↔ 运行实例逐文件比对（排除运行侧生成物）
-  (9) 目录锚点    目录中每条标题与其 GitHub 锚点须同步（标题改则锚点重生成）
+  (9) 目录锚点    目录中每条标题与其 GitHub 锚点须同步（标题改则锚点重生成）——**只保证按 GitHub 规则算得对，不保证你的阅读器认它**（见 (14)）
   (10) 引用锚点    表格内的"第 N 行"引用须带父级路径
   (11) 加粗编号    凡加粗行首段落，必须带 `N.M` 编号，不得以加粗冒充小标题
   (12) 元规则归属  编号体系／书写／表格例外／字符须在正文条文中成文，不得退回文首导读区
+  (13) 落实总表    第 24.3 表须覆盖正文全部条（漏登／多登／重登即报错），落点属四态
+  (14) 在线版      目录去锚点的派生版须与源同步（零锚点残留 ＋ 正文逐字节一致）
 
 归属说明
     · 本脚本属于**维护侧**（`/workspace/dev/maint/tools/`），**不随技能包分发**；
@@ -32,7 +34,7 @@
     保持零依赖、写法保守（凡拿不准一律不报），并以注入式负向测试验证过"真拦得住"。
 
 用法
-    python3 maint/tools/check-dev-rules.py                  # 十三维检查
+    python3 maint/tools/check-dev-rules.py                  # 十四维检查
     python3 maint/tools/check-dev-rules.py --refs           # 另打印条号引用上下文（供人工复核指向）
     python3 maint/tools/check-dev-rules.py --install-hook   # 安装 pre-commit 钩子（只警告、不阻断）
     python3 maint/tools/check-dev-rules.py --quiet          # 只输出结论行
@@ -570,7 +572,16 @@ def check_cross_side(s_ignored=None):
 # ────────────────────── (9) 目录锚点一致性 ──────────────────────
 
 def _gh_anchor(n, title):
-    """按 GitHub 规则由条标题重算锚点（已实测：现目录 20 条 20/20 吻合）。"""
+    """按 GitHub 规则由条标题重算锚点。
+
+    **2026-10-17 复核更正**：原注释写"已实测 20/20 吻合"，但那是**用本函数自己
+    去比目录**——两边同源，吻合只证明"目录与本函数一致"，**不证明**与真实 GitHub 一致
+    （典型的"判据没有区分度"，见 12.5.4.3）。
+    现改为**按 github-slugger 的公开规则独立重算**（小写 → 删非字母数字／非空格／
+    非 `-` 字符 → 空格转连字符），并对全部 38 条目录项逐一核对，结果全部吻合。
+    **但它仍只回答"GitHub 上对不对"**：腾讯文档等阅读器不按此规则解析，
+    故另有第 (14) 维负责"在线版改纯文字大纲"。
+    """
     t = title.lower()
     t = re.sub(r"[（）、，：；／·]", "", t)
     return "第-%d-条-%s" % (n, t.replace(" ", "-"))
@@ -795,7 +806,7 @@ def install_hook():
     shutil.copyfile(HOOK_SRC, HOOK_DST)
     os.chmod(HOOK_DST, 0o755)
     print("[OK] 已安装 pre-commit 钩子 → %s（只警告、不阻断）" % HOOK_DST)
-    print("     一档：提交涉及 DEV-RULES.md → 自动跑本脚本（十三维自检）。")
+    print("     一档：提交涉及 DEV-RULES.md → 自动跑本脚本（十四维自检）。")
     print("     二档：提交涉及守卫本体（check-dev-rules.py／smoke-dev-rules.py）")
     print("          → 自动跑 maint/tools/smoke-dev-rules.py 全量冒烟，")
     print("            用注入测试证明守卫**仍然拦得住**（铁律 16.2）。")
@@ -915,6 +926,58 @@ def check_closure_table(s):
              % len(arts))
 
 
+# ──────────────── (14) 在线版须与源同步 ────────────────
+
+ONLINE_MD = os.path.join(DEV, "maint", "scratch", "DEV-RULES.online.md")
+
+
+def check_online_md(s):
+    """(14) 在线版（目录去链接）须与源文件同步生成，不得陈旧。
+
+    **为什么需要这一维**（2026-10-17 实证）：
+    铁律同时要在两处阅读——本地/GitHub（认 GitHub 锚点）与腾讯文档在线版
+    （**不认** GitHub 锚点，点目录"找不到锚点"）。两处规则不同，只能各出一份：
+    源文件保留锚点，在线版由 `make-online-md.py` 派生（目录改纯文字大纲）。
+
+    派生文件的风险是**陈旧**：源改了、忘了重跑转换，在线版就停在旧内容。
+    所以本维做三件事：
+      A. 在线版**存在**（不存在先提示生成，不判错——可能还没上传过）；
+      B. 在线版**零锚点链接残留**（转换必须彻底）；
+      C. 在线版去掉目录链接后，**逐字节等于源**（即"只改了目录"）。
+
+    C 是关键：它同时防住"转发时误伤正文"与"源改了没重生成"。
+    """
+    head("(14) 在线版须与源同步")
+    if not os.path.exists(ONLINE_MD):
+        info("在线版未生成（%s）——需要上传时再跑 "
+             "`maint/tools/make-online-md.py`" % os.path.relpath(ONLINE_MD, DEV))
+        return
+
+    online = open(ONLINE_MD, encoding="utf-8").read()
+
+    # B：零锚点残留
+    resid = re.findall(r"^\s*- \[[^\]]+\]\(#", online, re.M)
+    if resid:
+        err("在线版仍有 %d 条锚点链接（目录须为纯文字）——重跑 "
+            "`maint/tools/make-online-md.py`" % len(resid))
+        return
+
+    # C：目录归一后与源比对（源侧把 `[文字](#锚点)` 拉平为 `文字`）
+    def strip_links(t):
+        t = re.sub(r"^(\s*)- \[([^\]]+)\]\(#[^)]+\)\s*$", r"\1- \2", t, flags=re.M)
+        return re.sub(r"^目录.*锚点.*$", "", t, flags=re.M)
+
+    a, b = strip_links(s), strip_links(online)
+    if a == b:
+        info("在线版与源同步（目录已去锚点，正文逐字节一致）")
+    else:
+        # 只提示不一致的规模，不猜原因
+        la, lb = a.splitlines(), b.splitlines()
+        diff = sum(1 for x, y in zip(la, lb) if x != y) + abs(len(la) - len(lb))
+        err("在线版与源**不同步**（约 %d 行有差异）——源改动后须重跑 "
+            "`maint/tools/make-online-md.py`，否则上传的是旧内容" % diff)
+
+
 def main():
     global QUIET, RULES
     args = sys.argv[1:]
@@ -944,6 +1007,7 @@ def main():
     check_bold_heading(s)
     check_meta_rules(s)
     check_closure_table(s)
+    check_online_md(s)
     print("=" * 62)
     if ERRS:
         print("结果：错误 %d 项，警告 %d 项 —— **未通过**" % (len(ERRS), len(WARNS)))

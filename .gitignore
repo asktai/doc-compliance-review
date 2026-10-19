@@ -24,3 +24,7 @@ config.local.json
 
 # 重排映射临时产物：由重排脚本每次跑自动覆盖，属运行期产物，不入档
 maint/scratch/.last-clause-map.txt
+
+# 在线版（目录去锚点）：由 maint/tools/make-online-md.py 从 DEV-RULES.md 派生，
+# 每次上传前重生成；属派生物，不入档（第 (14) 维守卫会查它是否与源同步）。
+maint/scratch/DEV-RULES.online.md
