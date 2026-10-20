@@ -223,7 +223,7 @@ def build(no_files=False):
     A("|---|---|---|---|")
     A("| 产出物台账（本文档的在线版） | 腾讯文档 | "
       "https://docs.qq.com/markdown/DRFdLZ1ZZVGdsUEZ6 | **以最新一次导入为准**，勿作长期引用目标 |")
-    A("| 开发工程规范（铁律 v1.43.2，开发侧） | 腾讯文档 | "
+    A("| 开发工程规范（铁律 v1.43.3，开发侧） | 腾讯文档 | "
       "https://docs.qq.com/markdown/DRGdTUnpOWUdKTm9N | **开发侧资产**，仅供查阅与留档；不入包、不对外分发 |")
     A("| 开发日志（DEVLOG，开发侧） | 腾讯文档 | "
       "https://docs.qq.com/markdown/DRGJrUHJ2T2pwdHNZ | **开发侧资产**，仅供查阅与留档；不入包、不对外分发 |")

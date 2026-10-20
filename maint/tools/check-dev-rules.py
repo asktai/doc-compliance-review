@@ -278,17 +278,34 @@ def check_wording(s):
     a3 = tail_lines(s, "### A.3")        # A.3「术语纪律」含废止词表，属**必要保留**
     app_a = tail_lines(s, "## 附录 A")   # 附录 A 全节都在讲术语，同样豁免「用户」
 
+    # A.3.7（乙）的否定／脱离类修饰——"非运行实例侧""脱离运行实例侧"不指代那个侧别，
+    # 按废词处理。此处用**显式清单**兜常见的，清单外靠人工（A.3.7 已声明本项为"部分覆盖"）。
+    NEG_DECOUPLE = ("非", "不是", "属于", "脱离", "绕过", "抛开", "并非")
+
     for w, rep in BANNED.items():
         hits = []
         for i, l in enumerate(lines, 1):
             if i in a3:
                 continue
             # 只查**裸用**：排除被更长术语包含的情形。
-            # "运行实例侧"是**正式用词**（A.3.7：前面带"运行"、后面接"侧"、且与另一侧对仗），
-            # 不是废词"实例侧"的变体——故此处豁免，**依据是 A.3.7 的明文条文**，
-            # 不是"正则可以这么绕"。若 A.3.7 被删，这条豁免即失去依据，须一并删。
-            if re.search(r"(?<!运行)" + re.escape(w), l):
+            # "运行实例侧"是**正式用词**——依据是 A.3.7（甲）的字面条：紧前是"运行"即放行。
+            # **注意（2026-10-20 二次修正）**：原注释写"且与另一侧对仗"，该条件已从条文删除
+            #   （A.3.7 自举的反例即是"单说一侧"也合法）——注释与条文必须同步，否则守卫的
+            #   依据与条文对不上，日后改条文的人看不出这里绑着什么（12.3.3 引用漂移）。
+            # 另按 A.3.7（乙）：即便紧前是"运行"，若整体前带否定／脱离修饰，**仍按废词处理**。
+            bare = False
+            for m in re.finditer(r"(?<!运行)" + re.escape(w), l):
+                bare = True
+                break
+            if bare:
                 hits.append(i)
+                continue
+            # 走到这里说明"所有出现处"都紧跟"运行"。再检查是否带否定修饰。
+            for m in re.finditer("运行" + re.escape(w), l):
+                pre = l[max(0, m.start() - 3):m.start()]
+                if any(pre.endswith(n) for n in NEG_DECOUPLE):
+                    hits.append(i)
+                    break
         if hits:
             err("已废止词「%s」在正文残留（第 %s 行）；应改用「%s」"
                 % (w, "、".join(map(str, hits)), rep or "见 A.3"))
