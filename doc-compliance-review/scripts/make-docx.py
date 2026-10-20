@@ -1491,4 +1491,12 @@ def main():
     for m in made: print("  -", m)
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except (FileNotFoundError, IsADirectoryError, UnicodeDecodeError,
+            json.JSONDecodeError, OSError) as e:
+        # ⚠ 2026-10-20 全量质检修（独立复核实测坐实）：spec 文件不存在/非 JSON
+        #   原来直接抛裸 traceback。统一：用法/输入故障 exit 2。
+        print("[make-docx] 输入错误：%s —— 请核对 spec 路径与 JSON 格式" % e,
+              file=sys.stderr)
+        sys.exit(2)

@@ -122,7 +122,9 @@ PATTERNS = {
     # (3) 标签兜底：**凡写明××证号的，其后号码一律脱** —— 这是覆盖外国身份证/外国护照/
     #    营业执照注册号/税号等"格式不定证件"的唯一可靠办法（裸值无法判定，只认标签）
     "idcard": [
-        re.compile(r"[1-9]\d{5}(?:19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])\d{3}[\dXx]"),
+        # ⚠ 2026-10-20 全量质检修（独立复核实测坐实）：原无 (?<!\d)(?!\d) 守卫，
+        #   19 位银行卡号的**末 18 位**会被本条当身份证吃掉——首 digit 泄露且错分类。
+        re.compile(r"(?<!\d)[1-9]\d{5}(?:19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])\d{3}[\dXx](?!\d)"),
         re.compile(r"(?<![A-Za-z0-9])[CMEGPTW]\d{8}(?![A-Za-z0-9])"),
         re.compile(r"((?:证件号码|证件号|身份证号码|身份证号|护照号码|护照号|通行证号码|通行证号|"
                    r"港澳通行证号|台胞证号|居住证号码|居住证号|营业执照号|营业执照注册号|注册号|"
@@ -292,4 +294,11 @@ def main():
         print("[desensitize] 已回填 →", os.path.abspath(out), "（映射条目", len(mapping), "个，映射表", os.path.abspath(mp), "）")
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except (FileNotFoundError, IsADirectoryError, UnicodeDecodeError, OSError) as e:
+        # ⚠ 2026-10-20 全量质检修（独立复核实测坐实）：异常输入原来直接抛裸 traceback，
+        #   既没人话、退出码也与其他故障不分。统一：用法/输入故障 exit 2。
+        print("[desensitize] 输入错误：%s —— 请核对文件路径与编码（须为 UTF-8 文本）" % e,
+              file=sys.stderr)
+        sys.exit(2)

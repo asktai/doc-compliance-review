@@ -222,6 +222,10 @@ def do_check(target, op):
             ap = cand
     rel = os.path.relpath(os.path.abspath(ap), ROOT).replace("\\", "/")
     lib = classify(rel)
+    # ⚠ 2026-10-20 全量质检修（独立复核实测坐实）：目标不存在时原来直接给判定
+    #   （"允许：../../../nonexistent/x.md"），读起来像"文件可以放读"。补一句提示。
+    if not os.path.exists(ap):
+        print("[guard] 提示：目标不存在（%s）——以下判定按路径归属给出，不代表文件可读" % rel)
     if lib is None:
         # 技能内其他内容：只有可查看清单文档可 view，其余 view/copy/export 一律拒绝
         base = os.path.basename(rel)

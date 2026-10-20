@@ -168,6 +168,11 @@ def verify(data=None):
 def parse_report(path):
     """从审查意见报告抽出 [(定位, ★数, 标题原文)] 与出现的规则 ID。"""
     txt = _read(path)
+    # ⚠ 2026-10-20 全量质检修（独立复核实测坐实）：`★3` 这类数字写法会被 RE_HEAD
+    #   误读成 ★1 并报假"评级漂移"，原来无声无息。检出即警告。
+    if re.search(r"★\d", txt):
+        print("  [警告] %s：发现 `★` 后紧跟数字的写法（如 ★3）——星级须用 ★ 重复表示"
+              "（★/★★/★★★），否则条目会被误读" % os.path.basename(path))
     items = []
     for m in RE_HEAD.finditer(txt):
         items.append({"locate": m.group(1).strip(), "level": len(m.group(2)),
@@ -245,7 +250,14 @@ def check(paths, only=None, all_reports=False):
         if not exp:
             continue
         stem = os.path.splitext(os.path.basename(c.get("sample") or ""))[0]
-        owned = [x for f, a, _r in per if stem and stem in os.path.basename(f) for x in a]
+        paired = [f for f, _a, _r in per if stem and stem in os.path.basename(f)]
+        owned = [x for f, a, _r in per if f in paired for x in a]
+        # ⚠ 2026-10-20 全量质检修（独立复核实测坐实）：原来"配对到文件但解析 0 条目"
+        #   与"根本没有报告"一样静默跳过——格式不符的报告会把漏报全放过（假过）。
+        if paired and not owned:
+            print("  [警告] %s：配对到报告（%s）但解析出 0 条目——疑似格式不符"
+                  "（条目须 `## 序号. 定位 ★★★` 写法），请核对后重跑"
+                  % (cid, "、".join(os.path.basename(f) for f in paired)))
         if not owned and not all_reports:
             # 没有这个样例的报告就别拿别人的报告硬比——那只会产出假漏报
             skipped += 1

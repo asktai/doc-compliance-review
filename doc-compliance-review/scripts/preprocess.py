@@ -291,11 +291,20 @@ def main():
         inputs = [indir]
         log("未指定输入，读取默认输入文件夹：", os.path.abspath(indir))
     files = []
+    missing = []
     for p in inputs:
         if os.path.isdir(p):
             for r, _, fs in os.walk(p):
                 for f in fs: files.append(os.path.join(r, f))
-        else: files.append(p)
+        elif os.path.exists(p):
+            files.append(p)
+        else:
+            missing.append(p)
+    # ⚠ 2026-10-20 全量质检修（独立复核实测坐实）：输入文件不存在原来会被
+    #   process_one 抛错 → except 记"跳过"→ 最终 exit 0，批量调用方/CI 全部假过。
+    #   输入不存在属用法错误（exit 2），与"处理失败"（exit 1）分开。
+    if missing:
+        log("输入不存在（请核对路径）：", "、".join(os.path.abspath(p) for p in missing)); sys.exit(2)
     KNOWN = DOC_EXTS | PDF_EXTS | IMG_EXTS | TXT_EXTS
     files = [f for f in files if os.path.splitext(f)[1].lower() in KNOWN]
     if not files:
@@ -308,6 +317,8 @@ def main():
         except Exception as e:
             log("跳过（错误）：", f, e)
     log(f"共处理 {ok}/{len(files)} 个文件；来源：{'、'.join(os.path.abspath(p) for p in inputs[:3])}{' 等' if len(inputs) > 3 else ''}；输出：{os.path.abspath(outdir)}")
+    if ok < len(files):
+        sys.exit(1)   # 有文件处理失败：与"全部成功"分开，调用方可按退出码判
 
 if __name__ == "__main__":
     main()
