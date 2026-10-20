@@ -34,6 +34,52 @@ errs = []
 def err(m):
     errs.append(m)
 
+EXEMPT_OPEN = "<!-- selfcheck-exempt:"
+EXEMPT_CLOSE = "<!-- /selfcheck-exempt -->"
+
+
+def _fold(s):
+    """统一大小写与全半角，供专有名词／路径匹配用。
+
+    ⚠ 2026-10-20 二轮质检加：原匹配区分大小写、不折全角，
+    于是 `CHECK.PY`、`ＣＨＡＮＧＥＬＯＧ`、`pack．py`（全角点）全漏。
+    **专有名词残留最容易藏在大小写变体里**——这是 (L4) 的判据漏洞，不是文档的问题。
+    """
+    out = []
+    for ch in s:
+        # 全角 ASCII（！到～）折回半角
+        o = ord(ch)
+        if 0xFF01 <= o <= 0xFF5E:
+            ch = chr(o - 0xFEE0)
+        out.append(ch)
+    return "".join(out).casefold()
+
+
+def exempt_lines(lines):
+    """返回"作者显式声明为反例、应豁免扫描"的行号集合。
+
+    ⚠ 2026-10-20 二轮质检加（12.4 的口径）：守卫**必须允许规则本体写出被禁形态**。
+    实测踩到：本文档"检查器自身的洞"那张表为了举例，写进了 `CHECK.PY`、`/etc/passwd`、
+    `~/x` 等真·违规样例，于是 (L4)(L5) 把自己文档拦下了——
+    **这不是文档脏，是守卫不给规则本体留出口**。没有出口的守卫，第一天就会被关掉。
+    用法：在反例段落前后各加一行标记（见下 EXEMPT_OPEN/CLOSE），
+    **并写明豁免依据**（哪条规则要求写出该形态），否则不算合法豁免。
+    """
+    out, inside = set(), False
+    for i, l in enumerate(lines, 1):
+        if EXEMPT_OPEN in l:
+            inside = True
+            out.add(i)
+            continue
+        if EXEMPT_CLOSE in l:
+            inside = False
+            out.add(i)
+            continue
+        if inside:
+            out.add(i)
+    return out
+
+
 def in_fence(lines):
     """返回代码块内的行号集合（1-based）。"""
     out, inside = set(), False
@@ -49,14 +95,29 @@ def in_fence(lines):
 
 def main():
     path = sys.argv[1] if len(sys.argv) > 1 else "DEV-RULES-LITE.md"
+    # ⚠ 2026-10-20 二轮质检修：原只捕 FileNotFoundError，传目录／非 UTF-8 文件
+    #   会**打出一屏堆栈**（复核者戊实测）。堆栈与"检出问题"的退出码都是非零，
+    #   下游会**分不清"脚本崩了"和"文档真有问题"**——这正是 12.1 说的"假过"的反面：
+    #   **崩了也算报错，等于判据被噪声污染**。
+    #   治法：把所有"读不出来"的情形收成一条清晰报错，退出码 2（与"检出问题"的 1 分开）。
     try:
         with open(path, encoding="utf-8") as f:
             s = f.read()
     except FileNotFoundError:
-        print("守卫失效：规范文件不存在（%s）" % path)
+        print("守卫失效：规范文件不存在（%s）—— 不是文档有问题，是没找到文件" % path)
+        return 2
+    except IsADirectoryError:
+        print("守卫失效：给的是目录不是文件（%s）—— 请指向 .md 文件本身" % path)
+        return 2
+    except UnicodeDecodeError as e:
+        print("守卫失效：文件不是 UTF-8（%s）：%s —— 先转码，别让脚本带病跑" % (path, e))
+        return 2
+    except OSError as e:
+        print("守卫失效：读文件出错（%s）：%s" % (path, e))
         return 2
     lines = s.splitlines()
     fenced = in_fence(lines)
+    exempt = exempt_lines(lines)
 
     # 维度总表：结论行与"共几项"都由它派生，加维度只改这里
     CHECKS = [
@@ -64,11 +125,17 @@ def main():
         (4, "专有名词残留"), (5, "绝对路径残留"),
         (6, "目录与正文标题一致"),
     ]
+    RAN = []   # 每维跑完 append 自己的编号，结论行只认它
 
     # ---------- (L1) 条号连续 ----------
     print("(L1) 条号与款号连续性")
+    RAN.append(1)
     arts = []
-    for l in lines:
+    for i, l in enumerate(lines, 1):
+        # ⚠ 2026-10-20 二轮质检修：原**不跳代码块**，正文示例里写一行
+        #   "## 第 9 条 示例"（在 ``` 内）就被算成真的条号，报"重号"——误拦。
+        if i in fenced:
+            continue
         m = re.match(r"^## 第 (\d+) 条", l)
         if m:
             arts.append(int(m.group(1)))
@@ -111,6 +178,7 @@ def main():
 
     # ---------- (L2) 引用不悬空 ----------
     print("(L2) 文档内条号／款号引用是否悬空")
+    RAN.append(2)
     defined = set()
     for l in lines:
         for m in re.finditer(r"\*\*((?:\d+)(?:\.\d+)+)\s*[^\d.]", l):
@@ -141,43 +209,76 @@ def main():
         print("      无悬空引用（比对基准：%d 个已定义的条／款号）" % len(defined))
 
     # ---------- (L3) 表格完整性 ----------
-    print("(L3) Markdown 表格列数一致性")
+    # ⚠ 2026-10-20 二轮质检修三处（复核者戊实测指出，全部坐实）：
+    #   (甲) 原只看表头列数、**不比分隔行**——表头 2 列配 `|---|---|---|` 照样全过；
+    #   (乙) 原不查**空表**（只有表头、表体 0 行）——表体整段被删也全过；
+    #   (丙) 原按裸 `split("|")` 数格子，**不认 Markdown 合法转义 `\|`**，
+    #        单元格写 `a \| b` 就被误判成 3 列（误拦）。
+    #   **这是"假过"＋"误拦"两个方向同时出错**，正是 12.1 说的三种失效里的两种。
+    print("(L3) Markdown 表格完整性（列数／分隔行／空表）")
+    RAN.append(3)
+
+    def _cols(row):
+        """数一行表格的格子数，`\|` 是转义、不算分隔。"""
+        r = row.strip()
+        if r.startswith("|"):
+            r = r[1:]
+        if r.endswith("|") and not r.endswith("\\|"):
+            r = r[:-1]
+        # 先把 \| 换成占位符，split 完再换回来位置无所谓（只数个数）
+        return len(re.split(r"(?<!\\)\|", r))
+
     tbl_bad, i, n = [], 0, len(lines)
     while i < n:
-        if (i + 1) in fenced or i + 1 in fenced:
+        if (i + 1) in fenced:
             i += 1
             continue
         l = lines[i]
-        if l.strip().startswith("|") and i + 1 < n and re.match(r"^\s*\|[\s:|-]+\|\s*$", lines[i + 1]):
-            cols = len(l.strip().strip("|").split("|"))
+        is_head = l.strip().startswith("|")
+        is_sep = (i + 1 < n) and bool(re.match(r"^\s*\|[\s:|-]+\|\s*$", lines[i + 1]))
+        if is_head and is_sep:
+            hcols = _cols(l)
+            scols = _cols(lines[i + 1])
+            if scols != hcols:
+                tbl_bad.append("第 %d 行 分隔行 %d 列 ≠ 表头 %d 列" % (i + 2, scols, hcols))
+            body = 0
             j = i + 2
             while j < n and lines[j].strip().startswith("|"):
-                if j + 1 in fenced:
+                if (j + 1) in fenced:
                     break
-                c = len(lines[j].strip().strip("|").split("|"))
-                if c != cols:
-                    tbl_bad.append("第 %d 行 %d 列（表头 %d 列）" % (j + 1, c, cols))
+                body += 1
+                c = _cols(lines[j])
+                if c != hcols:
+                    tbl_bad.append("第 %d 行 %d 列（表头 %d 列）" % (j + 1, c, hcols))
                 j += 1
+            if body == 0:
+                tbl_bad.append("第 %d 行的表格**只有表头、没有表体**（表体 0 行）" % (i + 1))
             i = j
             continue
         i += 1
     if tbl_bad:
-        err("(L3) 表格列数不一致：%s" % "；".join(tbl_bad))
+        err("(L3) 表格不完整：%s" % "；".join(tbl_bad))
     else:
-        print("      全部表格列数一致")
+        print("      全部表格：列数一致、分隔行相符、无空表")
 
     # ---------- (L4) 专有名词残留 ----------
     print("(L4) 项目专有名词残留")
+    RAN.append(4)
     hit = []
     for i, l in enumerate(lines, 1):
-        if i in fenced:
+        if i in fenced or i in exempt:
             continue
-        scan = l
+        # ⚠ 2026-10-20 二轮质检修：原**区分大小写、不折全角**——
+        #   `CHECK.PY`、`DevLog`、`ＣＨＡＮＧＥＬＯＧ`（全角）、`pack．py`（全角点）
+        #   全部漏过（复核者戊实测）。专有名词残留恰恰**最容易出现在大小写变体里**，
+        #   所以先 fold 成小写、再把全角转半角，然后才匹配。
+        scan = _fold(l)
         for a in ALLOW:
-            scan = scan.replace(a, " " * len(a))
+            scan = scan.replace(_fold(a), " " * len(a))
         for w in PROPER:
+            wf = _fold(w)
             # 整词：前不接字母数字与 . - _，后不接字母数字 . - _（防 check.py 命中 lite-selfcheck.py）
-            pat = r"(?<![\w.\-])" + re.escape(w) + r"(?![\w\-])"
+            pat = r"(?<![\w.\-])" + re.escape(wf) + r"(?![\w\-])"
             if re.search(pat, scan):
                 hit.append("第 %d 行「%s」" % (i, w))
     if hit:
@@ -192,12 +293,24 @@ def main():
     #   判据：绝对路径（以 / 开头且不是 URL）**一律视为项目残留**——
     #   通用文档里不该出现任何人的本机路径。
     print("(L5) 绝对路径残留（作者本机痕迹）")
+    RAN.append(5)
     pbad = []
     for i, l in enumerate(lines, 1):
-        if i in fenced:
+        if i in fenced or i in exempt:
             continue
-        for m in re.finditer(r"(?<![\w:/])/(?:tmp|home|root|Users|var|opt|workspace)/[\w\-./]*", l):
-            pbad.append("第 %d 行「%s」" % (i, m.group(0)))
+        # ⚠ 2026-10-20 二轮质检修：原只认 unix 绝对路径的少数几个根，
+        #   下列全部漏过（复核者戊逐条实测）：
+        #   `~/x`（家目录）、`C:\tmp\x`（盘符）、`\\server\share`（UNC）、`/etc/passwd`（其它根）。
+        #   判据统一为：**任何指向"某台具体机器上某个位置"的写法**，都是本机痕迹。
+        line_f = _fold(l)
+        for pat, why in [
+            (r"(?<![\w:/])/(?:tmp|home|root|Users|var|opt|etc|srv|mnt|media|workspace|usr)/[\w\-./]*", "unix 绝对路径"),
+            (r"(?<![\w])~/[\w\-./]*", "家目录写法"),
+            (r"(?<![\w])[A-Za-z]:\\[\w\-./\\]*", "Windows 盘符路径"),
+            (r"\\\\[\w.\-]+\\[\w\-.$]*", "UNC 网络路径"),
+        ]:
+            for m in re.finditer(pat, l):
+                pbad.append("第 %d 行「%s」（%s）" % (i, m.group(0)[:40], why))
     if pbad:
         err("(L5) 绝对路径残留：%s" % "；".join(pbad[:12]))
     else:
@@ -208,6 +321,7 @@ def main():
     #   六项全过（实测踩过：补「本文件版本沿革」后目录漏项，检查一声不吭）。
     #   判据：文中每个二级标题（## ）都须在目录里有对应条目，且目录条目都指向真实标题。
     print("(L6) 目录与正文标题一致")
+    RAN.append(6)
     heads = []
     for i, l in enumerate(lines, 1):
         if i in fenced:
@@ -234,10 +348,36 @@ def main():
         for e in errs:
             print("  - " + e)
         return 1
-    # ⚠ 数字从 CHECKS 派生，不手写——本行原写死"四项"，
-    #   加 (L5) 后就变成了谎报（12.3.4 说的正是这种事，本条自己先犯了一次）。
-    dims = "".join("(L%d)" % n for n, _ in CHECKS)
-    print("自洽检查通过：%s %s项全过" % (dims, "一二三四五六"[len(CHECKS) - 1]))
+
+    # ⚠ 2026-10-20 二轮质检修（这是本轮最重要的一处，复核者戊实测指出）：
+    #   原来结论行只说"CHECKS 里有几维就报几维全过"——**表不等于实现**。
+    #   实测：往 CHECKS 塞一个 "(7, 假维度)" 而根本没有 L7 的代码，
+    #   结论行照样会说"七项全过"（旧版更直接崩栈，但那同样是"结论不由执行决定"）。
+    #   这正是 12.1 说的**假过**：零个维度自然零个错误，于是判"通过"。
+    #   治法：**以"实际跑过的维度"为准**，不是以表为准；
+    #   且**表里有、实际没跑**的，本身就要报错（说明实现漏了）。
+    ran = set(RAN)
+    declared = set(n for n, _ in CHECKS)
+    never = sorted(declared - ran)
+    extra = sorted(ran - declared)
+
+    if never:
+        print("自洽检查未通过，1 项：")
+        print("  - (L0) 判据失效：声明的维度 %s 一声没吭——没实现的维度不算通过"
+              % "、".join("(L%d)" % n for n in never))
+        return 1
+    if extra:
+        print("自洽检查未通过，1 项：")
+        print("  - (L0) 声明缺项：实际跑了 %s，但 CHECKS 表里没登记——结论行会漏报它"
+              % "、".join("(L%d)" % n for n in extra))
+        return 1
+    if not ran:
+        print("自洽检查未通过，1 项：")
+        print("  - (L0) 判据失效：一个维度都没跑起来，零维自然零错误，不得判通过")
+        return 1
+
+    dims = "".join("(L%d)" % n for n in sorted(ran))
+    print("自洽检查通过：%s %d 项全过（按实际执行维度计，非按声明表计）" % (dims, len(ran)))
     return 0
 
 
