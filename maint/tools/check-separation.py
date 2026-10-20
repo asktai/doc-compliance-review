@@ -12,12 +12,12 @@
   (1) 白名单目录防混入。`pack.py` 的 `FULL_DIRS`（core／industries／scripts／assets）
       是**整体递归打包**的——往里塞一份"AI 参考资料""测试数据"会被**照单全收且无声**。
       故：这些目录内出现**未登记**的条目即报错。
-  (2) 素材准入核验（第 7.4 条准入制）。技能目录 `samples/` 属"必须随包的测试素材"，
+  (2) 素材准入核验（铁律第 9.4 条准入制）。技能目录 `samples/` 属"必须随包的测试素材"，
       **默认拒绝随包**：须在开发侧准入清单 `maint/samples-manifest.json` 逐条登记
       「许可随包 ＋ 理由」。未登记 → 报错；已登记但文件缺失 → 报错；
       sha256 不符（文件被换过）→ 报错。
   (3) 开发资料越界检查。AI 学习参考、临时测试数据、出题素材三类**不得出现在技能目录**，
-      一律放 `maint/ai-notes/`、`maint/test-data/`、`maint/scratch/`（第 7.5 条）。
+      一律放 `maint/ai-notes/`、`maint/test-data/`、`maint/scratch/`（铁律第 9.5 条）。
 
 用法：
   python3 maint/tools/check-separation.py            # 查（默认，报错退码 1）
@@ -230,7 +230,7 @@ def check_admission(man, seal=False):
 # ────────────────── (3) 开发资料越界检查 ──────────────────
 
 def check_dev_material_out_of_skill():
-    """三类开发资料不得出现在技能目录（第 7.5 条给的"家"在 maint/ 下）。"""
+    """三类开发资料不得出现在技能目录（铁律第 9.5 条给的"家"在 maint/ 下）。"""
     HOMES = {
         "ai-notes": ("AI 对话记录", "学习参考", "与AI对话"),
         "test-data": ("测试数据", "临时测试"),
@@ -240,7 +240,7 @@ def check_dev_material_out_of_skill():
         # 技能目录内若出现同名目录，几乎必是放错了位置
         p = os.path.join(SKILL, d)
         if os.path.isdir(p):
-            err("技能目录内出现开发资料目录「%s」——应放 maint/%s/（第 7.5 条）"
+            err("技能目录内出现开发资料目录「%s」——应放 maint/%s/（铁律第 9.5 条）"
                 % (d, d))
     # 技能目录内不得出现任何"开发侧资料"痕迹
     for root, dirs, files in os.walk(SKILL):

@@ -140,6 +140,24 @@ def section(s, start_mark):
     return s[i:] if not j else s[i:i + len(start_mark) + j.start()]
 
 
+def _line_span(s, start_mark):
+    """返回 start_mark 所在行**直到下一个同级或更高级标题之前**的行号集合。
+
+    与 `section()` 的区别：`section()` 返回**文本**，本函数返回**行号**，
+    供"某段整体豁免"类判据使用（2026-10-20 加：规则本体段落须能写出被禁形态）。
+    """
+    lines = s.splitlines()
+    start = None
+    for i, l in enumerate(lines, 1):
+        if start is None:
+            if l.startswith(start_mark):
+                start = i
+            continue
+        if re.match(r"^#{2,3} ", l):
+            return set(range(start, i))
+    return set(range(start, len(lines) + 1)) if start else set()
+
+
 def in_fence_lines(s):
     """返回被 ``` 围栏包裹的行号集合（这些行不参与"路径引用"检查）。"""
     fenced, inside, buf = set(), False, []
@@ -246,9 +264,44 @@ def check_refs(s, show=False):
         err("悬空引用（指向不存在的条）：%s" % dangling)
     else:
         info("无悬空引用（全部指向存在的条）")
+
+    # ⚠ 2026-10-20 补：原先只查"第 N 条"这一种形态，
+    #   而正文里大量引用写成数字路径（"见 19.6""按 12.5.4.3 办"）——
+    #   **写错一个号（如 19.6 根本不存在）此维一声不吭**。
+    #   实测：我自己写正文时凭空引了"19.6""8.5"两个不存在的款，本维全过。
+    #   现补第二道：把正文里出现的 N.M(.K) 与附录 A.N.M 逐一对照"已定义编号"。
+    #   **判据要有区分度**（12.5.4.3）：只认"该编号及其实父级都不存在"才算悬空，
+    #   父级存在而子款号写错（如 12.5.9 而 12.5 存在）**同样算**——见下 exist 判定。
+    defined = set()
+    for l in s.splitlines():
+        for m in re.finditer(r"\*\*((?:A\.)?\d+(?:\.\d+)+)\s*[^\d.]", l):
+            defined.add(m.group(1))
+    for n in nums:
+        defined.add(str(n))
+    # 版本号形态（v1.7.0 / 1.0.0）与日期不参与判定
+    VER = re.compile(r"(?<![\d.])(?:v)?\d+\.\d+\.\d+(?![\d.])")
+
+    bad_num = []
+    fenced = in_fence_lines(s)
+    for i, line in enumerate(s.splitlines(), 1):
+        if i in fenced:
+            continue
+        scan = VER.sub(lambda m: " " * len(m.group(0)), line)   # 先抹掉版本号
+        scan = re.sub(r"`[^`]*`", lambda m: " " * len(m.group(0)), scan)  # 抹掉反引号内
+        for m in re.finditer(r"(?<![\d.])((?:A\.)?\d+\.\d+(?:\.\d+)*)(?![\d.])", scan):
+            ref = m.group(1)
+            if ref in defined:
+                continue
+            # 父级已定义但本号未定义 → 这是"款号写错"，比整条悬空更常见，**必须报**
+            bad_num.append((i, ref))
+    if bad_num:
+        err("悬空编号引用（数字路径式，指向不存在的款）：%s"
+            % "、".join("第 %d 行「%s」" % (i, r) for i, r in bad_num[:8]))
+    else:
+        info("数字路径式引用（N.M／A.N.M）全部指向已定义的款（已排除版本号与反引号内）")
+
     if show and not QUIET:
         print("  ── 引用上下文（供人工复核**指向是否正确**，脚本查不出语义）──")
-        fenced = in_fence_lines(s)
         for i, line in enumerate(s.splitlines(), 1):
             if i in fenced or line.lstrip().startswith("- ["):   # 排除代码块与目录
                 continue
@@ -270,6 +323,62 @@ def tail_lines(s, mark):
         if l.startswith(mark):
             return set(range(i, len(lines) + 1))
     return set()
+
+
+def check_external_refs(s):
+    """(3b) 外部文件里写死的铁律条号，是否还对得上。
+
+    2026-10-20 新增。12.5.1.1 早就承认这是盲区："条号也被别处引用——
+    脚本注释、随包文档里写死的'（铁律第 9.4 条）'，本文件一动即全部悬空，
+    守卫一个也看不见"。**承认了却不做手段，等于把缺口写在墙上就走开**（12.5）。
+    现补：扫开发侧 .py／.md 里的"铁律第 N.M"与"（铁律 A.B / C.D）"，
+    逐个对 `DEV-RULES.md` 里**实际定义过的款号**。
+
+    **判据边界**（避免误报）：
+      · 只认带"铁律"二字的引用——裸写"第 9.4 条"可能是别家文档的编号；
+      · 只认**款号形态**（N.M 起），条号（"铁律第 9 条"）另由 (3) 管；
+      · 开发日志与历史记录**豁免**（DEVLOG 记述的是当时的条号，属史实，改了反而失真）。
+    """
+    head("(3b) 外部文件里的铁律条号引用")
+    defined = set()
+    for l in s.splitlines():
+        for m in re.finditer(r"\*\*((?:A\.)?\d+(?:\.\d+)+)\s*[^\d.]", l):
+            defined.add(m.group(1))
+
+    roots = [os.path.join(DEV, "maint", "tools"),
+             os.path.join(DEV, "maint", "doc-compliance-review"),
+             SKILL]
+    EXEMPT_FILES = {"DEVLOG.md", "CHANGELOG.md"}
+    EXEMPT_DIRS = ("scratch", "ai-notes", "test-data", "__pycache__")
+    bad = []
+    scanned = 0
+    for root in roots:
+        if not os.path.isdir(root):
+            continue
+        for dirpath, dirnames, filenames in os.walk(root):
+            dirnames[:] = [d for d in dirnames if d not in EXEMPT_DIRS]
+            for fn in filenames:
+                if not (fn.endswith(".py") or fn.endswith(".md")):
+                    continue
+                if fn in EXEMPT_FILES:
+                    continue
+                p = os.path.join(dirpath, fn)
+                try:
+                    txt = open(p, encoding="utf-8").read()
+                except (UnicodeDecodeError, OSError):
+                    continue
+                scanned += 1
+                for ln, line in enumerate(txt.splitlines(), 1):
+                    for m in re.finditer(r"铁律\s*(?:第\s*)?(\d+\.\d+(?:\.\d+)*)", line):
+                        ref = m.group(1)
+                        if ref in defined or any(d.startswith(ref + ".") for d in defined):
+                            continue
+                        bad.append("%s:%d「铁律 %s」"
+                                   % (os.path.relpath(p, DEV), ln, ref))
+    if bad:
+        err("外部文件里的铁律条号已悬空（真源改号后未同步搬迁）：%s" % "、".join(bad[:8]))
+    else:
+        info("外部文件（%d 份）里的铁律条号引用全部对得上现行条号" % scanned)
 
 
 def check_wording(s):
@@ -451,11 +560,15 @@ def check_paths(s):
                 continue
             if re.search(r"[\\*?]", c):
                 continue
-            if "/" in c or re.match(r"^[\w\-.·]+\.(md|py|json|SKILL|zip|Skill)$", c):
+            # ⚠ 2026-10-20 修正：原把 `SKILL|Skill` 列入合法扩展名白名单，
+            #   而 20.4 明令**大写 `.Skill` 回流须当场报错**——于是写 `` `.Skill` ``
+            #   既不当作路径去查，也不报违规，**两头都漏**（全量质检实测）。
+            #   现只保留小写写法在"纯扩展名"里，大写形态由下面的 EXT_BAD 单独断言。
+            if "/" in c or re.match(r"^[\w\-.·]+\.(md|py|json|zip)$", c):
                 cands.add(c)
 
     # 纯扩展名不是路径
-    exts = {".Skill", ".zip", ".py", ".md", ".json"}
+    exts = {".skill", ".zip", ".py", ".md", ".json"}
     prefix = {"dev/": DEV + "/", "maint/": DEV + "/maint/", "dist/": DIST + "/",
               "~/.codebuddy/skills/": RUN + "/", "scripts/": SKILL + "/scripts/"}
     search = [DEV, os.path.join(DEV, "maint"), SKILL, os.path.join(SKILL, "scripts"),
@@ -487,6 +600,31 @@ def check_paths(s):
             err("路径引用不存在：%s" % m)
     else:
         info("路径／文件引用 %d 项全部真实存在（已排除围栏代码块与纯扩展名）" % len(cands))
+
+    # 单列一道：**大写扩展名 `.Skill` 回流**（20.4 明令报错，原先无人管——
+    # 它既不是能查的真路径，又被白名单放过，等于三不管）。
+    # **判据须有区分度（12.5.4.3）**：20.4 本条自己就要写出 `.Skill` 来立规矩、
+    #   还要引述历史写法（20.4.3 的"例外"），故**规则本体段与否定语境必须放行**，
+    #   否则这道守卫第一天就误报。三道豁免：
+    #     （甲）20.4 本条及其子款所在的整段（规则本体，必须能写出禁用形态）；
+    #     （乙）同一行内 `非／不得／禁用／改为／回流` 等否定或纠正词在前；
+    #     （丙）22 条那张"错误写法 → 正确写法"对照表（它整张都是反例样本）。
+    body20 = _line_span(s, "**20.4") | _line_span(s, "**20.5")
+    bad_ext = []
+    NEG_WORDS = ("不得", "禁用", "非", "不应", "禁止", "改为", "回流", "大小写敏感")
+    for i, l in enumerate(s.splitlines(), 1):
+        if i in in_fence_lines(s) or i in body20:
+            continue
+        for m in re.finditer(r"`[^`\n]*\.(Skill|SKILL)[^`\n]*`", l):
+            pre = l[:m.start()]
+            if any(w in pre[-40:] or w in l[max(0, m.end() - 6):m.end() + 24] for w in NEG_WORDS):
+                continue
+            bad_ext.append("第 %d 行「%s」" % (i, m.group(0)[:40]))
+    if bad_ext:
+        err("出现大写扩展名 `.Skill`／`.SKILL`（20.4：分发包一律小写 `.skill`，大写即违规）：%s"
+            % "、".join(bad_ext[:6]))
+    else:
+        info("无大写扩展名回流（规则本体与否定语境已豁免）")
 
 
 # 开发侧需要跟随铁律版本号的文档（真源＝DEV-RULES.md 顶部版本行）
@@ -1114,6 +1252,7 @@ def main():
     check_structure(s)
     check_guide(s)
     check_refs(s, show="--refs" in args)
+    check_external_refs(s)
     check_wording(s)
     check_expression(s)
     check_paths(s)

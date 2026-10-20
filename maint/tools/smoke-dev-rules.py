@@ -103,6 +103,23 @@ def inj_refs(s):
     return _sub1(s, "\n## 第一章", "\n注入测试：详见第 99 条的相关规定。\n\n## 第一章")
 
 
+def inj_refs_dotted(s):
+    """(3) 悬空引用（数字路径式）：引用一个不存在的款号 19.6。
+
+    2026-10-20 补：原用例只覆盖"第 99 条"这一形态，
+    而正文大量引用写成"见 19.6""按 12.5.4.3 办"——凭空写一个不存在的款号，守卫原先不报。
+    """
+    return _sub1(s, "\n## 第一章", "\n注入测试：按 19.6 办。\n\n## 第一章")
+
+
+def inj_ext_ref(s):
+    """(3b) 外部文件里的铁律条号悬空：临时把 check-separation.py 的条号改坏再还原。
+
+    **注意**：本条要改磁盘文件，故不用 CASES 机制——见 main() 里的单列档。
+    """
+    return None
+
+
 def inj_wording(s):
     """(4) 术语纪律：正文插入废止词。"""
     return _sub1(s, "\n## 第一章", "\n注入测试：该工作由维护侧负责。\n\n## 第一章")
@@ -143,6 +160,14 @@ def inj_oldnum(s):
 def inj_paths(s):
     """(6) 路径引用真实性：引用一个不存在的文件。"""
     return _sub1(s, "\n## 第一章", "\n注入测试：见 `dev/NoSuchFileForSmoke.md`。\n\n## 第一章")
+
+
+def inj_skill_ext(s):
+    """(6) 大写扩展名回流：写 `xxx.Skill` 当格式引用（20.4 明令报错）。
+
+    2026-10-20 补：原 `SKILL|Skill` 在白名单里，写了既不查也不报。
+    """
+    return _sub1(s, "\n## 第一章", "\n注入测试：产物名须为 `xxx.Skill`。\n\n## 第一章")
 
 
 def inj_version(s):
@@ -307,6 +332,7 @@ CASES = [
     (1, "条标题格式（缺空格）", inj_struct_fmt, "标题格式"),
     (2, "导读表与正文不一致", inj_guide, "导读"),
     (3, "悬空引用（第 99 条）", inj_refs, "悬空"),
+    (3, "悬空款号（19.6 数字路径式）", inj_refs_dotted, "悬空编号引用"),
     (4, "废止词残留（维护侧）", inj_wording, "废止词"),
     (4, "「非运行实例侧」按反义废词拦（A.3.7 乙）", inj_wording_neg, "废止词"),
     (5, "相对引用（见下）", inj_reldir, "相对引用"),
@@ -315,6 +341,7 @@ CASES = [
     (5, "旧编号形态 (1)", inj_oldnum, "编号形态"),
     (5, "编号含空段 `..`", inj_dotdot, "编号形态异常"),
     (6, "路径引用不存在", inj_paths, "路径引用不存在"),
+    (6, "大写扩展名 .Skill 回流", inj_skill_ext, "大写扩展名"),
     (7, "铁律版本串漂移", inj_version, "铁律版本"),
     (9, "目录锚点不一致", inj_toc, "目录"),
     (10, "表格行引用缺父级", inj_ref_anchor, "父级"),
@@ -563,6 +590,48 @@ def main():
                 print("  [OK] (14) 在线版已逐字节还原")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
+
+    # ── 第 (3b) 档：外部文件里的铁律条号引用（2026-10-20 新增）──
+    # 12.5.1.1 承认的盲区：条号被脚本注释、随包文档写死引用，真源改号后全部悬空，
+    # 而 (3) 维只扫 DEV-RULES.md 自身。这道守卫要读别处的文件，故单列一档：
+    # **造一个不存在的号 → 断言拦住 → 立即还原**。
+    print("  [--] (3b) 外部文件里的铁律条号　单独一档")
+    SEP3B = os.path.join(DEV, "maint", "tools", "check-separation.py")
+    if not os.path.exists(SEP3B):
+        print("      跳过：check-separation.py 不存在")
+    else:
+        bak3b = open(SEP3B, "rb").read()
+        try:
+            btxt = bak3b.decode("utf-8")
+            # 把一个真实存在的款号改成绝不存在的号（号在下面拼，不在此写字面量）。
+            # **号要拼出来，不得在源码里写字面量**——(3b) 守卫会扫本文件，
+            # 写死的假号会让冒烟自己变成违规样本（实测踩过：自指报错，守卫在骂自己）。
+            REAL = "铁律第 " + "9.4" + " 条"
+            FAKE = "铁律第 " + "77" + ".4 条"
+            if REAL not in btxt:
+                fails.append((3, "外部条号悬空", "注入点未命中（check-separation.py 已改形）"))
+                print("  [E] (3b) 外部条号悬空            注入点未命中")
+            else:
+                with open(SEP3B, "w", encoding="utf-8") as f:
+                    f.write(btxt.replace(REAL, FAKE, 1))
+                rc3b, out3b = run_check()
+                hit3b = "悬空" in out3b and "77.4" in out3b
+                if rc3b != 0 and hit3b:
+                    standalone_n[0] += 1
+                    print("  [OK] (3b) %-22s 拦住（报「外部文件里的铁律条号已悬空」）"
+                          % "外部条号悬空")
+                else:
+                    why = "未报外部条号悬空（守卫失效）"
+                    fails.append((3, "外部条号悬空", why))
+                    print("  [E] (3b) %-22s %s" % ("外部条号悬空", why))
+        finally:
+            with open(SEP3B, "wb") as f:
+                f.write(bak3b)
+        if digest(SEP3B) != hashlib.sha256(bak3b).hexdigest():
+            fails.append((3, "外部条号悬空", "还原失败：check-separation.py 哈希未复原"))
+            print("  [E] (3b) 还原失败——**源文件被污染**，请立即检查 %s" % SEP3B)
+        else:
+            print("  [OK] (3b) check-separation.py 已逐字节还原")
 
     # ── 第 (12) 档：分离守卫（铁律第 9 条）──
     # 分离守卫查的是"技能目录里有没有不该在那的东西"，与铁律正文的十四维不同源，
