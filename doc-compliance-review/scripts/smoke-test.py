@@ -149,6 +149,35 @@ def run(cmd, timeout=600):
     return subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="ignore", timeout=timeout)
 
 
+def head_lines(text, budget=200, max_lines=3):
+    """按「整行」截断子进程输出，用来做检查项详情。
+
+    为什么不直接 text[:90]：冒烟日志是给人看的证据，按字符硬切会把一行从中间
+    切断（实例侧路径比开发侧长，同一个检查项在两侧切出来的残句还不一样，看日志
+    的人会误以为字段值本身就是残缺的）。这里改为整行取舍：放得下的行完整保留，
+    放不下就停下并标省略号——宁可少一行，不出残句。
+    """
+    out = []
+    for line in (text or "").splitlines():
+        line = line.rstrip()
+        if not line:
+            continue
+        if len(out) >= max_lines or sum(len(x) for x in out) + len(line) > budget:
+            out.append("…")
+            break
+        out.append(line)
+    return " / ".join(out)
+
+
+def tail_line(text, budget=90):
+    """取最后一条非空行做详情（用于「最后一行才是结论」的输出）。整行不动，超长才切头。"""
+    lines = [l.rstrip() for l in (text or "").splitlines() if l.strip()]
+    if not lines:
+        return ""
+    last = lines[-1]
+    return last if len(last) <= budget else "…" + last[-(budget - 1):]
+
+
 def main():
     ap = argparse.ArgumentParser(description="文档合规审查助手AI合同审核全能版·端到端冒烟测试")
     ap.add_argument("--base", default=None, help="工作根目录（默认取 config.json 的 base_dir）")
@@ -545,14 +574,14 @@ def main():
     try:
         v = run([PY, os.path.join(HERE, "version.py")])
         check("version.py 版本身份证（含版本号与规模）",
-              v.returncode == 0 and "v3." in (v.stdout or ""), (v.stdout or "")[:90])
+              v.returncode == 0 and "v3." in (v.stdout or ""), head_lines(v.stdout))
         me = os.path.dirname(HERE)          # 与自身比对：应判「已是最新版」
         c = run([PY, os.path.join(HERE, "version.py"), "--check", me])
         check("version.py --check 自身（应判已是最新）",
-              c.returncode == 0 and "已是最新版" in (c.stdout or ""), (c.stdout or "")[:90])
+              c.returncode == 0 and "已是最新版" in (c.stdout or ""), head_lines(c.stdout))
         g = run([PY, os.path.join(HERE, "detect-tools.py"), "--install-guide"])
         check("detect-tools.py --install-guide 可执行（只给命令、不代装）",
-              g.returncode == 0, (g.stdout or "")[-90:])
+              g.returncode == 0, tail_line(g.stdout))
     except Exception as e:
         check("版本与依赖自检", False, repr(e))
 
