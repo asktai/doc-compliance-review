@@ -283,7 +283,10 @@ def check_wording(s):
         for i, l in enumerate(lines, 1):
             if i in a3:
                 continue
-            # 只查**裸用**：排除被更长术语包含的情形（如「运行实例侧」含「实例侧」）
+            # 只查**裸用**：排除被更长术语包含的情形。
+            # "运行实例侧"是**正式用词**（A.3.7：前面带"运行"、后面接"侧"、且与另一侧对仗），
+            # 不是废词"实例侧"的变体——故此处豁免，**依据是 A.3.7 的明文条文**，
+            # 不是"正则可以这么绕"。若 A.3.7 被删，这条豁免即失去依据，须一并删。
             if re.search(r"(?<!运行)" + re.escape(w), l):
                 hits.append(i)
         if hits:
@@ -638,16 +641,32 @@ def check_ref_anchor(s):
     for i, line in enumerate(s.splitlines(), 1):
         if i in fenced or (seg and line in seg.splitlines()):
             continue
-        if line.lstrip().startswith(("- [", "|", ">")):   # 目录／表格／引用块里的举例跳过
+        # ⚠ 2026-10-20 修正：原为 `line.lstrip().startswith(("|", ">", "- ["))` 一律跳过，
+        #   结果是**整张表的引用一概不查**——第 22 条那张讲"引用须带父级"的表自己就漏检，
+        #   他处表格里裸写"第 N 行"同样放行（实测注入不报）。
+        #   现改为：**表格行照查**，只跳过两类真正的"举例"——
+        #   ① 反引号内的代码片段（规则示例，不是实际引用）；
+        #   ② 目录行与引用块（`- [` / `>`）——那里本就不写行引用。
+        if line.lstrip().startswith(("- [", ">")):
             continue
+        # 抹掉反引号内内容后再匹配，避免把规则示例当实际引用
+        scan = re.sub(r"`[^`]*`", lambda m: " " * len(m.group(0)), line)
         # 裸写"第 N 行"（前面既非 `N.M` 也非条级"第 N 条"／`N`）→ 违规。
         # **父级有两种合法形态**：款级 `17.3`、条级 `14` 或 `第 14 条`（实测都出现过）。
-        for m in re.finditer(r"(?<![\.\d])(?<!M )第 (\d+) 行", line):
-            pre = line[:m.start()]
+        for m in re.finditer(r"(?<![\.\d])(?<!M )第 (\d+) 行", scan):
+            pre = scan[:m.start()]
             ok_parent = re.search(r"(?:\d+\.\d+|\d+)\s*$", pre) or re.search(r"第\s*\d+\s*条\s*$", pre)
-            if not ok_parent:
-                bad.append("第 %d 行：裸写「第 %s 行」，应带父级（如 `17.3 第 %s 行`）：%s"
-                           % (i, m.group(1), m.group(1), line.strip()[:60]))
+            if ok_parent:
+                continue
+            # ③ 明确标为**反例／错误写法**的引述 → 放行。
+            #    第 22 条那张表自己就写着「**不得裸写"第 4 行"**」——它是在**讲规则**，
+            #    不是在引用某行。判据看紧邻前文是否有否定标记词（"不得／禁止／反例／错误写法／应写作"）。
+            #    只在**同一行**内看，且限 20 字以内，避免"整段有否定词"把真引用也放行。
+            seg20 = pre[max(0, m.start() - 20):m.start()]
+            if re.search(r"(不得|禁止|反例|错误写法|应写作|应改为|不得再)", seg20):
+                continue
+            bad.append("第 %d 行：裸写「第 %s 行」，应带父级（如 `17.3 第 %s 行`）：%s"
+                       % (i, m.group(1), m.group(1), line.strip()[:60]))
     if bad:
         for b in bad:
             err(b)
@@ -677,12 +696,61 @@ def check_bold_heading(s):
     head("(11) 加粗行首段落须带编号")
     lines = s.splitlines()
     fenced = in_fence_lines(s)
-    # 第 1 条标题行号——之前的属"导读区"，放行
+    # 第 1 条标题行号
     first_art = None
     for i, l in enumerate(lines, 1):
         if re.match(r"^### 第 1 条", l):
             first_art = i
             break
+    # 文首两个**结构单元**可免编号，边界一律由结构定，不按行号数：
+    #   ① 元信息块：第 1 行 → 导读区起点之前；
+    #   ② 导读区：含"导读 ·"字样的行 → 其**紧邻**的结束分隔线（含）。
+    # 二者**之外**、第 1 条标题**之前**的地带（目录区、过渡说明）**不免检**——
+    # 2026-10-20 实测：原写法 `i <= 40` 与"第 1 条之前一律放行"两处，
+    # 都会让该地带的无编号加粗段落**照样通过**（门槛卡位置、不卡内容）。
+    #
+    # ⚠ 同日复核又抓出一处**假过**：若只取"导读起点后第一条 `---`"，那么把导读区
+    #   自己的结束线删掉后，守卫会把**目录区的分隔线**当成导读区边界，
+    #   于是整片目录区被静默豁免（实测：删线后在目录内插无编号加粗，不报）。
+    #   故此处加两道约束：①导读区**跨度上限**（超过 GUIDE_MAX 行即判边界可疑）；
+    #   ②导读区内若出现"目录"字样，说明已跨进目录区，边界同样可疑。可疑即报错、
+    #   且**不放行**该区间（宁可按违规查，不许静默豁免）。
+    GUIDE_MAX = 40
+    g_start = None
+    guide_end = None
+    for i, l in enumerate(lines, 1):
+        if g_start is None and "导读 ·" in l:
+            g_start = i
+            continue
+        if g_start is not None and l.strip() == "---":
+            guide_end = i
+            break
+    if g_start is None:
+        # 结构被改：只豁免元信息块（按"第一条 `---` 之前"），**不把 g_start 置 1**，
+        # 否则元信息块也失去豁免，会连带误报文件头的版本行（复核实测）。
+        for i, l in enumerate(lines, 1):
+            if l.strip() == "---":
+                guide = set(range(1, i + 1))
+                break
+        else:
+            guide = set()
+        err("找不到导读区起点（含「导读 ·」的段落）——结构被改，仅按元信息块豁免")
+    else:
+        span = (guide_end - g_start + 1) if guide_end else 0
+        if guide_end is None:
+            # 只豁免元信息块 ＋ 导读标题行（标题行本身是无编号加粗，属正常）
+            guide = set(range(1, g_start + 1))
+            err("找不到导读区的结束分隔线（`---`）——边界不明，导读区此后不豁免")
+        elif span > GUIDE_MAX:
+            guide = set(range(1, g_start + 1))
+            err("导读区跨度异常（%d 行，上限 %d）——疑似把目录区误并入，"
+                "导读区此后不豁免，请检查导读区结束分隔线是否被删"
+                % (span, GUIDE_MAX))
+        elif any("目录" in l for l in lines[g_start - 1:guide_end]):
+            guide = set(range(1, g_start + 1))
+            err("导读区区间内出现「目录」字样——结束分隔线可能被删，导读区此后不豁免")
+        else:
+            guide = set(range(1, g_start + 1)) | set(range(g_start, guide_end + 1))
 
     bad = []
     for i, l in enumerate(lines, 1):
@@ -703,10 +771,8 @@ def check_bold_heading(s):
         # 带编号 → 合规（N.M / N.M.K / A.N / N.0）
         if re.match(r"^\*\*(?:\d+(?:\.\d+)+|A\.\d+(?:\.\d+)*)\b", l):
             continue
-        # 导读区（第 1 条之前）与文件头元信息 → 放行
-        if first_art and i < first_art:
-            continue
-        if i <= 40:
+        # 文首元信息块与导读区（边界见函数开头，按结构定）→ 放行
+        if i in guide:
             continue
         # 明确声明"非本规范组成部分"的游离段 → 放行
         if "非本规范组成部分" in l:
