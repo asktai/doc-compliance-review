@@ -5481,3 +5481,18 @@ SKILL.md 与 README.md 适用文档枚举补 DPA（与 frontmatter 对齐）；
 
 **待开发者定**：(1) 是否出 v3.11.14 包（本轮改动触及使用者可见文字与脚本，按规范应递增版本）；
 (2) 丙 5 悬置：是否补一份输出成品样例。
+
+### 第十二轮补记 ｜ 2026-10-20 ｜ 两项遗留处置完成（开发者选定"两项都做"）
+
+**(1) 丙 5 悬置落地**：新增 `samples/输出成品样例-审查意见报告（格式演示）.md`——交付物第 5 类
+成品格式对照样例；文件名刻意不含任何输入件主干（避免被 sample-baseline.py 误配对）；
+已登记 `maint/samples-manifest.json` 并 `--seal` 回填 sha256（9 条全符）；
+samples/README.md 与 README.md 计数口径同步（7 输入件＋1 成品样例）。
+
+**(2) v3.11.14 出包**：SKILL.md frontmatter／标题行、README 两处、VERSION.md（新条目＋当前版本行）、
+version.json（latest→v3.11.14，history 前移 v3.11.13）、SECURITY.md、提示词版、教程示例文件名
+四处真源全部同步；头图（make-header.py 4 件）与 skill-card.png（maint/tools/make-card.py）刷新。
+**check.py 两次拦住漏网**（教程示例串、SECURITY/提示词版、头图版本串）——版本一致性守卫实证有效。
+出包自检五项全过：`.zip` 68 条目 1.51 MB，`.skill` 负载与 zip 字节一致（sha256 ef52c112…）。
+台账由 gen-ledger.py 重建（v3.11.14 在役）；**注意**：gen-ledger 重建会冲掉手工加的行
+（"技能开发规范（通用铁律）"行被冲掉后已人工补回）——此缺口转下轮（台账生成器应支持登记包外产出物）。
