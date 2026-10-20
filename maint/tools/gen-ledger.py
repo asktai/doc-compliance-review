@@ -12,6 +12,7 @@
 """
 
 import argparse
+import glob
 import hashlib
 import os
 import re
@@ -24,6 +25,12 @@ DIST = os.path.join(ROOT, "dist")
 DEV = os.path.join(ROOT, "dev")
 SKILL = os.path.join(DEV, "doc-compliance-review")
 OUT = os.path.join(ROOT, "产出物台账.md")
+WS_ROOT = ROOT
+# 包外产出物登记规则（工作区根下的 *.md，不入 dist/ 但属对外交付）：
+# (文件名 glob, 台账标签, 状态文字)
+EXTRA_ARTS = [
+    ("技能开发规范（通用铁律）-v*.md", "技能开发规范（通用铁律）", "**发布**（对外分发）"),
+]
 
 CST = timezone(timedelta(hours=8))
 
@@ -172,6 +179,16 @@ def build(no_files=False):
         A(f"| 技能本体（工作副本） | {skill_ver} | 注意：与最新包 {latest} 不一致 | `dev/doc-compliance-review/` |")
     elif skill_ver:
         A(f"| 技能本体（工作副本） | {skill_ver} | 与最新包一致 | `dev/doc-compliance-review/` |")
+    # ⚠ 2026-10-20 修（真实发作两次）：本节原为硬编码三行，工作区根下**包外产出物**
+    #   （对外发布的规范类文档，如「技能开发规范（通用铁律）-v1.0.0.md」）无处登记，
+    #   每次重建台账就被冲掉、再手工补回——属于"记性代替守卫"。改为扫工作区根 *.md，
+    #   凡命中 _EXTRA_ARTS 的自动登记；新增包外产出物只需在下面加一条规则。
+    for pattern, label, status in EXTRA_ARTS:
+        for p in sorted(glob.glob(os.path.join(WS_ROOT, pattern))):
+            name = os.path.basename(p)
+            m = re.search(r"v(\d+(?:\.\d+)+)", name)
+            ver = "v" + m.group(1) if m else "—"
+            A(f"| {label} | {ver} | {status} | `{name}` |")
     A("")
     A(f"- 分发包总数：**{len(pkgs)}** 个（覆盖 **{len(versions)}** 个版本：{versions[0]} — {latest}）")
     A(f"- 统计口径：`dist/` 目录实时扫描；只认四段式命名的包。")

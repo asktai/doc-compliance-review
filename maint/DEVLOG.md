@@ -5529,3 +5529,20 @@ version.json（latest→v3.11.14，history 前移 v3.11.13）、SECURITY.md、�
 已顺带在教程补一句依据，减少误读。
 
 **回归**：check.py 无错误；教程 769→749 行、README 320→318 行，SKILL 646 行未减（无可删整段）。
+
+### 第十三轮补记 ｜ 2026-10-20 ｜ v3.11.15 发行
+
+**版本升链**：SKILL.md frontmatter／标题行、README 两处、SECURITY.md、提示词版、教程示例、
+VERSION.md（新条目＋当前版本行）、version.json（latest→v3.11.15、history 前移 v3.11.14）全部同步；
+头图 4 件（make-header.py）与 skill-card.png（maint/tools/make-card.py）刷新。
+check.py 先拦住头图版本串（守卫有效），刷新后无错误；smoke-test 全过。
+
+**出包**：`.zip` 68 条目 1.51 MB；`.skill` 负载与 zip 字节一致（sha256 505e3f17…）。
+
+**装机**：运行实例原为 v3.11.13（未随 v3.11.14 更新），已按 v3.11.15 包重装；
+重装后完整版自检「(8) 跨侧一致性」由 12 处不一致 → **无错误**（该维度实证有效）。
+
+**修根因（台账生成器）**：第十二轮记的"gen-ledger 重建冲掉手工行"这次**再次发作**——
+按"记性代替守卫"的教训，不再手工补第 N 次，改 `maint/tools/gen-ledger.py`：
+新增 `EXTRA_ARTS` 规则表，扫工作区根 `*.md` 自动登记**包外产出物**；
+连跑两次验证幂等（「技能开发规范（通用铁律）」行稳定在册，不再被冲）。

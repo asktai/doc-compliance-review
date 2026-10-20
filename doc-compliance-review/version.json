@@ -3,23 +3,28 @@
   "product": "文档合规审查助手AI合同审核全能版",
   "skill_id": "doc-compliance-review",
   "latest": {
-    "version": "v3.11.14",
+    "version": "v3.11.15",
     "date": "2026-10-20",
-    "summary": "全量质检修正：修复银行卡脱敏误吞、预处理假过等 13 处，新增输出成品样例",
+    "summary": "文本冗余清理：删重复命令块与整块复制的清单，顺带修正两处事实错误",
     "changes": [
-      "脱敏修复：19 位银行卡号末 18 位不再被身份证规则误吞（补边界守卫）",
-      "预处理输入不存在/处理失败不再静默成功（退出码分级 2/1）",
-      "异常输入人话报错；样例基线两处静默假过改显式警告",
-      "文档修正：README 交付物默认值矛盾、行业库主动推荐规则等 8 处",
-      "新增输出成品样例（审查意见报告格式对照）"
+      "删去教程/README 中与 SKILL 逐字重复的命令块与整块复制的加载库勾选项清单（改指向真源）",
+      "压缩讲述文档拆分动机的元话语与修辞性总结，保留技术要点",
+      "修正：教程功能菜单「9 项」→ 12 项（与 SKILL/README 一致）",
+      "修正：涉密门「每次都会先问」→ 默认每次先问（有 privacy.fulltext_gate 开关）",
+      "对话腔专项核查：全包无实际对话腔残留"
     ],
     "download_page": "https://github.com/asktai/doc-compliance-review/releases",
     "files": {
-      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.11.14/文档合规审查助手AI合同审核全能版_v3.11.14_20261020_(doc-compliance-review).skill",
-      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.11.14/文档合规审查助手AI合同审核全能版_v3.11.14_20261020_(doc-compliance-review).zip"
+      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.11.15/文档合规审查助手AI合同审核全能版_v3.11.15_20261020_(doc-compliance-review).skill",
+      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.11.15/文档合规审查助手AI合同审核全能版_v3.11.15_20261020_(doc-compliance-review).zip"
     }
   },
   "history": [
+    {
+      "version": "v3.11.14",
+      "date": "2026-10-20",
+      "summary": "全量质检修正：修复银行卡脱敏误吞、预处理假过等 13 处，新增输出成品样例"
+    },
     {
       "version": "v3.11.13",
       "date": "2026-10-16",
