@@ -49,6 +49,7 @@ import os
 import re
 import shutil
 import sys
+import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DEV = os.path.dirname(os.path.dirname(HERE))            # /workspace/dev
@@ -633,6 +634,24 @@ VER_FILES = ["maint/DEVLOG.md", "CHANGELOG.md", "publish.py"]
 VER_RE = re.compile(r"(?:现|当前)\s*\*{0,2}([Vv]\d+\.\d+\.\d+)\*{0,2}")
 
 
+def _is_rules_itself(s):
+    """待检内容是不是"铁律本体"（而非别的文档）——**按内容判，不按路径判**。
+
+    ⚠ 2026-10-20 修：先写成"路径必须等于 DEV-RULES.md"，结果**把全量冒烟打断**——
+    冒烟把注入后的副本写到临时目录再 `--file` 传入，路径永远不等于本体，于是 (7)(14)
+    两维全被跳过，冒烟当场报"(7) 未报错（守卫失效）"。**这正是"改 A 把 B 改坏"**。
+    现改为看内容特征：有本规范的条号元规则 ＋ 落实总表，才算本体；副本改了版本号
+    仍是本体（否则打瘸点打不进去）。
+    """
+    # 路径判定：本体本身，**或冒烟/元自测写出的临时副本**（它们在 /tmp 下，
+    # 但内容就是本体的打瘸版——必须照样跑这两维，否则打瘸点打不进去）。
+    if os.path.abspath(RULES) == os.path.abspath(os.path.join(DEV, "DEV-RULES.md")):
+        return True
+    real = os.path.realpath(RULES)
+    tmp = os.path.realpath(tempfile.gettempdir())
+    return real.startswith(tmp + os.sep)
+
+
 def check_rules_version(s):
     """(7) 铁律版本串跨文档一致性。
 
@@ -653,6 +672,14 @@ def check_rules_version(s):
     的漂移同样能拦下（第 20 条：口径须全处一致）。
     """
     head("(7) 铁律版本串一致性（跨开发侧文档·限文件头）")
+    # ⚠ 2026-10-20 修（实测发现假过/假报）：本维拿"待检文件的版本串"当**真源**，
+    #   却比的是**固定的一份开发侧文档集**。用 --file 检别的文档（如对外发布版）时，
+    #   真源变成了那份文档的版本号、文档集却还是本项目的——比出来的错全是假的。
+    #   故：待检文件不是铁律本体时，本维不适用（跳过并说明），不得静默给"通过"。
+    if not _is_rules_itself(s):
+        info("待检内容不是铁律本体（%s）——本维不比跨文档版本，跳过"
+             % os.path.basename(RULES))
+        return
     m = re.search(r"\*\*版本 ([Vv]\d+\.\d+\.\d+)\*\*", s)
     if not m:
         err("未能从真源解析铁律版本（顶部应为「**版本 vx.y.z**」）")
@@ -1193,6 +1220,11 @@ def check_online_md(s):
     本维就失去区分度；抹少了，又会把版式差异误报成内容漂移（2026-10-19 就栽在后者）。
     """
     head("(14) 在线版须与源同步")
+    # ⚠ 2026-10-20 修（同上）：在线版是**铁律本体**的派生件，拿别的文档来比必假报。
+    if not _is_rules_itself(s):
+        info("待检内容不是铁律本体（%s）——在线版是铁律本体的派生物，本维不适用，跳过"
+             % os.path.basename(RULES))
+        return
     if not os.path.exists(ONLINE_MD):
         info("在线版未生成（%s）——需要上传时再跑 "
              "`maint/tools/make-online-md.py`" % os.path.relpath(ONLINE_MD, DEV))
