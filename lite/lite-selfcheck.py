@@ -12,6 +12,7 @@
   (L4) 无项目专有名词残留（可移植性的硬指标）
 用法：python3 lite-selfcheck.py <文件路径>
 """
+import os
 import re
 import sys
 
@@ -93,6 +94,26 @@ def in_fence(lines):
     return out
 
 
+
+def lines_of_source():
+    """读本脚本自身的源码行。供 (L0) 静态自检用。"""
+    with open(os.path.abspath(__file__), encoding="utf-8") as f:
+        return f.read().splitlines()
+
+
+def _dim_spans(src):
+    """把源码按"每维的起止"切片：从 RAN.append(n) 那一行，到下一个 RAN.append 之前。
+    返回 {维度号: 该维的代码体文本}。"""
+    marks = []
+    for m in re.finditer(r"(?m)^\s*RAN\.append\((\d+)\)\s*$", src):
+        marks.append((int(m.group(1)), m.start()))
+    marks.sort(key=lambda t: t[1])
+    spans = {}
+    for idx, (n, st) in enumerate(marks):
+        en = marks[idx + 1][1] if idx + 1 < len(marks) else len(src)
+        spans[n] = src[st:en]
+    return spans
+
 def main():
     path = sys.argv[1] if len(sys.argv) > 1 else "DEV-RULES-LITE.md"
     # ⚠ 2026-10-20 二轮质检修：原只捕 FileNotFoundError，传目录／非 UTF-8 文件
@@ -124,6 +145,7 @@ def main():
         (1, "条号与款号连续性"), (2, "引用不悬空"), (3, "表格完整性"),
         (4, "专有名词残留"), (5, "绝对路径残留"),
         (6, "目录与正文标题一致"),
+        (7, "表格行数引用不虚指"),
     ]
     RAN = []   # 每维跑完 append 自己的编号，结论行只认它
 
@@ -131,14 +153,26 @@ def main():
     print("(L1) 条号与款号连续性")
     RAN.append(1)
     arts = []
+    # ⚠ 2026-10-20 三轮质检修（复核者壬实测）：原正则只认半角数字与行首无空格，
+    #   `## 第９条`（全角）／`  ## 第 3 条`（缩进）被静默放行——
+    #   而且只要目录也配套全角、正文不引用，**这个"幽灵条"谁都看不见**（L2/L6 才有兜底）。
+    #   治法：匹配前先 fold（全角转半角），并允许行首空白。
+    weird = []
     for i, l in enumerate(lines, 1):
         # ⚠ 2026-10-20 二轮质检修：原**不跳代码块**，正文示例里写一行
         #   "## 第 9 条 示例"（在 ``` 内）就被算成真的条号，报"重号"——误拦。
         if i in fenced:
             continue
-        m = re.match(r"^## 第 (\d+) 条", l)
+        lf = _fold(l)
+        m = re.match(r"^\s*##\s*第\s*(\d+)\s*条", lf)
         if m:
-            arts.append(int(m.group(1)))
+            n0 = int(m.group(1))
+            # 检出"写法不正"但数值可用的（全角/缩进/多空格）——放行但记一笔
+            if l != l.lstrip() or not re.match(r"^## 第 \d+ 条", l):
+                weird.append("第 %d 行「%s」（写法不标准：缩进或含多余空格）" % (i, l.strip()[:30]))
+            arts.append(n0)
+    if weird:
+        err("(L1) 条号写法不标准（虽然能识别，但换工具会漏）：%s" % "；".join(weird))
     if not arts:
         err("(L1) 一条都没找到——守卫失效")
     else:
@@ -180,8 +214,11 @@ def main():
     print("(L2) 文档内条号／款号引用是否悬空")
     RAN.append(2)
     defined = set()
+    # ⚠ 2026-10-20 三轮质检修：原不 fold——`第 ９ 条`（全角）引用一个
+    #   **存在**的第 9 条时会被误判"悬空"，因为 defined 里收的是半角 "9"。
+    #   L1 已 fold、这里不 fold，两侧对不齐。统一在收集与查询两端都 fold。
     for l in lines:
-        for m in re.finditer(r"\*\*((?:\d+)(?:\.\d+)+)\s*[^\d.]", l):
+        for m in re.finditer(r"\*\*((?:\d+)(?:\.\d+)+)\s*[^\d.]", _fold(l)):
             defined.add(m.group(1))
     for a in arts:
         defined.add(str(a))
@@ -191,7 +228,7 @@ def main():
     for i, l in enumerate(lines, 1):
         if i in fenced:
             continue
-        scan = VER.sub(lambda m: " " * len(m.group(0)), l)
+        scan = VER.sub(lambda m: " " * len(m.group(0)), _fold(l))
         scan = re.sub(r"`[^`]*`", lambda m: " " * len(m.group(0)), scan)
         for m in re.finditer(r"第\s*(\d+(?:\.\d+)*)\s*[条款]", scan):
             ref = m.group(1)
@@ -303,10 +340,15 @@ def main():
         #   `~/x`（家目录）、`C:\tmp\x`（盘符）、`\\server\share`（UNC）、`/etc/passwd`（其它根）。
         #   判据统一为：**任何指向"某台具体机器上某个位置"的写法**，都是本机痕迹。
         line_f = _fold(l)
+        # ⚠ 2026-10-20 三轮质检修两处（复核者壬实测）：
+        #   (甲) 原 unix 根目录用**白名单**（tmp/home/root/...），`/data/x`、`/opt2/`
+        #        全漏——注释自称"任何根"但实现不是，**注释与判据漂移**。改黑名单：
+        #        排除 URL 协议后，凡 `/小写字母开头/` 的写法一律视为本机路径。
+        #   (乙) Windows 盘符只认反斜杠 `C:\`，`C:/tmp/x` 正斜杠漏过。补上。
         for pat, why in [
-            (r"(?<![\w:/])/(?:tmp|home|root|Users|var|opt|etc|srv|mnt|media|workspace|usr)/[\w\-./]*", "unix 绝对路径"),
+            (r"(?<![\w:/.])/(?!/)[a-z][\w\-]*(?:/[\w\-./]*)+", "unix 风格绝对路径"),
             (r"(?<![\w])~/[\w\-./]*", "家目录写法"),
-            (r"(?<![\w])[A-Za-z]:\\[\w\-./\\]*", "Windows 盘符路径"),
+            (r"(?<![\w])[A-Za-z]:[\\/][\w\-./\\]*", "Windows 盘符路径"),
             (r"\\\\[\w.\-]+\\[\w\-.$]*", "UNC 网络路径"),
         ]:
             for m in re.finditer(pat, l):
@@ -342,6 +384,46 @@ def main():
     if not miss and not ghost:
         print("      目录与正文一致（%d 个标题）" % len(heads))
 
+    # ---------- (L7) 表格行数引用不虚指 ----------
+    # ⚠ 2026-10-20 三轮质检加（复核者辛指出，且**这是复发**）：
+    #   v1.0.2 修过 6.3 的"示例指向不存在的 8.5 第 3 行"；v1.0.3 里 15.2 又写了
+    #   "7.3 第 4 行"——7.3 根本没有表格，也没有第 4 行。**同类病在修过之后又犯**，
+    #   说明它**必须靠守卫**，不能靠"我记得检查"。
+    #   判据：文中出现 "`X 第 N 行`"（X 是款号），且该处**确指**而非"示例非实指"，
+    #   那么 X 对应的段落下**必须有至少 N 行表格行**。例外：该行已标"示例非实指"。
+    print("(L7) 表格行数引用不虚指")
+    RAN.append(7)
+    ref_bad = []
+    # 先算出每个款号下的表格行数
+    tbl_rows = {}   # 款号 -> 该行数
+    cur_sec = None
+    for i, l in enumerate(lines, 1):
+        if i in fenced:
+            continue
+        m = re.match(r"^\*\*((?:\d+)(?:\.\d+)+)[^\d.]", l)
+        if m:
+            cur_sec = m.group(1)
+            tbl_rows.setdefault(cur_sec, 0)
+            continue
+        if cur_sec and l.strip().startswith("|") and not re.match(r"^\s*\|[\s:|-]+\|\s*$", l):
+            tbl_rows[cur_sec] = tbl_rows.get(cur_sec, 0) + 1
+    # 再扫引用
+    for i, l in enumerate(lines, 1):
+        if i in fenced or i in exempt:
+            continue
+        if "示例非实指" in l or "非实指" in l:
+            continue
+        for m in re.finditer(r"`((?:\d+)(?:\.\d+)+) 第 (\d+) 行`", l):
+            sec, nrows = m.group(1), int(m.group(2))
+            if sec in tbl_rows and tbl_rows[sec] >= nrows:
+                continue
+            ref_bad.append("第 %d 行「%s 第 %s 行」——该款下没有那么多表格行（实际 %d 行）"
+                           % (i, sec, nrows, tbl_rows.get(sec, 0)))
+    if ref_bad:
+        err("(L7) 虚指表格行：%s" % "；".join(ref_bad))
+    else:
+        print("      无表格行数虚指")
+
     print()
     if errs:
         print("自洽检查未通过，%d 项：" % len(errs))
@@ -356,6 +438,27 @@ def main():
     #   这正是 12.1 说的**假过**：零个维度自然零个错误，于是判"通过"。
     #   治法：**以"实际跑过的维度"为准**，不是以表为准；
     #   且**表里有、实际没跑**的，本身就要报错（说明实现漏了）。
+    # ⚠ 2026-10-20 三轮质检修（本轮最严重，复核者壬实测坐实）：
+    #   把某维的 err(...) 改成 pass，维度"跑了但哑了"——文档真有问题时
+    #   照样报"全过"、exit=0。RAN 只核"跑没跑"，核不出"报错路径被删了"。
+    #   **判据**：每一维的代码体里必须**静态存在至少一个可调用的 err(** 调用。
+    #   （不看这次实际报没报——干净文档下所有维都不报，那不算哑；
+    #     看的是**代码里还有没有报错这条路**，被删了才算哑。）
+    src = "\n".join(lines_of_source())
+    dim_spans = _dim_spans(src)
+    mute = []
+    for n, _ in CHECKS:
+        body = dim_spans.get(n, "")
+        # 至少要有一个真正的 err( 调用（不是注释、不是字符串里的字样）
+        if not re.search(r"(?m)^\s*err\(", body):
+            mute.append(n)
+    if mute:
+        print("自洽检查未通过，1 项：")
+        print("  - (L0) 判据失效：维度 %s 的代码里没有一个可调用的 err( —— "
+              "报错路径被删了，跑也白跑（打瘸点打在了错误路径上）"
+              % "、".join("(L%d)" % n for n in mute))
+        return 1
+
     ran = set(RAN)
     declared = set(n for n, _ in CHECKS)
     never = sorted(declared - ran)
