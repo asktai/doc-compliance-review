@@ -3,24 +3,27 @@
   "product": "文档合规审查助手AI合同审核全能版",
   "skill_id": "doc-compliance-review",
   "latest": {
-    "version": "v3.11.16",
+    "version": "v3.12.0",
     "date": "2026-10-21",
-    "summary": "提问全链路带编号与鼠标优先：每个提问有全局流水号 Qn，选项也带号，能点就不打字",
+    "summary": "新增文档精要总结与思维导图（一页看懂）；审查修订硬性要求原稿上改，做不到显式降级",
     "changes": [
-      "新增 1.0.3 提问总纲：全文每个提问一律带全局流水号 Q1、Q2…，同一会话内连续递增、跨步骤不复用、不重排",
-      "选项本身也带号：控件卡片写「1. 合同类」，与文字清单同形同号，点卡片或回数字都行",
-      "鼠标优先：有交互控件必须弹单选/多选；无控件整块列全、回数字即可",
-      "只有自由项（审查人姓名、主体名称、金额、补充说明、背景资料）才请用户打字，题干明写「此项须打字」",
-      "开场清单拆题：「尺度／地位」原挤在一行、易漏答一半，现拆为两问各带选项；加载库与交付物补齐选项号",
-      "功能总菜单、涉密门、性质、加载库、身份、尺度和地位、交付物、格式、两库向导、撰写要素清单、收尾随访逐处改到位"
+      "新增功能「文档精要总结」（菜单第 12 项）：精要总结（MD/HTML/PDF，五段固定结构）＋思维导图（交互 HTML 折叠树＋MD 大纲），只提炼不审查不动原文",
+      "精要红线：只提炼不创作、数字照录零加工、不夹带审查结论、免责声明照带",
+      "新增「原稿底稿硬性要求」：修订类交付物必须在原稿上改；无法做到时显式降级并在文件名/文档属性/报告三处标注「⚠ 降级：非原稿修改（原因）」",
+      "功能菜单 12 项 → 13 项；提问全局流水号机制延续"
     ],
     "download_page": "https://github.com/asktai/doc-compliance-review/releases",
     "files": {
-      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.11.16/文档合规审查助手AI合同审核全能版_v3.11.16_20261021_(doc-compliance-review).skill",
-      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.11.16/文档合规审查助手AI合同审核全能版_v3.11.16_20261021_(doc-compliance-review).zip"
+      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.12.0/文档合规审查助手AI合同审核全能版_v3.12.0_20261021_(doc-compliance-review).skill",
+      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.12.0/文档合规审查助手AI合同审核全能版_v3.12.0_20261021_(doc-compliance-review).zip"
     }
   },
   "history": [
+    {
+      "version": "v3.11.16",
+      "date": "2026-10-21",
+      "summary": "提问全链路带编号与鼠标优先：每个提问有全局流水号 Qn，选项也带号，能点就不打字"
+    },
     {
       "version": "v3.11.15",
       "date": "2026-10-20",
