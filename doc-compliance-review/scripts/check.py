@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-文档合规审查助手AI合同审核全能版 · 结构校验与环境自检（Python 版）
+文档合规审查助手AI合同 · 结构校验与环境自检（Python 版）
 ==================================================================
 替代原 `check.ps1`：**纯 Python 实现，无需 PowerShell、不绕过任何执行策略**，
 跨平台（Windows / macOS / Linux）一致运行，消除「依赖执行策略绕过参数运行脚本」带来的绕过面。
@@ -79,7 +79,7 @@ REQUIRED_FILES = [
     "LICENSE.md",
     "VERSION.md",
     os.path.join("scripts", "TONE.md"),   # 感谢语参考：藏于脚本目录，不入使用者的视线
-    "文档合规审查助手AI合同审核提示词版.md",
+    "文档合规审查助手AI合同提示词版.md",
     os.path.join("core", "01-general-risk-rules.md"),
     # 按需加载的三份专项口径（SKILL.md 只留索引段指向它们，缺哪一个都是断链）
     "permissions-and-libraries.md", "drafting-guide.md", "template-guide.md",
@@ -154,7 +154,7 @@ def check_assets():
     adir = os.path.join(ROOT, "assets")
     refs = {}
     for fn in ("SKILL.md", "README.md", "安装使用教程.md", "LICENSE.md", "VERSION.md",
-               os.path.join("scripts", "TONE.md"), "文档合规审查助手AI合同审核提示词版.md", "SECURITY.md"):
+               os.path.join("scripts", "TONE.md"), "文档合规审查助手AI合同提示词版.md", "SECURITY.md"):
         p = os.path.join(ROOT, fn)
         if not os.path.exists(p):
             continue
@@ -439,7 +439,7 @@ DISC_VERBATIM = ("AI不能替代人工，人工不能依赖AI，个人仅限研�
                  "后方可使用；使用风险与后果由使用者自行承担。使用即为已知晓后果并免责作者，否则，请勿使用！")
 DISC_KEYS = ["AI不能替代人工", "人工不能依赖AI", "商业使用须获作者书面授权",
              "不构成法律意见", "执业律师复核", "免责作者"]
-DISC_FULL_DOCS = ["SKILL.md", "LICENSE.md", "安装使用教程.md", "文档合规审查助手AI合同审核提示词版.md"]
+DISC_FULL_DOCS = ["SKILL.md", "LICENSE.md", "安装使用教程.md", "文档合规审查助手AI合同提示词版.md"]
 DISC_KEY_DOCS = ["README.md", "scripts/make-docx.py", "SECURITY.md", "core/01-general-risk-rules.md"]
 
 
@@ -451,7 +451,7 @@ def _norm(t):
 def check_disclaimer():
     """《免责声明》口径一致：每次使用先输出的那段，入口文档须逐字一致。
 
-    入口文档（SKILL.md / LICENSE.md / 安装使用教程.md / 文档合规审查助手AI合同审核提示词版.md）要求**逐字全文**；
+    入口文档（SKILL.md / LICENSE.md / 安装使用教程.md / 文档合规审查助手AI合同提示词版.md）要求**逐字全文**；
     生成端与摘要处（README.md / make-docx.py / SECURITY.md / core 库）只查**关键句**，
     允许节选改写——README 页首与「三、快速上手」各保留一句概要，全文在 `LICENSE.md`。
     """
@@ -480,7 +480,7 @@ def check_disclaimer():
 
 
 # ---------------------------------------------------------------- 长文档分批口径
-BATCH_DOCS = ["SKILL.md", "文档合规审查助手AI合同审核提示词版.md"]
+BATCH_DOCS = ["SKILL.md", "文档合规审查助手AI合同提示词版.md"]
 BATCH_KEYS = ["共 N 批", "按条款分批", "一次性"]
 
 
@@ -742,7 +742,7 @@ def check_doc_number_caliber():
     `VERSION.md` 为沿革表（旧数字属历史记录）跳过。
     """
     DOCS = ("SKILL.md", "README.md", "安装使用教程.md",
-            "文档合规审查助手AI合同审核提示词版.md")
+            "文档合规审查助手AI合同提示词版.md")
 
     # ---- 真源 1：格式数 ----
     real_fmt = None
@@ -925,7 +925,7 @@ def check_version_consistency():
     if not re.search(r"\*\*%s\*\*" % re.escape(v), t):
         bad.append("SKILL.md 正文标题")
     # 各文档里应出现该版本串
-    for rel in ("README.md", "SECURITY.md", "文档合规审查助手AI合同审核提示词版.md"):
+    for rel in ("README.md", "SECURITY.md", "文档合规审查助手AI合同提示词版.md"):
         p = os.path.join(ROOT, rel)
         if os.path.exists(p) and v not in _read(p):
             bad.append(rel)
@@ -1150,7 +1150,7 @@ def check_skill_ext_lowercase():
     allow_scripts = {"pack.py", "check.py"}   # 变更说明与守卫本身需引用"错误形态"
     bad = []
     for rel in ("SKILL.md", "README.md", "VERSION.md", "SECURITY.md",
-                "安装使用教程.md", "文档合规审查助手AI合同审核提示词版.md"):
+                "安装使用教程.md", "文档合规审查助手AI合同提示词版.md"):
         if rel in allow_docs:
             continue
         for ln, line in enumerate(_doc_lines(rel), 1):
@@ -1245,7 +1245,7 @@ def _walk(base, exts):
 
 
 def main():
-    ap = argparse.ArgumentParser(description="文档合规审查助手AI合同审核全能版 · 结构与环境自检（Python 版，替代 check.ps1）")
+    ap = argparse.ArgumentParser(description="文档合规审查助手AI合同 · 结构与环境自检（Python 版，替代 check.ps1）")
     ap.add_argument("--sign", action="store_true", help="生成/刷新脚本完整性指纹")
     ap.add_argument("--verify", action="store_true", help="仅校验脚本指纹")
     ap.add_argument("--strict", action="store_true", help="指纹不一致时视为错误")

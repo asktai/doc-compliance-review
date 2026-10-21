@@ -1,7 +1,7 @@
 ---
 industry: 新零售
 slug: newretail
-display_name: 文档合规审查助手AI合同审核全能版（新零售行业版）
+display_name: 文档合规审查助手AI合同（新零售行业版）
 common_roles: [品牌方, 渠道方]
 positions:
   - 价格与渠道管控

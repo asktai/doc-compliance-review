@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-文档合规审查助手AI合同审核全能版 · 端到端冒烟测试（smoke-test）
+文档合规审查助手AI合同 · 端到端冒烟测试（smoke-test）
 ===============================================================
 用途：一条命令验证本机环境下技能链路是否可用——预处理（提取/清洗/留痕）→ 交付物产出
       （9 类型 × docx/excel/pdf）→ 结果自检，逐项打印 PASS/FAIL 并以退出码反映结果。
@@ -179,7 +179,7 @@ def tail_line(text, budget=90):
 
 
 def main():
-    ap = argparse.ArgumentParser(description="文档合规审查助手AI合同审核全能版·端到端冒烟测试")
+    ap = argparse.ArgumentParser(description="文档合规审查助手AI合同·端到端冒烟测试")
     ap.add_argument("--base", default=None, help="工作根目录（默认取 config.json 的 base_dir）")
     ap.add_argument("--keep", action="store_true", help="保留测试产物")
     ap.add_argument("--in-base", action="store_true",
@@ -209,7 +209,7 @@ def main():
         work = os.path.join(tempfile.gettempdir(), "dcr-smoke", f"_smoke-{ts}")
     os.makedirs(work, exist_ok=True)
     print("=" * 62)
-    print("文档合规审查助手AI合同审核全能版 · 端到端冒烟测试")
+    print("文档合规审查助手AI合同 · 端到端冒烟测试")
     print("模式：", "快速档（PDF/OCR/老格式转换 记为 SKIP，项数不变）；跑全量档请加 --full"
           if a.fast else "全量档（含 PDF 导出与 OCR）")
     print("工作目录：", work)

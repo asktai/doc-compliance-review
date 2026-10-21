@@ -1,7 +1,7 @@
 ---
 industry: 医疗卫生
 slug: medical
-display_name: 文档合规审查助手AI合同审核全能版（医疗卫生行业版）
+display_name: 文档合规审查助手AI合同（医疗卫生行业版）
 common_roles: [采购方, 供货方]
 positions:
   - 资质与两票制合规

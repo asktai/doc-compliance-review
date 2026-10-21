@@ -5924,3 +5924,22 @@ v3.11.16 → **v3.12.0**（新功能走次版本号）。菜单 12→13 项（ch
 
 ### 七、验证
 `check-dev-rules.py DEV-RULES.md` 待本条目写入后复跑（本条目本身即改动）；发布版派生复跑；跨侧守卫复跑。
+
+---
+
+## 第二十轮（2026-10-21）：产品更名「文档合规审查助手AI合同审核全能版」→「文档合规审查助手AI合同」（v3.12.1）
+
+### 一、开发者指令
+**「文档合规审查助手AI合同审核全能版 更名为 文档合规审查助手AI合同」**。
+
+### 二、替换范围（31 个文件，全链一次改齐）
+frontmatter display_name（真源）／SKILL 正文／README／SECURITY／教程／VERSION.md／version.json（product＋files URL）／LICENSE／permissions-and-libraries／9 个行业库 meta／16 个脚本中提及产品名的注释（pack、check、guard、desensitize、preprocess、local-only、harden-dir、make-docx、make-header、smoke-test、_config）。**提示词版文件名**随之更名：`文档合规审查助手AI合同审核提示词版.md` → `文档合规审查助手AI合同提示词版.md`（git mv，check.py/guard.py/pack.py/教程/README 引用同步）。
+
+### 三、保持不变
+技能 ID `doc-compliance-review`（包目录/ID 段不动）｜功能与条款口径｜display_name_en｜**CHANGELOG 与 DEVLOG 历史条目**（按"当时叫什么记什么"保留旧名——回改即造假历史）。
+
+### 四、头图重生成
+`make-header.py` 副行 SUB_TEXT「合同审核全能版」→「合同」（banner×2＋icon×2）；`make-card.py` 技能卡重生成——版本串 v3.12.1。
+
+### 五、版本与验证
+v3.12.0 → **v3.12.1**。`check.py --sign` 重签 16 脚本指纹（脚本注释变了）；**0 错 0 警告**；smoke 全过；出包 70 条目（新包名 `文档合规审查助手AI合同_v3.12.1_20261021_(doc-compliance-review)`）；运行实例同步升级（自动备份，config 保留），运行侧 check 通过（1 警告＝运行侧生成物差异，属正常）。

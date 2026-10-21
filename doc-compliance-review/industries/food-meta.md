@@ -1,7 +1,7 @@
 ---
 industry: 食品
 slug: food
-display_name: 文档合规审查助手AI合同审核全能版（食品行业版）
+display_name: 文档合规审查助手AI合同（食品行业版）
 common_roles: [采购方, 供货方]
 positions:
   - 食品安全责任前置

@@ -1,7 +1,7 @@
 ---
 industry: 新媒体
 slug: newmedia
-display_name: 文档合规审查助手AI合同审核全能版（新媒体行业版）
+display_name: 文档合规审查助手AI合同（新媒体行业版）
 common_roles: [委托方, 服务方]
 positions:
   - 内容合规前置（广告法+审查文号）

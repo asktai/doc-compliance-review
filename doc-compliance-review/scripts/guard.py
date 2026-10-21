@@ -11,7 +11,7 @@ except Exception:
     pass
 _sys.dont_write_bytecode = True   # 不在技能目录留下 __pycache__（避免缓存残留）
 """
-文档合规审查助手AI合同审核全能版 · 资源权限守卫与库备份（可选工具）
+文档合规审查助手AI合同 · 资源权限守卫与库备份（可选工具）
 ==============================================================
 用途：把「谁能对哪些资源做什么」从口头约定变成**可判定的规则**，并把「改库前先备份」变成
       一条命令。规则正文与触发词在 `SKILL.md` 第十五节；本脚本是它的执行侧。
@@ -104,7 +104,7 @@ VIEWABLE = {
     "versionfile": "VERSION.md",
     "license":     "LICENSE.md",
     "tutorial":    "安装使用教程.md",
-    "prompt":      "文档合规审查助手AI合同审核提示词版.md",
+    "prompt":      "文档合规审查助手AI合同提示词版.md",
 }
 VIEW_CN = {"readme": "技能手册", "version": "版本身份证（当前版本／脚本数／规则数）",
            "versionfile": "版本沿革", "license": "许可与免责", "tutorial": "安装使用教程",

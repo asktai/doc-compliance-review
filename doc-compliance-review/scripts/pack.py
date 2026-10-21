@@ -11,7 +11,7 @@ except Exception:
     pass
 _sys.dont_write_bytecode = True
 """
-文档合规审查助手AI合同审核全能版 · 发布包打包脚本（UTF-8 文件名）
+文档合规审查助手AI合同 · 发布包打包脚本（UTF-8 文件名）
 ===============================================================
 用 Python zipfile 生成**唯一的发布 zip** —— 以开放平台（open.workbuddy.cn）的上架规范为准。
 
@@ -23,12 +23,12 @@ _sys.dont_write_bytecode = True
            ├─ SKILL.md               ← 每次会话都加载的主口径（刻意瘦身，只留常驻部分）
            ├─ permissions-and-libraries.md／drafting-guide.md／template-guide.md   ← 按需加载，命中入口才读
             ├─ README.md / 安装使用教程.md / LICENSE.md / VERSION.md
-            ├─ 文档合规审查助手AI合同审核提示词版.md / SECURITY.md
+            ├─ 文档合规审查助手AI合同提示词版.md / SECURITY.md
             ├─ core/  industries/  scripts/（含 TONE.md）  assets/  samples/
            └─ …
 
 一份源、一次打包、一个产物，不存在两处内容漂移的可能。纯提示词版也**不单独打包**，
-它是包内的单个文件「文档合规审查助手AI合同审核提示词版.md」，复制粘贴即可用（少一个包就少一处不一致）。
+它是包内的单个文件「文档合规审查助手AI合同提示词版.md」，复制粘贴即可用（少一个包就少一处不一致）。
 
 **平台硬约束**：技能包内**至多两级目录**（`技能目录/二级目录/文件`）。
 三级（如 `industries/<slug>/rules.md`）会被判「目录层级超限」直接拒收——故行业库平铺为
@@ -78,7 +78,7 @@ import os, re, sys, json, hashlib, zipfile, argparse, datetime
 # 注：`scripts/TONE.md`（感谢语参考）**不在此列**——scripts/ 由 FULL_DIRS 整体递归打包，
 # 再列一次会写出同名重复条目（zipfile 会告警且条目数虚增）。它随 scripts/ 进包即达目的。
 FULL_FILES = ["SKILL.md", "README.md", "安装使用教程.md", "LICENSE.md", "VERSION.md",
-              "文档合规审查助手AI合同审核提示词版.md", "SECURITY.md",
+              "文档合规审查助手AI合同提示词版.md", "SECURITY.md",
               # 按需加载的三份专项口径：SKILL 里只留索引段，命中对应入口时才读这几份，
               # 以此压住 SKILL 的常驻体积。必须随包，否则索引指向包外不存在的文件。
               "permissions-and-libraries.md", "drafting-guide.md", "template-guide.md",

@@ -1,24 +1,28 @@
 {
   "_说明": "在线版本清单。技能侧 `scripts/version.py --notice`（默认联网检查）会读取本文件，向使用者展示：最新版本号、发布日期、更新了哪些内容、下载指引页。字段口径：version＝最新版本号（小写 v 前缀；SKILL.md frontmatter 为同号裸写、不带 v，二者指同一版本）；date＝该版本发布日期（YYYY-MM-DD）；summary＝一句话概述；changes＝本版要点列表；download_page＝人去看的下载指引页；files＝分发包直链（.skill／.zip）。本文件只描述'有哪些版本、去哪儿下载'，不含任何使用者信息，工具读取时也不会上传任何数据。",
-  "product": "文档合规审查助手AI合同审核全能版",
+  "product": "文档合规审查助手AI合同",
   "skill_id": "doc-compliance-review",
   "latest": {
-    "version": "v3.12.0",
+    "version": "v3.12.1",
     "date": "2026-10-21",
-    "summary": "新增文档精要总结与思维导图（一页看懂）；审查修订硬性要求原稿上改，做不到显式降级",
+    "summary": "产品更名为「文档合规审查助手AI合同」：全链更名（文档/脚本/头图/包名/提示词版文件名）",
     "changes": [
-      "新增功能「文档精要总结」（菜单第 12 项）：精要总结（MD/HTML/PDF，五段固定结构）＋思维导图（交互 HTML 折叠树＋MD 大纲），只提炼不审查不动原文",
-      "精要红线：只提炼不创作、数字照录零加工、不夹带审查结论、免责声明照带",
-      "新增「原稿底稿硬性要求」：修订类交付物必须在原稿上改；无法做到时显式降级并在文件名/文档属性/报告三处标注「⚠ 降级：非原稿修改（原因）」",
-      "功能菜单 12 项 → 13 项；提问全局流水号机制延续"
+      "产品名「文档合规审查助手AI合同审核全能版」→「文档合规审查助手AI合同」，全链同步：全部文档、脚本、frontmatter、头图副行、分发包名",
+      "提示词版文件名同步更名为「文档合规审查助手AI合同提示词版.md」",
+      "技能 ID（doc-compliance-review）与功能不变；CHANGELOG/DEVLOG 历史记录保留旧名"
     ],
     "download_page": "https://github.com/asktai/doc-compliance-review/releases",
     "files": {
-      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.12.0/文档合规审查助手AI合同审核全能版_v3.12.0_20261021_(doc-compliance-review).skill",
-      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.12.0/文档合规审查助手AI合同审核全能版_v3.12.0_20261021_(doc-compliance-review).zip"
+      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.12.1/文档合规审查助手AI合同_v3.12.1_20261021_(doc-compliance-review).skill",
+      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.12.1/文档合规审查助手AI合同_v3.12.1_20261021_(doc-compliance-review).zip"
     }
   },
   "history": [
+    {
+      "version": "v3.12.0",
+      "date": "2026-10-21",
+      "summary": "新增文档精要总结与思维导图（一页看懂）；审查修订硬性要求原稿上改，做不到显式降级"
+    },
     {
       "version": "v3.11.16",
       "date": "2026-10-21",

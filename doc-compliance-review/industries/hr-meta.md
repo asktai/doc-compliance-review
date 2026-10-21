@@ -1,7 +1,7 @@
 ---
 industry: 人力资源
 slug: hr
-display_name: 文档合规审查助手AI合同审核全能版（人力资源/HR行业版）
+display_name: 文档合规审查助手AI合同（人力资源/HR行业版）
 common_roles: [用人单位, 用工单位, 人力资源服务方]
 positions:
   - 用工合规（三性/比例/同工同酬）

@@ -1,7 +1,7 @@
 ---
 industry: <行业中文名>
 slug: <slug英文/拼音，唯一>
-display_name: 文档合规审查助手AI合同审核全能版（<行业>行业版）
+display_name: 文档合规审查助手AI合同（<行业>行业版）
 common_roles: [<常见我方角色1>, <常见我方角色2>]
 positions:
   - <我方立场要点1>

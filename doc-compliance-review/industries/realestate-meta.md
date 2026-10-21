@@ -1,7 +1,7 @@
 ---
 industry: 建筑地产
 slug: realestate
-display_name: 文档合规审查助手AI合同审核全能版（建筑地产行业版）
+display_name: 文档合规审查助手AI合同（建筑地产行业版）
 common_roles: [施工承包方, 发包方/开发商, 业主/购房人, 承租人/出租人（商业物业）, 物业服务企业]
 positions:
   - 工程价款与签证闭合环（进度款挂钩形象进度、变更签证书面化）

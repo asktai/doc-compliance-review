@@ -1,7 +1,7 @@
 ---
 industry: 制造业
 slug: manufacturing
-display_name: 文档合规审查助手AI合同审核全能版（制造业行业版）
+display_name: 文档合规审查助手AI合同（制造业行业版）
 common_roles: [采购方, 供货方]
 positions:
   - 技术规格/图纸附件化

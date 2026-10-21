@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-文档合规审查助手AI合同审核全能版 · 头标（横幅 / 图标）生成
+文档合规审查助手AI合同 · 头标（横幅 / 图标）生成
 ==========================================================================
 产出「方便发布」的品牌头标：宽幅头图（放 README / SKILL 顶部、发行页首图）
 ＋方形图标（技能卡片 / 头像 / 应用图标）。
@@ -11,7 +11,7 @@
   · 版本号自动读自 SKILL.md frontmatter —— 版本升级后重跑一次即可刷新头图；
   · 超采样绘制（默认 4×）再降采样，边缘平滑；中文用系统字体，不会出现 AI 生图乱码；
   · 视觉基调＝中式文书（宣纸 / 朱印 / 天平）＋ 轻量 AI 点缀（扫描线 / 取景框 / AI 胶囊）；
-  · 标题拆**主副两行**：主行「文档合规审查助手」，副行「AI 合同审核全能版」，
+  · 标题拆**主副两行**：主行「文档合规审查助手」，副行「AI 合同」，
     长名称不被迫缩小字号。
 
 用法：
@@ -68,7 +68,7 @@ ICON_CORNER_K = 0.13
 # —— 文案 ——
 TITLE_MAIN = "文档合规审查助手"          # 主行（大字）
 SUB_CAPS = "AI"                          # 副行行首胶囊
-SUB_TEXT = "合同审核全能版"              # 副行（小字）
+SUB_TEXT = "合同"                        # 副行（小字）
 EN1 = "DOCUMENT COMPLIANCE REVIEW ASSISTANT"
 EN2 = "AI CONTRACT AUDIT · ALL-ROUND EDITION"
 TAGS = "合同 · 商务文档 · 逐条审查 · 三色风险分级 · 红线修订 · 脱敏与比对"
@@ -525,7 +525,7 @@ def read_version():
 
 
 def main():
-    ap = argparse.ArgumentParser(description="文档合规审查助手AI合同审核全能版 · 头标（横幅/图标）生成")
+    ap = argparse.ArgumentParser(description="文档合规审查助手AI合同 · 头标（横幅/图标）生成")
     ap.add_argument("--out", default=os.path.join(ROOT, "assets"), help="输出目录（默认 ../assets）")
     ap.add_argument("--theme", default="all", choices=["all", "dark", "light"], help="配色：all/dark/light")
     ap.add_argument("--version", default=None, help="覆盖版本串（默认读 SKILL.md frontmatter）")
