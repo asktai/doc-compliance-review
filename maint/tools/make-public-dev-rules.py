@@ -18,7 +18,8 @@ RULES = [
     ("# 开发工程规范（铁律）｜ Development Rules",
      "# 开发工程规范（铁律）",
      "标题去掉英文副名（发布版单语）"),
-    ("**版本 v1.43.3** ｜ 首次成文：2026-09-26 ｜ 最近修订：2026-10-20 ｜ **适用范围：全部开发工作**",
+    # 版本行改为正则匹配：内部维护版每次升版都会改这行字面量，写死必漏（2026-10-21 教训）
+    (re.compile(r"\*\*版本 v[\d.]+\*\* ｜ 首次成文：[\d-]+ ｜ 最近修订：[\d-]+ ｜ \*\*适用范围：全部开发工作\*\*"),
      "**版本 v1.0.0** ｜ 首次成文：2026-10-20 ｜ **适用范围：全部开发工作**",
      "版本号重新起算：发布版是独立产品，版本体系不与内部维护版混编"),
     ("> 本文件规定 AI 在全部开发工作中**必须怎样做**（红线与流程），属**开发侧**文件，\n"
@@ -251,6 +252,12 @@ def main():
     out = src
     missed = []
     for old, new, why in RULES:
+        if hasattr(old, "search"):          # 编译正则条目
+            if not old.search(out):
+                missed.append(getattr(old, "pattern", "?")[:60])
+                continue
+            out = old.sub(new, out, count=1)
+            continue
         if old not in out:
             missed.append(old.split("\n")[0][:60])
             continue
