@@ -621,8 +621,13 @@ def check_paths(s):
     exts = {".skill", ".zip", ".py", ".md", ".json"}
     prefix = {"dev/": DEV + "/", "maint/": DEV + "/maint/", "dist/": DIST + "/",
               "~/.codebuddy/skills/": RUN + "/", "scripts/": SKILL + "/scripts/"}
+    # 搜索目录：开发侧若干固定位置 ＋ **被检文件自己所在的目录**。
+    # 2026-10-21 补最后一项：对外发布版放在 /workspace 根、与自己的检查器同目录，
+    # 若不搜它所在目录，发布版"检查器与本文件同目录附带"这句话就永远被判"路径不存在"
+    # ——**检查器无法为它自己参与构造的承诺作证**（12.5.4.3 判据须能区分真假）。
     search = [DEV, os.path.join(DEV, "maint"), SKILL, os.path.join(SKILL, "scripts"),
-              os.path.join(SKILL, "core"), os.path.join(SKILL, "assets")]
+              os.path.join(SKILL, "core"), os.path.join(SKILL, "assets"),
+              os.path.dirname(os.path.abspath(RULES))]
     missing = []
     for c in sorted(cands):
         if c in exts:
