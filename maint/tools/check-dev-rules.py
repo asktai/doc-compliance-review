@@ -102,7 +102,7 @@ def no_of(s, keyword):
     教训：本脚本曾把「第 19 条」写死用于排除反例，V1.24.0 该条挪为第 20 条后，
     排除立即失效、连报 3 项误报（把该条自己的反例当成真问题）。
     """
-    m = re.search(r"^### 第 (\d+) 条 [^\n]*" + re.escape(keyword), s, re.M)
+    m = re.search(r"^#{2,3} 第 (\d+) 条 [^\n]*" + re.escape(keyword), s, re.M)
     return int(m.group(1)) if m else None
 
 
@@ -128,8 +128,17 @@ def read():
 
 def title_rows(s):
     """全部条标题：(条号, 条号后的原文)。**故意不要求条号后有空格**，
-    否则格式一旦不统一就会漏抓该条（2026-09-29 踩过的坑）；格式问题由 (1) 单独报出。"""
-    return [(int(n), rest) for n, rest in re.findall(r"^### 第 (\d+) 条(.*)$", s, re.M)]
+    否则格式一旦不统一就会漏抓该条（2026-09-29 踩过的坑）；格式问题由 (1) 单独报出。
+
+    2026-10-20 修：原来只认 `### 第 N 条`（三级），而**条标题用几级标题取决于文档
+    有没有`章`这一层**——完整版是「章(##) → 条(###)」，条用三级；精简版不分章，
+    条就直接挂在二级（`## 第 N 条`）。只认三级会让精简版解析出 0 条，然后所有依赖
+    条标题的检查维度集体报假错（(1)(9)(10)(11)(13) 一次性刷出几十条），
+    看起来像"文档结构崩了"，实则只是检查器不认这种层级。
+    这里改为二级、三级都认——`## 第X章` 因带"章"字不会误入。
+    """
+    return [(int(n), rest)
+            for n, rest in re.findall(r"^#{2,3} 第 (\d+) 条(.*)$", s, re.M)]
 
 
 def section(s, start_mark):
@@ -201,7 +210,12 @@ def check_structure(s):
     CN = "一二三四五六七八九十"
     chaps = re.findall(r"^## 第(.+?)章", s, re.M)
     want = [CN[i] for i in range(len(chaps))]
-    if chaps != want:
+    if not chaps:
+        # 2026-10-20 自检发现：原写法 `info("章序号一至%s连续" % want[-1])` 在"无章"时
+        # 直接 IndexError 崩溃（裸 traceback，连 err 都没机会报）。而"不分章、只列条"
+        # 是合法结构——精简版规范（16 条）就是这样。无章即跳过本项，不算错。
+        info("无章划分（只有条、不分章）——本维跳过")
+    elif chaps != want:
         err("章序号不连续：实际 %s；应为 %s" % (chaps, want))
     else:
         info("章序号一至%s连续" % want[-1])
@@ -230,7 +244,11 @@ def check_structure(s):
     for _, a, b in rng:
         covered |= set(range(a, b + 1))
     uncov = sorted(set(nums) - covered)
-    if uncov:
+    if not rng:
+        # 无章划分（精简结构）：本项要求的"章标题带（第 X—Y 条）"本就不存在，
+        # 报"未被任何章区间覆盖"等于拿分章结构的标准去要求不分章的文档。
+        info("无章划分（只有条、不分章）——本维跳过")
+    elif uncov:
         err("有条未被任何章区间覆盖：%s（该章标题缺「（第 X—Y 条）」标注）" % uncov)
     else:
         info("章区间覆盖全部条、互不重叠（共 %d 个章带区间标注）" % len(rng))
@@ -243,6 +261,11 @@ def check_guide(s):
     body = {n: rest.strip() for n, rest in title_rows(s) if rest.strip()}
     rows = re.findall(r"^\| \*\*第 (\d+) 条\*\* \| (.+?) \| (.+?) \|\s*$", s, re.M)
     if not rows:
+        # 导读表是**分章结构**的配套（每条一句话概览，供人速览全篇）；
+        # 精简版只有 16 条、不分章，本就不设导读表——按缺失报错即误判。
+        if not re.search(r"^## 第.+?章", s, re.M):
+            info("无章划分（精简结构）——文首导读表不适用，本维跳过")
+            return
         err("未找到文首导读表（`| **第 N 条** | 名称 | 一句话 |`）")
         return
     for n, name, _ in rows:
@@ -341,6 +364,14 @@ def check_external_refs(s):
       · 开发日志与历史记录**豁免**（DEVLOG 记述的是当时的条号，属史实，改了反而失真）。
     """
     head("(3b) 外部文件里的铁律条号引用")
+    if not _is_rules_itself(s):
+        # 本维扫的是**开发侧文件里对本体的条号引用**（`maint/tools/` 等）。
+        # 待检若是发布版（16 条精简结构），那些引用指的是**本体 24 条**的款号，
+        # 与待检文件不是同一套编号——照本体标准比对必报假错（2026-10-21 实测）。
+        # 与 (7)(14) 维同口径：不是本体即不适用。
+        info("待检内容不是铁律本体（%s）——外部文件引用的是本体条号，本维不适用，跳过"
+             % os.path.basename(RULES))
+        return
     defined = set()
     for l in s.splitlines():
         for m in re.finditer(r"\*\*((?:A\.)?\d+(?:\.\d+)+)\s*[^\d.]", l):
@@ -452,9 +483,18 @@ def check_expression(s):
         info("无相对引用（%s）" % "／".join(REL_REFS))
 
     bad_d = []
+    # 否定语境豁免：规则**必须能写出被禁形态**（"不写 `2026-9-5`"本身就在教读者别这么写），
+    # 否则守卫会逼着规则作者删掉反例、只留正例，反例一没、读者就不知道边界在哪。
+    # 本体原先把反例写在表格里（表格被排除，侥幸躲过）；精简版写在正文段落，
+    # 2026-10-20 自检时暴露本条无豁免 → 补上与 (6) 维"否定语境豁免"同口径的判据。
+    NEG_CUES = ("不写", "不得", "不可", "禁止", "反例", "错误", "误写", "应为", "→")
     for i, l in enumerate(body.splitlines(), 1):
+        cue_line = any(c in l for c in NEG_CUES)
         for m in re.finditer(r"\b(20\d{2})-(\d{1,2})-(\d{1,2})\b", l):
             if len(m.group(2)) != 2 or len(m.group(3)) != 2:
+                # 同行含否定／对照措辞，且该行同时给出了补零后的正确形态 → 判为反例，豁免
+                if cue_line and re.search(r"\b20\d{2}-\d{2}-\d{2}\b", l):
+                    continue
                 bad_d.append("第 %d 行 %s" % (i, m.group(0)))
     if bad_d:
         err("日期月／日未补零：%s" % "；".join(bad_d))
@@ -552,6 +592,12 @@ def check_paths(s):
     head("(6) 路径引用真实性")
     fenced = in_fence_lines(s)
     cands = set()
+    # 占位符豁免（2026-10-20 补）：规则讲"别怎么写"时必然举出**假文件名**
+    # （"记『改了 `X.md`』等于没记"——`X.md` 是占位范例，本就不该存在）。
+    # 判据**刻意从窄**：只认"单字母/字母占位 + 常见扩展名"，且**同行须有否定措辞**。
+    # 不用宽泛的"如/例如"——实测那样会豁免全文 30% 的行，等于把本维改哑（12.4）。
+    PLACEHOLDER = re.compile(r"^[A-Za-z]{1,2}(?:[-_][A-Za-z]{1,2})?\.(md|py|json|txt|docx)$")
+    NEG_CUES = ("等于没记", "不写", "不得", "禁止", "反例", "须写成", "应为", "→")
     for i, line in enumerate(s.splitlines(), 1):
         if i in fenced:
             continue
@@ -560,6 +606,9 @@ def check_paths(s):
             if " " in c or not c:
                 continue
             if re.search(r"[\\*?]", c):
+                continue
+            # 占位范例：仅在同行带否定／对照措辞时放行
+            if PLACEHOLDER.match(c) and any(cue in line for cue in NEG_CUES):
                 continue
             # ⚠ 2026-10-20 修正：原把 `SKILL|Skill` 列入合法扩展名白名单，
             #   而 20.4 明令**大写 `.Skill` 回流须当场报错**——于是写 `` `.Skill` ``
@@ -831,8 +880,12 @@ def check_ref_anchor(s):
         #   ② 目录行与引用块（`- [` / `>`）——那里本就不写行引用。
         if line.lstrip().startswith(("- [", ">")):
             continue
-        # 抹掉反引号内内容后再匹配，避免把规则示例当实际引用
+        # 抹掉反引号内内容后再匹配，避免把规则示例当实际引用。
+        # 2026-10-21：**中文引号内同样豁免**——`| **标题锚** | "第 8 条下 8.2 那张表的第 2 行" |`
+        #   这种表格示例整段都在引号里，是在**演示引用长什么样**，不是真在引用。
+        #   只抹反引号时它会漏进来（实测报假错），与反引号内豁免同口径补上。
         scan = re.sub(r"`[^`]*`", lambda m: " " * len(m.group(0)), line)
+        scan = re.sub(r"[\"“]([^\"”]*)[\"”]", lambda m: " " * len(m.group(0)), scan)
         # 裸写"第 N 行"（前面既非 `N.M` 也非条级"第 N 条"／`N`）→ 违规。
         # **父级有两种合法形态**：款级 `17.3`、条级 `14` 或 `第 14 条`（实测都出现过）。
         for m in re.finditer(r"(?<![\.\d])(?<!M )第 (\d+) 行", scan):
@@ -845,7 +898,9 @@ def check_ref_anchor(s):
             #    不是在引用某行。判据看紧邻前文是否有否定标记词（"不得／禁止／反例／错误写法／应写作"）。
             #    只在**同一行**内看，且限 20 字以内，避免"整段有否定词"把真引用也放行。
             seg20 = pre[max(0, m.start() - 20):m.start()]
-            if re.search(r"(不得|禁止|反例|错误写法|应写作|应改为|不得再)", seg20):
+            # 2026-10-21 补「不写／不记作／误写」：精简版写的是"不写\"第 2 行\""，
+            #   否定词表原先只有"不得／禁止／…"，"不写"不在其中 → 反例被当真引用报出。
+            if re.search(r"(不得|不写|不记作|误写|禁止|反例|错误写法|应写作|应改为|不得再)", seg20):
                 continue
             bad.append("第 %d 行：裸写「第 %s 行」，应带父级（如 `17.3 第 %s 行`）：%s"
                        % (i, m.group(1), m.group(1), line.strip()[:60]))
@@ -881,7 +936,7 @@ def check_bold_heading(s):
     # 第 1 条标题行号
     first_art = None
     for i, l in enumerate(lines, 1):
-        if re.match(r"^### 第 1 条", l):
+        if re.match(r"^#{2,3} 第 1 条", l):
             first_art = i
             break
     # 文首两个**结构单元**可免编号，边界一律由结构定，不按行号数：
@@ -916,7 +971,12 @@ def check_bold_heading(s):
                 break
         else:
             guide = set()
-        err("找不到导读区起点（含「导读 ·」的段落）——结构被改，仅按元信息块豁免")
+        if not re.search(r"^## 第.+?章", s, re.M):
+            # 导读区（卷首速览）同样是分章结构的配套；精简版无此结构，
+            # 报"结构被改"是拿 24 条版的版式去量 16 条版。本维降级为提示。
+            info("无章划分（精简结构）——文首导读区不适用，按元信息块豁免")
+        else:
+            err("找不到导读区起点（含「导读 ·」的段落）——结构被改，仅按元信息块豁免")
     else:
         span = (guide_end - g_start + 1) if guide_end else 0
         if guide_end is None:
@@ -1007,7 +1067,7 @@ def check_meta_rules(s):
     # 正文起点：第 1 条标题行
     first_art = None
     for i, l in enumerate(lines, 1):
-        if re.match(r"^### 第 1 条", l):
+        if re.match(r"^#{2,3} 第 1 条", l):
             first_art = i
             break
     if first_art is None:
@@ -1085,12 +1145,18 @@ def check_closure_table(s):
     lines = s.splitlines()
 
     arts = [int(m.group(1)) for m in
-            (re.match(r"^### 第 (\d+) 条", l) for l in lines) if m]
+            (re.match(r"^#{2,3} 第 (\d+) 条", l) for l in lines) if m]
     if not arts:
         err("未解析出任何条——无法校验落实总表")
         return
 
-    # 定位 24.3 表：从"24.3 " 起，取到下一个非表格、非空行为止
+    # 定位「落实总表」：本体的收束条款是 24.3。**精简版没有这一章**（16 条版不分章、
+    # 不收束），对它报"未找到 24.3"是拿 24 条体系的标准去要求 16 条体系——不适用。
+    # 2026-10-20 自检发现：原写法硬编码 "24.3"，精简版必报一条假错。
+    # 判据改为：先看本文有没有第 24 条；没有即判"本结构不含落实总表"，跳过本维。
+    if 24 not in arts:
+        info("本文共 %d 条、无第 24 条（精简结构）——本维不适用，跳过" % len(arts))
+        return
     start = None
     for i, l in enumerate(lines, 1):
         if re.match(r"^\*\*24\.3 ", l):
