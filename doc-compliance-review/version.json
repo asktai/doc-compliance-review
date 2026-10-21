@@ -3,23 +3,29 @@
   "product": "文档合规审查助手AI合同审核全能版",
   "skill_id": "doc-compliance-review",
   "latest": {
-    "version": "v3.11.15",
-    "date": "2026-10-20",
-    "summary": "文本冗余清理：删重复命令块与整块复制的清单，顺带修正两处事实错误",
+    "version": "v3.11.16",
+    "date": "2026-10-21",
+    "summary": "提问全链路带编号与鼠标优先：每个提问有全局流水号 Qn，选项也带号，能点就不打字",
     "changes": [
-      "删去教程/README 中与 SKILL 逐字重复的命令块与整块复制的加载库勾选项清单（改指向真源）",
-      "压缩讲述文档拆分动机的元话语与修辞性总结，保留技术要点",
-      "修正：教程功能菜单「9 项」→ 12 项（与 SKILL/README 一致）",
-      "修正：涉密门「每次都会先问」→ 默认每次先问（有 privacy.fulltext_gate 开关）",
-      "对话腔专项核查：全包无实际对话腔残留"
+      "新增 1.0.3 提问总纲：全文每个提问一律带全局流水号 Q1、Q2…，同一会话内连续递增、跨步骤不复用、不重排",
+      "选项本身也带号：控件卡片写「1. 合同类」，与文字清单同形同号，点卡片或回数字都行",
+      "鼠标优先：有交互控件必须弹单选/多选；无控件整块列全、回数字即可",
+      "只有自由项（审查人姓名、主体名称、金额、补充说明、背景资料）才请用户打字，题干明写「此项须打字」",
+      "开场清单拆题：「尺度／地位」原挤在一行、易漏答一半，现拆为两问各带选项；加载库与交付物补齐选项号",
+      "功能总菜单、涉密门、性质、加载库、身份、尺度和地位、交付物、格式、两库向导、撰写要素清单、收尾随访逐处改到位"
     ],
     "download_page": "https://github.com/asktai/doc-compliance-review/releases",
     "files": {
-      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.11.15/文档合规审查助手AI合同审核全能版_v3.11.15_20261020_(doc-compliance-review).skill",
-      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.11.15/文档合规审查助手AI合同审核全能版_v3.11.15_20261020_(doc-compliance-review).zip"
+      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.11.16/文档合规审查助手AI合同审核全能版_v3.11.16_20261021_(doc-compliance-review).skill",
+      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.11.16/文档合规审查助手AI合同审核全能版_v3.11.16_20261021_(doc-compliance-review).zip"
     }
   },
   "history": [
+    {
+      "version": "v3.11.15",
+      "date": "2026-10-20",
+      "summary": "文本冗余清理：删重复命令块与整块复制的清单，顺带修正两处事实错误"
+    },
     {
       "version": "v3.11.14",
       "date": "2026-10-20",
