@@ -3,21 +3,24 @@
   "product": "文档合规审查助手AI合同",
   "skill_id": "doc-compliance-review",
   "latest": {
-    "version": "v3.12.1",
+    "version": "v3.12.2",
     "date": "2026-10-21",
-    "summary": "产品更名为「文档合规审查助手AI合同」：全链更名（文档/脚本/头图/包名/提示词版文件名）",
+    "summary": "感谢语人物名单扩至 32 位：新增貂蝉、贵妃、昭君、躲在树后看不见、楚霸王、刘皇叔、的火车",
     "changes": [
-      "产品名「文档合规审查助手AI合同审核全能版」→「文档合规审查助手AI合同」，全链同步：全部文档、脚本、frontmatter、头图副行、分发包名",
-      "提示词版文件名同步更名为「文档合规审查助手AI合同提示词版.md」",
-      "技能 ID（doc-compliance-review）与功能不变；CHANGELOG/DEVLOG 历史记录保留旧名"
+      "感谢语人物名单 25 → 32 位（scripts/TONE.md），新增：貂蝉／贵妃／昭君／躲在树后看不见／楚霸王／刘皇叔／的火车；其余功能不变"
     ],
     "download_page": "https://github.com/asktai/doc-compliance-review/releases",
     "files": {
-      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.12.1/文档合规审查助手AI合同_v3.12.1_20261021_(doc-compliance-review).skill",
-      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.12.1/文档合规审查助手AI合同_v3.12.1_20261021_(doc-compliance-review).zip"
+      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.12.2/文档合规审查助手AI合同_v3.12.2_20261021_(doc-compliance-review).skill",
+      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.12.2/文档合规审查助手AI合同_v3.12.2_20261021_(doc-compliance-review).zip"
     }
   },
   "history": [
+    {
+      "version": "v3.12.1",
+      "date": "2026-10-21",
+      "summary": "产品更名为「文档合规审查助手AI合同」：全链更名（文档/脚本/头图/包名/提示词版文件名）"
+    },
     {
       "version": "v3.12.0",
       "date": "2026-10-21",
