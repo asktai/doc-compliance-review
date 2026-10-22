@@ -327,6 +327,37 @@ def inj_closure_colswap_row(s):
                  "| 适用与效力 | 1 | 流程 | 本文件自身即约束，无检测对象 |")
 
 
+def inj_promise_gone(s):
+    """(15) 第 25 条被整条删掉 —— 承诺约束消失须报错。
+
+    实证背景：25.2 的事故就是"承诺没有守卫盯着"，若连条文本身都能被无声删掉，
+    这条约束等于不存在。注入方式：把条标题改成非条标题形态。
+    """
+    old = "### " + "\u7b2c 25 \u6761 " + "对外承诺的守门：例外须显式，承诺须有门禁"
+    return _sub1(s, old, "### 25 对外承诺的守门（标题被改坏）")
+
+
+def inj_promise_vague(s):
+    """(15) 在一句**真承诺**里塞进含糊词「基本上」—— 正是 25.2 事故的原话。
+
+    改的是 25.4.2 的实证写法那句（"处理文档的 20 个脚本零联网"），
+    它落在含"承诺"字样的段落里，属本维扫描范围；改成"基本上零联网"若不被拦，
+    就等于 25.3「模糊承诺」这一禁形同虚设。
+    """
+    old = "\u5904\u7406\u6587\u6863\u7684 20 \u4e2a\u811a\u672c\u96f6\u8054\u7f51"
+    return _sub1(s, old, old.replace("\u96f6\u8054\u7f51", "\u57fa\u672c\u4e0a\u96f6\u8054\u7f51"))
+
+
+def inj_promise_vague2(s):
+    """(15) 换一处（25.4.1 的"能消掉就消掉"句）注入含糊词，验证不认固定句子。
+
+    任一含"承诺"的段落里出现含糊词都应被拦；只认某一句的守卫是没有区分度的。
+    """
+    old = "\u4f7f\u4e8b\u5b9e\u91cd\u65b0\u914d\u5f97\u4e0a\u539f\u6765\u7684\u627f\u8bfa"
+    return _sub1(s, old, "\u4f7f\u4e8b\u5b9e\u57fa\u672c\u4e0a\u914d\u5f97\u4e0a\u539f\u6765\u7684\u627f\u8bfa")
+
+
+
 CASES = [
     (1, "条号连续性（缺一条）", inj_struct_gap, "条号"),
     (1, "条标题格式（缺空格）", inj_struct_fmt, "标题格式"),
@@ -355,6 +386,9 @@ CASES = [
     (13, "落实总表表头被删", inj_closure_hdr, "未找到表头"),
     (13, "落实总表表头列序互换", inj_closure_colswap_hdr, "未找到表头"),
     (13, "落实总表数据行列序互换", inj_closure_colswap_row, "漏登记"),
+    (15, "第 25 条被删（承诺约束消失）", inj_promise_gone, "未找到第 25 条"),
+    (15, "承诺句出现含糊词（事故原话）", inj_promise_vague, "含糊词"),
+    (15, "另一处承诺句被改成基本上零联网", inj_promise_vague2, "含糊词"),
 ]
 
 # 第 (8) 维比对的是「开发侧技能目录 ↔ 运行实例」，改铁律副本碰不到，
@@ -405,11 +439,21 @@ def main():
     # **防线：自检脚本得先"真的跑起来"**。曾踩过——被 --check 指定的脚本因路径不对
     # 启动失败，输出里一个维度标题都没有，`dims` 为空 → "零个维度自然零个错误" →
     # **假通过**。故要求：至少解析出 EXPECTED_DIMS 个维度，否则判失效。
-    if len(dims) < EXPECTED_DIMS:
+    # **缺维有两种成因，判据必须分开**（2026-10-22 实测踩坑）：
+    #   ① 脚本根本没跑起来（路径／语法／依赖问题）——输出里一个维度标题都没有；
+    #   ② 被 `--check` 指定的**打瘸体**（元自测把某维函数改成 `return`）——
+    #      该维头都没打，于是"少一维"，但其余维照常跑、照常输出。
+    # 原先一律判"未正常运行"，结果元自测打瘸第 (8) 或第 (15) 维时冒烟直接中止，
+    # 被打瘸的那一维根本走不到注入环节 → 元自测报"守卫失效"，其实是**误判**（12.5.4.3）。
+    # 故改为：一个维度都没解析出 ＝ 没跑起来（硬失败）；少几维但 ≥ 半数 ＝ 打瘸体，放行。
+    if not dims or len(dims) < EXPECTED_DIMS // 2:
         print("  [E] 自检只解析出 %d 个维度（应 ≥ %d）——**自检脚本未正常运行**，"
-              "基线无从判定" % (len(dims), EXPECTED_DIMS))
+              "基线无从判定" % (len(dims), EXPECTED_DIMS // 2))
         print(out)
         return 1
+    if len(dims) < EXPECTED_DIMS:
+        print("  [i] 只解析出 %d 维（应有 %d）——判为**打瘸体**（元自测把某维函数改成 "
+              "`return`），其缺的那一维将由注入环节判" % (len(dims), EXPECTED_DIMS))
     base_errs = {d: e for d, e in dims.items() if e and d != 8}
     if base_errs:
         print("  [E] 基线未过（除第 8 维外仍有错）——先修正式文件，再谈冒烟")
@@ -427,6 +471,10 @@ def main():
     # 无法用 CASES 的"只改字符串"机制表达，各自单列一档，故在此登记为已覆盖。
     STANDALONE_DIMS = {8, 14}
     cased = sorted({c[0] for c in CASES} | STANDALONE_DIMS)
+    absent = sorted(set(range(1, EXPECTED_DIMS + 1)) - set(covered))
+    if absent:
+        print("  [i] 打瘸体缺维：%s（该维未执行，其注入用例跳过——元自测据此判「守卫失效」）"
+              % absent)
     missing = [d for d in covered if d not in cased]
     if missing:
         print("  [E] 以下维度**无注入用例**（守卫未被验证）：%s" % missing)

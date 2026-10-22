@@ -60,6 +60,15 @@ RUN = os.path.expanduser("~/.codebuddy/skills/doc-compliance-review")
 # （生成物只应存在于运行实例，且 .git 等本就不该同步）
 EXCLUDE = {".git", "__pycache__", ".DS_Store",
            ".integrity.json", "_rules-baseline.json", "_smoke-baseline.json"}
+
+# 开发侧存在、但**按设计不入运行实例**的路径（开发侧生成物，与 EXCLUDE 相反的方向）。
+# 为什么需要：本维是"开发侧 → 运行实例"的单向镜像检查，凡开发侧有而运行侧无即报"缺文件"。
+# 但 `_发布包/`（pack.py 出包产物）与 `report/`（审查运行期产物）在 `.gitignore` 里
+# 已明确**不入档**，自然也不该进运行实例——跑一次出包就会凭空多出两条"缺文件"错误。
+# 实测（2026-10-22）：出包后本维必报 2 项、跑过法条交叉验证后再多 1 项，与代码改动无关，
+# 属**检查口径缺陷**而非漂移；长期如此会让人习惯性忽略本维输出（狼来了）。
+# 判据：与 `.gitignore` 已声明"运行期产物、不入档"的路径保持同一口径，两处须同步。
+DEV_ONLY = {"_发布包", "report"}
 DIST = "/workspace/dist"
 HOOK_SRC = os.path.join(HERE, "hooks", "pre-commit")
 HOOK_DST = os.path.join(DEV, ".git", "hooks", "pre-commit")
@@ -787,7 +796,7 @@ def check_cross_side(s_ignored=None):
     drift = []
     dev_files = {}
     for root, dirs, files in os.walk(SKILL):
-        dirs[:] = [d for d in dirs if d not in EXCLUDE]
+        dirs[:] = [d for d in dirs if d not in EXCLUDE and d not in DEV_ONLY]
         for fn in files:
             if fn in EXCLUDE:
                 continue
@@ -805,7 +814,8 @@ def check_cross_side(s_ignored=None):
         if len(drift) > 10:
             err("……另有 %d 处，不逐一列出" % (len(drift) - 10))
     else:
-        info("开发侧 %d 个文件与运行实例一致（已排除运行侧生成物）" % len(dev_files))
+        info("开发侧 %d 个文件与运行实例一致（已排除运行侧生成物与开发侧产物 %s）"
+             % (len(dev_files), "、".join(sorted(DEV_ONLY))))
 
 
 # ────────────────────── (9) 目录锚点一致性 ──────────────────────
@@ -1245,6 +1255,85 @@ def check_closure_table(s):
              % len(arts))
 
 
+
+# ──────────────── (15) 承诺条文不得含糊（第 25 条） ────────────────
+
+# 含糊词：用在**承诺句**里就等于没承诺（25.3「模糊承诺」）。
+# 只扫"承诺类"条文所在的段落，不扫全文——"基本上"在别处（如论述"基本上可以认为"）
+# 未必是承诺，全文扫会误伤，本维就失去区分度（24.3.5：给真病征，不给假想病征）。
+VAGUE_WORDS = ("基本上", "基本上都", "绝大多数情况下", "一般情况下都", "大致上")
+
+
+def check_promise(s):
+    """(15) 第 25 条须成文，且承诺条文里不得出现含糊词。
+
+    **为什么需要这一维**：25.3 把"模糊承诺"列为三禁之一，但"禁止"若只写在条文里、
+    没有断言盯着，写的人仍然会顺手写"基本上都不联网"——**这正是 25.2 事故的原话**。
+    本维做两件事：
+      A. 第 25 条**须存在**（删掉整条即报错，防"改着改着把约束改没了"）；
+      B. 第 25 条正文的**承诺句**（含"承诺／声明／保证／不得／须"的句子）里
+         **不得出现含糊词**。
+
+    边界：本维**判不了"这句话是不是真的"**（那属 25.4 人工核对），
+    只能判"这句话里有没有含糊词"。**不得据此认为"跑过＝承诺为真"**。
+    """
+    head("(15) 承诺条文不得含糊（第 25 条）")
+    if not _is_rules_itself(s):
+        info("非铁律本体，本维跳过")
+        return
+    m = re.search(r"(?ms)^### 第 25 条 .*?(?=^### 第 26 条 |^---\s*\n\s*## 附录)", s)
+    if not m:
+        err("未找到第 25 条（对外承诺的守门）——承诺约束缺失，SECURITY／README 里的"
+            "承诺将无人看管")
+        return
+    body = m.group(0)
+
+    # 按"**连续文字块**"判，不按单行判。
+    # 2026-10-22 实测踩坑：中文长句在源码里是**折行**的，一句话被拆成两三行，
+    # 「承诺」二字常落在上一行、含糊词落在下一行——若按行判，注入用例当场漏过
+    # （冒烟报"第 15 维未报错"，而当时我以为是守卫写对了）。**段落才是语义单位，行不是。**
+    blocks, cur = [], []
+    for line in body.splitlines():
+        st = line.strip()
+        # 表格与引用块属"举例／引用"：里面出现含糊词往往正是在批判它，不该算违规
+        if not st or st.startswith("|") or st.startswith(">") or re.match(r"^#{2,4} ", st):
+            if cur:
+                blocks.append(" ".join(cur))
+                cur = []
+            continue
+        cur.append(st)
+    if cur:
+        blocks.append(" ".join(cur))
+
+    # 自指豁免：条文里**引述并批判**含糊写法的那一段（25.2 引述事故原话），
+    # 里面必然含含糊词——不豁免就会"条文不能描述它自己禁止的东西"。
+    # 判据取"与含糊词同段出现的批判标记"，而不是放行整条或放行某个固定句子：
+    # 只要同段里明说了要禁（引用形式加引号 ＋ 出现"禁"或"不许"），即视为批判性引述。
+    hits = []
+    for b in blocks:
+        if not re.search(r"承诺|声明|保证|不得|须", b):
+            continue          # 非承诺性论述（背景、举例、分工说明）不扫
+        # 批判性引述的判据（同段须同时具备三条，缺一不放）：
+        #   ① 明说这是错的（"不是笔误""事故""错"）；
+        #   ② 含糊词被引号括起来（是被引的原话，不是自己在承诺时用的词）；
+        #   ③ 该段整体在讲"为什么会犯"或"为什么要禁"，不是承诺正文本体。
+        is_quote = ("\u201c" in b or "\u300c" in b)
+        is_critique = bool(re.search(r"(不是笔误|事故|错误|反例|本就错|是错的)", b))
+        if is_quote and is_critique:
+            continue
+        for w in VAGUE_WORDS:
+            if w in b:
+                i = b.find(w)
+                hits.append((w, b[max(0, i - 24):i + 24]))
+                break
+    if hits:
+        for w, seg in hits:
+            err("第 25 条承诺性文字里出现含糊词「%s」——按 25.3，用含糊词覆盖例外等于没承诺"
+                "（上下文：…%s…）" % (w, seg))
+        return
+    info("第 25 条已成文，承诺句无含糊词（「基本上」类词只许出现在举例批判处）"
+         "——注意：本维只查措辞，承诺是否为真须人工按 25.4 核")
+
 # ──────────────── (14) 在线版须与源同步 ────────────────
 
 ONLINE_MD = os.path.join(DEV, "maint", "scratch", "DEV-RULES.online.md")
@@ -1367,6 +1456,7 @@ def main():
     check_meta_rules(s)
     check_closure_table(s)
     check_online_md(s)
+    check_promise(s)
     print("=" * 62)
     if ERRS:
         print("结果：错误 %d 项，警告 %d 项 —— **未通过**" % (len(ERRS), len(WARNS)))
