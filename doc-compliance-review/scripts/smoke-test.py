@@ -723,6 +723,28 @@ def main():
             check("法条核验：--json 产出机读结果（条号/判定/版本齐备）",
                   bool(_rows) and all({"law", "no", "status", "version"} <= set(r) for r in _rows),
                   "%d 行" % len(_rows))
+            # 库规模与新增法：只**读库**不抓网，防止扩库后口径回退或法名识别漏配
+            _dbj = {}
+            try:
+                with open(dbp, encoding="utf-8") as f:
+                    _dbj = json.load(f)
+            except Exception:
+                _dbj = {}
+            _nl = len(_dbj.get("laws") or {})
+            _na = sum(len(v) for v in (_dbj.get("laws") or {}).values())
+            check("法条核验：原文库规模达「多部法、覆盖面够用」",
+                  _nl >= 15 and _na >= 300, "%d 部法、%d 条" % (_nl, _na))
+            # 新增的合同／公司／数据合规四部法必须能被法名识别并核到条文
+            _new = ("《公司法》第四十七条规定，全体股东认缴的出资额由股东按照公司章程的规定自公司成立之日起五年内缴足。\n"
+                    "《数据安全法》第二十一条规定，国家建立数据分类分级保护制度。\n"
+                    "《消费者权益保护法》第二十五条规定，经营者采用网络等方式销售商品，消费者有权自收到商品之日起七日内退货。\n")
+            _newf = os.path.join(work, "lv-new.md")
+            with open(_newf, "w", encoding="utf-8") as f:
+                f.write(_new)
+            r_new = run([PY, lv, "--file", _newf])
+            check("法条核验：新增法（公司法／数据安全法／消保法）可识别并核到原文",
+                  r_new.returncode == 0 and (r_new.stdout or "").count("通过") >= 3,
+                  head_lines(r_new.stdout))
     except Exception as e:
         check("法条核验自检", False, repr(e))
 

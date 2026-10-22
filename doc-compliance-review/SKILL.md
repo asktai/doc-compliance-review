@@ -7,7 +7,7 @@ description_zh: "对合同、协议及授权书、承诺函、告知书、声明
 description_en: "Desensitize, review clause by clause, grade risks in three colors and produce redline revisions, comparison ledgers and opinion reports for contracts, agreements and business documents (authorization letters, commitment letters, notices, policies, NDAs, SLAs, DPAs and more); coverage includes payment and liquidated damages, delivery and acceptance, IP, confidentiality and non-compete, jurisdiction clauses, arbitration, dispute resolution, limitation of action, contract validity, standard terms and personal information protection; accepts background materials (files, images, photos or plain text) to sharpen the review, and adapts the review stance to a strong or weak bargaining position; drafts contracts and reusable templates, and converts existing documents into templates. Nine industry rule sets included; handles Word, PDF, images and scanned files. Advisory only, not legal advice; review by a licensed lawyer is required."
 category: writing
 argument-hint: "<文档路径或文本> [版本/角色/尺度] | 审查 | 起草 | 比对 | 背景资料 | 脱敏 | 精要总结 | 思维导图 | 向导 | 撰写合同 | 撰写模板 | 文档转模板 | 合同转模板 | 技能版本 | 技能更新 | 技能升级 | 立查得 | 小查 | 帮助|help|? | 教程 | 私有库维护/备份/回溯/导入/导出 | 行业库维护/备份/回溯/导入/导出"
-version: 3.14.0
+version: 3.15.0
 license: 个人使用授权 · 商业使用须取得书面授权（见 `LICENSE.md`）
 author: 胡皓
 examples_zh:
@@ -26,7 +26,7 @@ examples_en:
 
 ![文档合规审查助手AI合同 · 合同与商务文档逐条审查 · 风险三色分级](assets/banner-dark.png)
 
-**v3.14.0** ｜ 作者：胡皓 ｜ 许可：个人使用授权 · 商业使用须取得书面授权（详见 `LICENSE.md`）
+**v3.15.0** ｜ 作者：胡皓 ｜ 许可：个人使用授权 · 商业使用须取得书面授权（详见 `LICENSE.md`）
 
 > **免责声明**：本技能仅作辅助法律工作，**不构成法律意见**，输出内容须经**执业律师复核**；**同一对话内首次使用时由技能先输出全文**（同一对话只此一次）——见**步骤 0.0**，全文亦见 `LICENSE.md`。
 
@@ -539,9 +539,9 @@ python scripts/legal-verify.py --list 民法典        # 查库里收了哪些�
 判定只有四档，**不发明第五档**：`通过`（引述能落到本条）｜`条号成立`（仅核到条号存在，没给引述正文）｜`表述存疑`（能落到本条但用词偏差大）｜`待核验`（条号不在库，或引述在本条找不到）。退出码 1 表示有后两档。
 
 三条口径，必须说清：
-- **库是"核验器"，不是"法条大全"**：现收录 11 部法、85 条，只覆盖规则库真在引的高频条号。**库里没有 ≠ 条号错**，一律标"待核验"交人工，**不得据此删引，更不得凭记忆补条文**。
+- **库是"核验器"，不是"法条大全"**：现收录 17 部法（含 1 件司法解释）、704 条，覆盖规则库真在引的高频条号，另把四条主线（合同／劳动／数据合规／消费与平台）常用条号一并收齐。**库里没有 ≠ 条号错**，一律标"待核验"交人工，**不得据此删引，更不得凭记忆补条文**。
 - **"通过"只证明与本库一致，不证明现行有效**：库记录所抓版本与施行日；条文以国家法律法规数据库（flk.npc.gov.cn）与官方公报为准。
-- **换代提示必须转写**：某部法已修订但新版未施行时，库里会带 `pending` 标注（如《商标法》2026-06-26 修订、2027-01-01 施行，**条号整体前移**）。凡跨该日期引用，报告里必须写明所据版本，不得裸引条号。
+- **换代提示必须转写**：某部法已修订但新版未施行时，库里会带 `pending` 标注（如《商标法》2026-06-26 修订、2027-01-01 施行，**条号整体前移**；《网络安全法》2025-10-28 修正、2026-01-01 施行）。凡跨该日期引用，报告里必须写明所据版本，不得裸引条号。
 
 > **检索/核验工具**：国家法律法规数据库 http://www.npc.gov.cn ｜ 中国裁判文书网 http://wenshu.court.gov.cn ｜ 市场监管总局合同示范文本库。
 

@@ -3,24 +3,30 @@
   "product": "文档合规审查助手AI合同",
   "skill_id": "doc-compliance-review",
   "latest": {
-    "version": "v3.14.0",
+    "version": "v3.15.0",
     "date": "2026-10-22",
-    "summary": "新增法条核验引擎：审查意见里引的法条，出具前先用随包离线原文库逐条核一遍（离线原文库逐条核）",
+    "summary": "法条库扩容 4 倍：从 11 部法 85 条扩到 17 部法 704 条，补进合同编通则解释、公司法、数据安全法、电商法、消保法、网络安全法",
     "changes": [
-      "新增 scripts/legal-verify.py：把意见稿里引用的法条逐条与本地原文库比对，产出可归档《法条核验表》",
-      "新增 core/legal-articles.json：11 部法 85 条高频条号原文，每条带来源 URL、抓取日期与 sha256 指纹",
-      "判定四档：通过／条号成立／表述存疑／待核验；库里没有的条号一律标待核验，不凭记忆补条文",
-      "版本提示：《商标法》2026-06-26 修订、2027-01-01 施行，条号整体前移，库内已标注并提示引用须注明版本",
-      "check.py 新增法条库自洽校验（条文非空、sha256 对齐、无页面噪声、文档口径一致）",
-      "冒烟新增 5 项法条核验用例，共 104 项"
+      "原文库扩到 17 部法（含 1 件司法解释）、704 条：新增《合同编通则解释》65 条、《公司法》42 条、《消费者权益保护法》28 条、《电子商务法》25 条、《数据安全法》25 条、《网络安全法》24 条",
+      "《民法典》从 38 条扩到 301 条：总则编法律行为效力＋合同编通则（订立/效力/履行/保全/变更转让/终止/违约）＋买卖租赁借款保证等典型合同",
+      "《劳动合同法》补齐全 94 条，《个人信息保护法》补齐 41 条，劳动与数据合规两条主线自此可整章核验",
+      "法名识别扩到 17 个（含简称：公司法／网安法／电商法／消保法／合同编通则解释），新增 7 部法的引用可直接机核",
+      "修好司法解释「三、合同的效力」这类序号式章节标题被并进上一条正文的问题",
+      "《网络安全法》2025-10-28 修正、2026-01-01 施行，库内标注 pending 并提示注明所据版本",
+      "check.py 法条库口径校验改为实算（17 部法、704 条）；冒烟新增 2 项（库规模下限、新增法可识核），共 106 项"
     ],
     "download_page": "https://github.com/asktai/doc-compliance-review/releases",
     "files": {
-      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.14.0/文档合规审查助手AI合同_v3.14.0_20261022_(doc-compliance-review).skill",
-      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.14.0/文档合规审查助手AI合同_v3.14.0_20261022_(doc-compliance-review).zip"
+      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.15.0/文档合规审查助手AI合同_v3.15.0_20261022_(doc-compliance-review).skill",
+      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.15.0/文档合规审查助手AI合同_v3.15.0_20261022_(doc-compliance-review).zip"
     }
   },
   "history": [
+    {
+      "version": "v3.14.0",
+      "date": "2026-10-22",
+      "summary": "新增法条核验引擎：意见稿引的法条，出具前先用随包离线原文库逐条核一遍"
+    },
     {
       "version": "v3.12.1",
       "date": "2026-10-21",
