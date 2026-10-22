@@ -7,7 +7,7 @@ description_zh: "对合同、协议及授权书、承诺函、告知书、声明
 description_en: "Desensitize, review clause by clause, grade risks in three colors and produce redline revisions, comparison ledgers and opinion reports for contracts, agreements and business documents (authorization letters, commitment letters, notices, policies, NDAs, SLAs, DPAs and more); coverage includes payment and liquidated damages, delivery and acceptance, IP, confidentiality and non-compete, jurisdiction clauses, arbitration, dispute resolution, limitation of action, contract validity, standard terms and personal information protection; accepts background materials (files, images, photos or plain text) to sharpen the review, and adapts the review stance to a strong or weak bargaining position; drafts contracts and reusable templates, and converts existing documents into templates. Nine industry rule sets included; handles Word, PDF, images and scanned files. Advisory only, not legal advice; review by a licensed lawyer is required."
 category: writing
 argument-hint: "<文档路径或文本> [版本/角色/尺度] | 审查 | 起草 | 比对 | 背景资料 | 脱敏 | 精要总结 | 思维导图 | 向导 | 撰写合同 | 撰写模板 | 文档转模板 | 合同转模板 | 技能版本 | 技能更新 | 技能升级 | 立查得 | 小查 | 帮助|help|? | 教程 | 私有库维护/备份/回溯/导入/导出 | 行业库维护/备份/回溯/导入/导出"
-version: 3.13.1
+version: 3.14.0
 license: 个人使用授权 · 商业使用须取得书面授权（见 `LICENSE.md`）
 author: 胡皓
 examples_zh:
@@ -26,7 +26,7 @@ examples_en:
 
 ![文档合规审查助手AI合同 · 合同与商务文档逐条审查 · 风险三色分级](assets/banner-dark.png)
 
-**v3.13.1** ｜ 作者：胡皓 ｜ 许可：个人使用授权 · 商业使用须取得书面授权（详见 `LICENSE.md`）
+**v3.14.0** ｜ 作者：胡皓 ｜ 许可：个人使用授权 · 商业使用须取得书面授权（详见 `LICENSE.md`）
 
 > **免责声明**：本技能仅作辅助法律工作，**不构成法律意见**，输出内容须经**执业律师复核**；**同一对话内首次使用时由技能先输出全文**（同一对话只此一次）——见**步骤 0.0**，全文亦见 `LICENSE.md`。
 
@@ -529,6 +529,20 @@ Qn+10 11. 补充（选填，可跳过：截止时间／重点条款／交易背�
 
 1. 每项风险附法律依据。2. 引用格式：全称＋条款项。3. 准确对应。4. 现行有效性：出具前核验。5. 无直接法条时注"实务惯例/裁判观点（参考性）"。6. 可附"法律依据索引"。7. **落锤前逐项核验**：用 `core/02-legal-verification-checklist.md` 勾核（条号存在性/现行有效性/名称准确性），未核验项一律标注"待核验"，禁止编造。
 
+**机核（推荐自动跑）**：意见稿落定后，把成稿喂给 `scripts/legal-verify.py`，用随包的 `core/legal-articles.json`（**离线原文库**）逐条比对，产出可归档的《法条核验表》：
+
+```
+python scripts/legal-verify.py --file 审查意见.md --json 核验.json
+python scripts/legal-verify.py --list 民法典        # 查库里收了哪些条号
+```
+
+判定只有四档，**不发明第五档**：`通过`（引述能落到本条）｜`条号成立`（仅核到条号存在，没给引述正文）｜`表述存疑`（能落到本条但用词偏差大）｜`待核验`（条号不在库，或引述在本条找不到）。退出码 1 表示有后两档。
+
+三条口径，必须说清：
+- **库是"核验器"，不是"法条大全"**：现收录 11 部法、85 条，只覆盖规则库真在引的高频条号。**库里没有 ≠ 条号错**，一律标"待核验"交人工，**不得据此删引，更不得凭记忆补条文**。
+- **"通过"只证明与本库一致，不证明现行有效**：库记录所抓版本与施行日；条文以国家法律法规数据库（flk.npc.gov.cn）与官方公报为准。
+- **换代提示必须转写**：某部法已修订但新版未施行时，库里会带 `pending` 标注（如《商标法》2026-06-26 修订、2027-01-01 施行，**条号整体前移**）。凡跨该日期引用，报告里必须写明所据版本，不得裸引条号。
+
 > **检索/核验工具**：国家法律法规数据库 http://www.npc.gov.cn ｜ 中国裁判文书网 http://wenshu.court.gov.cn ｜ 市场监管总局合同示范文本库。
 
 ---
@@ -538,7 +552,7 @@ Qn+10 11. 补充（选填，可跳过：截止时间／重点条款／交易背�
 > **一句话原则**：**能不出去就不出去；必须出去的，只出去必要的那一部分。**除"审查判断"一步外，**提取 / 清洗 / 脱敏 / 生成交付物全部可离线完成**。
 > **本节只留常驻要点，完整口径按需读取 `SECURITY.md`**（承诺七条／流转四路径／操作红线八不／内置措施／使用前自检都在其中）——只在下列情形读它：(1) 使用者问到数据安全、能否外发、文档会不会进模型；(2) 涉密门（1.0.1）判定前后；(3) 走纯本地链路或对外出域之前；(4) 批处理前的自检。**日常审查不读。**
 
-**常驻要点四条**：(1) **文档数据不进模型的训练／微调／评测**——`scripts/` 下 **16 个脚本零联网、零上传、零收集**（核验方式与依赖清单见 `SECURITY.md` 第五章）；(2) **审查模式必须把全文读入模型上下文**（架构决定），涉密的改走 `local-only.py` **纯本地链路、不读全文**；该层是否用于训练取决于平台策略，提交前先确认平台处于"不用于训练"状态；(3) **交付物按文档名自动建子目录隔离**，映射表只落本机 `~/.dcr-maps/`，**映射表与 `.clean.txt` 清洗稿绝不随交付物外发**；(4) **操作红线"八不"**（含：原文不直传公有云、不用客户文档做训练/微调/评测/案例库/公开演示、不跳过涉密门、不平铺混放多客户文档）→ 见 `SECURITY.md` 第四章。
+**常驻要点四条**：(1) **文档数据不进模型的训练／微调／评测**——`scripts/` 下 **17 个脚本零联网、零上传、零收集**（核验方式与依赖清单见 `SECURITY.md` 第五章）；(2) **审查模式必须把全文读入模型上下文**（架构决定），涉密的改走 `local-only.py` **纯本地链路、不读全文**；该层是否用于训练取决于平台策略，提交前先确认平台处于"不用于训练"状态；(3) **交付物按文档名自动建子目录隔离**，映射表只落本机 `~/.dcr-maps/`，**映射表与 `.clean.txt` 清洗稿绝不随交付物外发**；(4) **操作红线"八不"**（含：原文不直传公有云、不用客户文档做训练/微调/评测/案例库/公开演示、不跳过涉密门、不平铺混放多客户文档）→ 见 `SECURITY.md` 第四章。
 
 ### 12.1 脱敏（口径 + 操作，易踩坑，务必区分）
 

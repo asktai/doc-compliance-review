@@ -1,0 +1,399 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""法条原文库构建（开发侧工具，不随技能包分发）
+
+用途：从公开官方转载页抓取法律条文原文，落成 `core/legal-articles.json`，
+      供审查时**核验法条原文**——表里没有的条号一律标「待核验」，不得凭记忆引用。
+原则：
+  · 只抓一次、落成本地库，使用者侧完全离线，不联网。
+  · 每条记来源 URL ＋ 抓取日期 ＋ 原文 SHA-256，可复核、可追溯。
+  · 抓不到就留空并列入 `missing`，**绝不凭记忆补写条文**（那是另一种编造）。
+  · 只做核验，不做法律意见；使用者仍须以现行有效版本为准。
+
+用法（开发侧）：
+  python maint/tools/build-legal-db.py [--out <路径>] [--only 民法典]
+"""
+import argparse
+import html
+import json
+import os
+import re
+import ssl
+import sys
+import time
+import socket
+import hashlib
+import datetime
+import urllib.request
+
+UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+      "(KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36")
+
+# 数据源：只用公开可访问的官方或官方转载页；每部法可给篇；抓完合并去重
+SOURCES = {
+    "民法典": [
+        # 中国经济网转载新华社《民法典》全文（GBK），覆盖第 1–917 条
+        ("https://www.ce.cn/xwzx/gnsz/gdxw/202006/01/t20200601_35019528.shtml", "gbk"),
+        # 阜城县检察院分篇（第（八）篇＝附则），补齐尾部
+        ("https://www.hefucheng.jcy.gov.cn/jcyw/202010/t20201028_3000545.shtml", "gbk"),
+        # 固镇县人民政府《民法典》第七编 侵权责任、附则（补齐 1200 条以后）
+        ("https://www.guzhen.gov.cn/gzdt/ztzl/fzzfjs2/81249562.html", "utf-8"),
+    ],
+    "劳动合同法": [
+        ("https://www.longling.gov.cn/info/7359/2410199.htm", "utf-8"),
+    ],
+    "个人信息保护法": [
+        # 中央网络安全和信息化委员会办公室（国家网信办）全文
+        ("https://www.cac.gov.cn/2021-08/20/c_1631050028355286.htm", "utf-8"),
+    ],
+    "民事诉讼法": [
+        # 济南市槐荫区人民检察院转载 2023 年修正全文（GBK 页可能乱码，靠 _pick 兜底）
+        ("http://huaiyin.jnjcy.gov.cn/page/zhifabanangongzuoliucheng/minshixingzhengjian/202601204353.html",
+         "utf-8"),
+    ],
+    "反不正当竞争法": [
+        # 中国人大网（2019 年修正版，第九条含「电子侵入」及第四项，为现行文本）
+        ("http://www.npc.gov.cn/npc/c2/c30834/201906/t20190608_296509.html", "utf-8"),
+    ],
+    "反垄断法": [
+        # 国家市场监督管理总局（2022 年修正全文）
+        ("https://www.samr.gov.cn/zw/zfxxgk/fdzdgknr/fgs/art/2023/art_f0fae9eb3a684fc39e84d89eabfc2caa.html",
+         "utf-8"),
+    ],
+    "著作权法": [
+        # 中国人大网（2020 年第三次修正，2021-06-01 施行）
+        ("http://www.npc.gov.cn/npc/c2/c30834/202011/t20201119_308796.html", "utf-8"),
+    ],
+    "商标法": [
+        # 中国人大网（2019 年第四次修正版）——注意：2026-06-26 已修订通过新版，2027-01-01 施行
+        ("http://www.npc.gov.cn/c2/c30834/201906/t20190608_298036.html", "utf-8"),
+    ],
+    "广告法": [
+        # 国家市场监督管理总局（2015 年修订全文，2021 年修正仅涉第二十九条等个别条）
+        ("https://www.samr.gov.cn/zw/zfxxgk/fdzdgknr/fgs/art/2023/art_5474cf75173c45d6a0379730fb4e8d97.html",
+         "utf-8"),
+    ],
+    "劳动法": [
+        # 中国人大网（2018 年第二次修正版）
+        ("http://www.npc.gov.cn/zgrdw//npc//////zt/2006-03/20/content_347911.htm", "utf-8"),
+    ],
+    "食品安全法": [
+        # 中山检察在线转载（198 条全文候选之一，缺条由 missing 暴露）
+        ("https://zhongshan.jcy.gov.cn/article/view/cateid/24/id/18855.html", "utf-8"),
+    ],
+}
+
+# 法律版本元信息：核验时必须能回答「引的是哪一版、什么时候生效」。
+# 无 effective 的表示抓到的是现行有效文本、但未核到精确施行日，核验报告按「来源页日期」提示。
+META = {
+    "民法典": {"version": "2020-05-28 通过", "effective": "2021-01-01"},
+    "劳动合同法": {"version": "2012-12-28 修正", "effective": "2013-07-01"},
+    "个人信息保护法": {"version": "2021-08-20 通过", "effective": "2021-11-01"},
+    "民事诉讼法": {"version": "2023-09-01 修正", "effective": "2024-01-01"},
+    "反不正当竞争法": {"version": "2019-04-23 修正", "effective": "2019-04-23"},
+    "反垄断法": {"version": "2022-06-24 修正", "effective": "2022-08-01"},
+    "著作权法": {"version": "2020-11-11 修正", "effective": "2021-06-01"},
+    "商标法": {
+        "version": "2019-04-23 修正",
+        "effective": "2019-11-01",
+        "pending": {
+            "version": "2026-06-26 修订",
+            "effective": "2027-01-01",
+            "note": "修订后条号整体前移（原第四十三条＝新第四十七条），引用时须注明所据版本",
+        },
+    },
+    "广告法": {"version": "2021-04-29 修正", "effective": "2021-04-29"},
+    "劳动法": {"version": "2018-12-29 修正", "effective": "2018-12-29"},
+    "食品安全法": {"version": "2021-04-29 修正", "effective": "2021-04-29"},
+}
+
+# 需要重点核验的条号（来自 core 规则库与 02 核验清单的实际引用）
+# 说明：只收「规则库真在用」的条号，不做全法典收录——范围小才好逐条核，收多了反而没人核。
+WANTED = {
+    "民法典": [137, 172, 466, 490, 496, 497, 498, 501, 502, 509, 510, 511,
+               526, 563, 565, 566, 577, 584, 585, 586, 587, 588, 596,
+               601, 620, 622, 626, 628, 681, 682, 685, 686, 691, 692, 688,
+               1202, 1203, 1223],
+    "劳动合同法": [4, 22, 23, 24, 25, 26, 38, 39, 40, 41, 42, 46, 47, 48,
+                   66, 68, 82, 87, 92],
+    "个人信息保护法": [13, 17, 21, 23, 28, 29, 38, 39, 40, 51, 55, 56, 57,
+                       58, 59],
+    "民事诉讼法": [35],
+    "反不正当竞争法": [9],
+    "反垄断法": [18, 22],
+    "著作权法": [14, 19],
+    "商标法": [43],
+    "广告法": [15, 16, 46],
+    "劳动法": [41, 44],
+    "食品安全法": [148],
+}
+
+
+def fetch(url, enc, tries=3):
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    last = None
+    for i in range(tries):
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": UA})
+            with urllib.request.urlopen(req, timeout=45, context=ctx) as r:
+                raw = r.read()
+            break
+        except Exception as ex:
+            last = ex
+            time.sleep(1.5 * (i + 1))
+    else:
+        raise last
+    for e in (enc, "utf-8", "gb18030"):
+        try:
+            s = raw.decode(e)
+            if "第" in s and "条" in s:
+                return s
+        except Exception:
+            continue
+    return raw.decode("utf-8", errors="ignore")
+
+
+def to_text(h):
+    h = re.sub(r"<script.*?</script>", "", h, flags=re.S)
+    h = re.sub(r"<style.*?</style>", "", h, flags=re.S)
+    t = html.unescape(re.sub(r"<[^>]+>", "\n", h))
+    t = re.sub(r"[\u3000 \t]+", " ", t)
+    t = re.sub(r"\n{2,}", "\n", t)
+    return t
+
+
+CN_NUM = {"零": 0, "〇": 0, "一": 1, "二": 2, "两": 2, "三": 3, "四": 4, "五": 5,
+          "六": 6, "七": 7, "八": 8, "九": 9}
+
+
+def cn2int(s):
+    """中文数字转整数（够用到几千条：支持 千/百/十 与直读式）。"""
+    s = s.strip()
+    if not s:
+        return None
+    if s.isdigit():
+        return int(s)
+    total, cur = 0, 0
+    units = {"千": 1000, "百": 100, "十": 10}
+    for ch in s:
+        if ch in CN_NUM:
+            cur = CN_NUM[ch]
+        elif ch in units:
+            total += (cur or 1) * units[ch]
+            cur = 0
+        else:
+            return None
+    return total + cur
+
+
+ART_RE = re.compile(r"第([一二三四五六七八九十百千零〇\d]{1,8})条[　 ]*")
+
+# 条号必须出现在「行首」或紧跟在句末标点/右括号/冒号之后——否则是正文里的交叉引用
+# （如「违反本法第四十六条规定」「不适用本法第十七条、第十八条」），把它当成条头会整体错位。
+_HEAD_OK = set("。；：！？\n\r）)》”」")
+
+
+def _line_start_heads(text):
+    """返回 [(start, end, no)]：只认行首或句末标点后的「第X条」。"""
+    out = []
+    for m in ART_RE.finditer(text):
+        i = m.start()
+        j = i - 1
+        while j >= 0 and text[j] in " \t\u3000":
+            j -= 1
+        if j >= 0 and text[j] not in _HEAD_OK:
+            continue
+        no = cn2int(m.group(1))
+        if no:
+            out.append((i, m.end(), no))
+    return out
+
+
+def parse_articles(text):
+    """抽「第X条 正文」，返回 {条号int: 正文}。正文到下一个条头或篇/章标题为止。"""
+    out = {}
+    marks = _line_start_heads(text)
+    for i, (s, e, no) in enumerate(marks):
+        end = marks[i + 1][0] if i + 1 < len(marks) else min(len(text), e + 4000)
+        body = text[e:end]
+        # 砍掉尾部的篇/章/节标题噪声
+        body = re.split(r"\n\s*(?:第[一二三四五六七八九十]+[编章节]|附\s*则)", body)[0]
+        body = re.sub(r"\s*\n\s*", "", body).strip()
+        body = re.sub(r"（责任编辑：[^）]*）.*$", "", body).strip()
+        body = strip_footer(body)
+        if len(body) < 4:
+            continue
+        if no not in out or len(body) > len(out[no]):
+            out[no] = body
+    return out
+
+
+# 正文里绝不能出现的「解析垃圾」——出现即说明抽到了导航/页脚/交叉引用残句
+_GARBAGE_RE = re.compile(r"(上一篇|下一篇|打印本页|关闭窗口|责任编辑|扫一扫|分享到|"
+                         r"浏览次数|网站地图|版权所有|ICP备|返回顶部|字体[：:]大|"
+                         r"相关链接|首页\s*[>＞]|文章来源)")
+
+# 页脚/导航尾巴：从最先出现的标记处整段砍掉
+_FOOT_RE = re.compile(r"(相关链接|版权所有|Copyright|ICP备|举报电话|主办单位|"
+                      r"地址[：:]|网站标识码|返回顶部)")
+
+
+def strip_footer(body):
+    m = _FOOT_RE.search(body)
+    if m and m.start() > 20:
+        return body[:m.start()].strip()
+    return body
+
+
+def looks_garbage(body):
+    if _GARBAGE_RE.search(body):
+        return True
+    # 以「的/和/或/及/与/并/但/而」这类纯连接词开头，多半是从半句中间切出来的；
+    # 「因/对/在/为/以」等可作句首，不在此列。
+    if body[:1] in "的、，。；：了和或及与并但而":
+        return True
+    return False
+
+
+# 部分转载页把条文小标题（「服务期」「经济补偿」）挤在条号后、正文前，需剥离，
+# 否则引用会变成「第二十二条规定：服务期用人单位……」。
+# 两个来源：①人工核对过的条号→小标题对照表（准）；②通用规则（次）。
+# 通用规则只在「小标题＋紧随正文首字」同时成立时才切，宁可不切也不错切。
+LINE_TITLES = {
+    # 劳动合同法（龙陵县政府网页版，逐条带小标题，已逐条目视核对）
+    "劳动合同法": {
+        1: "立法宗旨", 2: "适用范围", 3: "基本原则", 4: "规章制度",
+        5: "协调劳动关系三方机制", 6: "集体协商机制", 7: "劳动关系的建立",
+        8: "用人单位的告知义务和劳动者的说明义务",
+        9: "用人单位不得扣押劳动者证件和要求提供担保", 10: "订立书面劳动合同",
+        11: "未订立书面劳动合同时劳动报酬不明确的解决", 12: "劳动合同的种类",
+        13: "固定期限劳动合同", 14: "无固定期限劳动合同",
+        15: "以完成一定工作任务为期限的劳动合同", 16: "劳动合同的生效",
+        17: "劳动合同的内容", 18: "劳动合同对劳动报酬和劳动条件约定不明确的解决",
+        19: "试用期", 20: "试用期工资", 21: "试用期内解除劳动合同", 22: "服务期",
+        23: "保密义务和竞业限制", 24: "竞业限制的范围和期限", 25: "违约金",
+        26: "劳动合同的无效", 27: "劳动合同部分无效",
+        28: "劳动合同无效后劳动报酬的支付", 29: "劳动合同的履行", 30: "劳动报酬",
+        31: "加班", 32: "劳动者拒绝违章指挥、强令冒险作业",
+        33: "用人单位名称、法定代表人等的变更", 34: "用人单位合并或者分立",
+        35: "劳动合同的变更", 36: "协商解除劳动合同", 37: "劳动者提前通知解除劳动合同",
+        38: "劳动者单方解除劳动合同", 39: "用人单位单方解除劳动合同（过失性辞退）",
+        40: "无过失性辞退", 41: "经济性裁员", 42: "用人单位不得解除劳动合同的情形",
+        43: "工会在劳动合同解除中的监督作用", 44: "劳动合同的终止",
+        45: "劳动合同的逾期终止", 46: "经济补偿", 47: "经济补偿的计算",
+        48: "违法解除或者终止劳动合同的法律后果", 49: "社会保险关系跨地区转移接续",
+        50: "劳动合同解除或者终止后双方的义务", 51: "集体合同的订立和内容",
+        52: "专项集体合同", 53: "行业性集体合同、区域性集体合同",
+        54: "集体合同的报送和生效", 55: "集体合同中劳动报酬、劳动条件等标准",
+        56: "集体合同纠纷和法律救济", 57: "劳务派遣单位的设立",
+        58: "劳务派遣单位、用工单位及劳动者的权利义务", 59: "劳务派遣协议",
+        60: "劳务派遣单位的告知义务", 61: "跨地区派遣劳动者的劳动报酬、劳动条件",
+        62: "用工单位的义务", 63: "被派遣劳动者同工同酬",
+        64: "被派遣劳动者参加或者组织工会", 65: "劳务派遣中解除劳动合同",
+        66: "劳务派遣的适用岗位", 67: "用人单位不得自设劳务派遣单位",
+        68: "非全日制用工的概念", 69: "非全日制用工的劳动合同",
+        70: "非全日制用工不得约定试用期", 71: "非全日制用工的终止用工",
+        72: "非全日制用工的劳动报酬", 73: "劳动合同制度的监督管理体制",
+        74: "劳动行政部门监督检查事项", 75: "监督检查措施和依法行政、文明执法",
+        76: "其他有关主管部门的监督管理", 77: "工会监督检查的权利",
+        78: "劳动者权利救济途径", 79: "对违法行为的举报", 80: "规章制度违法的法律责任",
+        81: "缺乏必备条款、不提供劳动合同文本的法律责任",
+        82: "不订立书面劳动合同的法律责任", 83: "违法约定试用期的法律责任",
+        84: "扣押劳动者身份等证件的法律责任",
+        85: "未依法支付劳动报酬、经济补偿等的法律责任",
+        86: "订立无效劳动合同的法律责任", 87: "违反解除或者终止劳动合同的法律责任",
+        88: "侵害劳动者人身权益的法律责任", 89: "不出具解除、终止书面证明的法律责任",
+        90: "劳动者的赔偿责任", 91: "用人单位的连带赔偿责任",
+        92: "劳务派遣单位的法律责任", 93: "无营业执照经营单位的法律责任",
+        94: "个人承包经营者的连带赔偿责任", 95: "不履行法定职责、违法行使职权的法律责任",
+        96: "事业单位聘用制劳动合同的法律适用", 97: "过渡性条款", 98: "施行时间",
+    },
+}
+
+
+def strip_line_title(body, law=None, no=None):
+    """剥离条文小标题。先查人工核对过的对照表；不命中就原样返回（不猜）。"""
+    titles = LINE_TITLES.get(law or "")
+    t = titles.get(no) if titles else None
+    if t and body.startswith(t) and len(body) - len(t) >= 10:
+        return body[len(t):]
+    return body
+
+
+def short_anchor(body, n=40):
+    """取条文最靠前的 40 字作「特征句」，供核验时回读比对（跳过纯列举开头）。"""
+    s = body
+    k = re.search(r"[。；]", s)
+    head = s[:k.start()] if k and k.start() >= 12 else s
+    return head[:n].strip()
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--out", default=None, help="输出路径（默认 core/legal-articles.json）")
+    a = ap.parse_args()
+    here = os.path.dirname(os.path.abspath(__file__))
+    root = os.path.abspath(os.path.join(here, "..", "..", "doc-compliance-review"))
+    out = a.out or os.path.join(root, "core", "legal-articles.json")
+
+    result, missing, srcs = {}, {}, []
+    for law, urls in SOURCES.items():
+        merged = {}
+        for url, enc in urls:
+            try:
+                text = to_text(fetch(url, enc))
+            except Exception as ex:
+                print("[抓取失败] %s：%s" % (url, ex))
+                continue
+            got = parse_articles(text)
+            print("[抓取] %-8s %s → %d 条" % (law, url[:52], len(got)))
+            srcs.append({"law": law, "url": url, "fetched": datetime.date.today().isoformat()})
+            for k, v in got.items():
+                if k not in merged or len(v) > len(merged[k]):
+                    merged[k] = v
+        want = WANTED.get(law) or sorted(merged)
+        arts = {}
+        for no in want:
+            body = merged.get(no)
+            if body:
+                body = strip_line_title(body, law, no)
+                body = strip_footer(body)
+            if body and looks_garbage(body):
+                print("[可疑] %-8s 第%s条 疑似解析垃圾，已剔除 → %s" % (law, no, body[:40]))
+                body = None
+            if body:
+                arts[str(no)] = {
+                    "no": no,
+                    "anchor": short_anchor(body),
+                    "text": body,
+                    "sha256": hashlib.sha256(body.encode("utf-8")).hexdigest()[:16],
+                }
+            else:
+                missing.setdefault(law, []).append(no)
+        result[law] = arts
+
+    db = {
+        "_说明": "法条原文核验库（开发侧生成，随技能包分发）。审查引法条时以本库为唯一真值来源；"
+                 "本库没有的条号一律标「待核验」，不得凭记忆引用。条文以现行有效版本为准。",
+        "_用法": "核验三件事：①条号存不存在 ②引述的句子能不能在本条原文里找到 ③引的是哪一版。"
+                 "三者任一不过，一律降级为「待核验」并在报告里写明差在哪。",
+        "generated": datetime.date.today().isoformat(),
+        "sources": srcs,
+        "laws": result,
+        "meta": META,
+        "missing": missing,
+        "_校验": "每条含 sha256 前 16 位，供人工复核原文未被篡改。",
+    }
+    os.makedirs(os.path.dirname(out), exist_ok=True)
+    with open(out, "w", encoding="utf-8") as f:
+        json.dump(db, f, ensure_ascii=False, indent=1)
+    total = sum(len(v) for v in result.values())
+    print("\n落盘：%s（%d 条）" % (out, total))
+    if missing:
+        print("未抓到（须人工补或标待核验）：", json.dumps(missing, ensure_ascii=False))
+
+
+if __name__ == "__main__":
+    main()

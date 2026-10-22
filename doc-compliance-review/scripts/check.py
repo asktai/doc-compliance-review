@@ -1200,6 +1200,58 @@ def check_sample_baseline():
         pass
 
 
+def check_legal_db():
+    """法条核验库自洽：结构完整、条文非空、sha256 与正文对得上、文档口径与实收条数一致。
+    背景：库是「核验真值源」，一旦混入残缺/错位条文，核验会把错的判成对的——
+    比没有库更危险。故此处常驻校验，随每次改动必跑。"""
+    p = os.path.join(ROOT, "core", "legal-articles.json")
+    if not os.path.exists(p):
+        err("法条核验库缺失：core/legal-articles.json（python maint/tools/build-legal-db.py 生成）")
+        return
+    try:
+        db = json.loads(_read(p))
+    except Exception as e:
+        err("法条核验库解析失败：%s" % e)
+        return
+    laws = db.get("laws") or {}
+    if not laws:
+        err("法条核验库为空：laws 段无内容")
+        return
+    import hashlib
+    bad = []
+    total = 0
+    for law, ents in laws.items():
+        for no, e in ents.items():
+            total += 1
+            txt = (e or {}).get("text") or ""
+            if len(txt) < 6:
+                bad.append("%s第%s条正文过短" % (law, no))
+                continue
+            want = hashlib.sha256(txt.encode("utf-8")).hexdigest()[:16]
+            if e.get("sha256") != want:
+                bad.append("%s第%s条 sha256 不符" % (law, no))
+            if not e.get("anchor"):
+                bad.append("%s第%s条缺特征句" % (law, no))
+            # 条文里混进页眉页脚/导航，说明抓取解析出错位
+            if re.search(r"(版权所有|ICP备|责任编辑|上一篇|相关链接|扫一扫)", txt):
+                bad.append("%s第%s条含页面噪声" % (law, no))
+    if bad:
+        err("法条核验库有问题 %d 处：%s" % (len(bad), "；".join(bad[:5])))
+        return
+    # 文档口径
+    sm = re.search(r"现收录\s*(\d+)\s*部法、(\d+)\s*条", _read(os.path.join(ROOT, "SKILL.md")))
+    if sm:
+        dl, dn = int(sm.group(1)), int(sm.group(2))
+        if dl != len(laws) or dn != total:
+            err("SKILL.md 法条库口径失准：写「%d 部法、%d 条」，实测 %d 部、%d 条"
+                % (dl, dn, len(laws), total))
+            return
+    miss = db.get("missing") or {}
+    info("法条核验库: %d 部法 / %d 条（未收录待人工核：%s）"
+         % (len(laws), total,
+            "、".join("%s%s" % (k, v) for k, v in miss.items()) or "无"))
+
+
 # ---------------------------------------------------------------- 清理
 def _pycache_dirs():
     out = []
@@ -1279,6 +1331,7 @@ def main():
         check_package_fields()
         check_platform_limit()
         check_sample_baseline()
+        check_legal_db()
         check_reproducible_build()
         check_gitignore()
         check_skill_ext_lowercase()

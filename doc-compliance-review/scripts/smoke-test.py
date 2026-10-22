@@ -672,6 +672,60 @@ def main():
     except Exception as e:
         check("原稿级修订自检", False, repr(e))
 
+    # --- 3.4 法条核验（legal-verify.py ＋ core/legal-articles.json）---
+    print("\n[3.4] 法条核验（离线原文库比对）")
+    try:
+        lv = os.path.join(HERE, "legal-verify.py")
+        dbp = os.path.join(HERE, "..", "core", "legal-articles.json")
+        check("法条核验：原文库可读且非空",
+              os.path.exists(dbp) and os.path.getsize(dbp) > 20000,
+              "%d 字节" % (os.path.getsize(dbp) if os.path.exists(dbp) else 0))
+        if not os.path.exists(lv):
+            check("法条核验：脚本存在", False, "缺 scripts/legal-verify.py")
+        else:
+            _ok = "《民法典》第五百八十五条规定，当事人可以约定一方违约时应当根据违约情况向对方支付一定数额的违约金。\n" \
+                  "《劳动合同法》第四十六条规定，劳动者依照本法第三十八条规定解除劳动合同的，用人单位应当向劳动者支付经济补偿。\n"
+            _okf = os.path.join(work, "lv-ok.md")
+            with open(_okf, "w", encoding="utf-8") as f:
+                f.write(_ok)
+            r_ok = run([PY, lv, "--file", _okf])
+            check("法条核验：正确引用判「通过」并退出 0",
+                  r_ok.returncode == 0 and "通过" in (r_ok.stdout or ""),
+                  head_lines(r_ok.stdout))
+            # 负向一：编造的条号内容（585 条里没有「百分之三十」）
+            _bad = "《民法典》第五百八十五条规定，违约金不得超过合同总价款的百分之三十。\n" \
+                   "《民事诉讼法》第九百九十九条规定，当事人可以协议管辖。\n"
+            _badf = os.path.join(work, "lv-bad.md")
+            with open(_badf, "w", encoding="utf-8") as f:
+                f.write(_bad)
+            r_bad = run([PY, lv, "--file", _badf])
+            check("法条核验：引述失真／条号不在库时判「待核验」并退出 1",
+                  r_bad.returncode == 1 and "待核验" in (r_bad.stdout or ""),
+                  head_lines(r_bad.stdout))
+            # 负向二：版本提示（商标法 2027-01-01 起施行的新版条号整体前移）
+            _ver = "《商标法》第四十三条规定，商标注册人可以通过签订商标使用许可合同，许可他人使用其注册商标。\n"
+            _verf = os.path.join(work, "lv-ver.md")
+            with open(_verf, "w", encoding="utf-8") as f:
+                f.write(_ver)
+            r_ver = run([PY, lv, "--file", _verf])
+            check("法条核验：换代在即的法律给出「已修订／施行日」提示",
+                  "修订" in (r_ver.stdout or "") and "2027-01-01" in (r_ver.stdout or ""),
+                  head_lines(r_ver.stdout))
+            # 机读输出
+            _jf = os.path.join(work, "lv-out.json")
+            run([PY, lv, "--file", _okf, "--json", _jf])
+            _rows = []
+            try:
+                with open(_jf, encoding="utf-8") as f:
+                    _rows = json.load(f).get("rows") or []
+            except Exception:
+                _rows = []
+            check("法条核验：--json 产出机读结果（条号/判定/版本齐备）",
+                  bool(_rows) and all({"law", "no", "status", "version"} <= set(r) for r in _rows),
+                  "%d 行" % len(_rows))
+    except Exception as e:
+        check("法条核验自检", False, repr(e))
+
     # --- 3.5 版本与依赖（分发与落地成本）---
     print("\n[3.5] 版本与依赖")
     try:

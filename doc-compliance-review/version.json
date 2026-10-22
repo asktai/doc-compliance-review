@@ -3,16 +3,21 @@
   "product": "文档合规审查助手AI合同",
   "skill_id": "doc-compliance-review",
   "latest": {
-    "version": "v3.13.1",
-    "date": "2026-10-21",
-    "summary": "感谢语人物名单扩至 32 位：新增貂蝉、贵妃、昭君、躲在树后看不见、楚霸王、刘皇叔、的火车",
+    "version": "v3.14.0",
+    "date": "2026-10-22",
+    "summary": "新增法条核验引擎：审查意见里引的法条，出具前先用随包离线原文库逐条核一遍（离线原文库逐条核）",
     "changes": [
-      "感谢语人物名单 25 → 32 位（scripts/TONE.md），新增：貂蝉／贵妃／昭君／躲在树后看不见／楚霸王／刘皇叔／的火车；其余功能不变"
+      "新增 scripts/legal-verify.py：把意见稿里引用的法条逐条与本地原文库比对，产出可归档《法条核验表》",
+      "新增 core/legal-articles.json：11 部法 85 条高频条号原文，每条带来源 URL、抓取日期与 sha256 指纹",
+      "判定四档：通过／条号成立／表述存疑／待核验；库里没有的条号一律标待核验，不凭记忆补条文",
+      "版本提示：《商标法》2026-06-26 修订、2027-01-01 施行，条号整体前移，库内已标注并提示引用须注明版本",
+      "check.py 新增法条库自洽校验（条文非空、sha256 对齐、无页面噪声、文档口径一致）",
+      "冒烟新增 5 项法条核验用例，共 104 项"
     ],
     "download_page": "https://github.com/asktai/doc-compliance-review/releases",
     "files": {
-      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.13.1/文档合规审查助手AI合同_v3.13.1_20261021_(doc-compliance-review).skill",
-      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.13.1/文档合规审查助手AI合同_v3.13.1_20261021_(doc-compliance-review).zip"
+      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.14.0/文档合规审查助手AI合同_v3.14.0_20261022_(doc-compliance-review).skill",
+      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.14.0/文档合规审查助手AI合同_v3.14.0_20261022_(doc-compliance-review).zip"
     }
   },
   "history": [
