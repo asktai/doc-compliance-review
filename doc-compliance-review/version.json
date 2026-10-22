@@ -3,26 +3,50 @@
   "product": "文档合规审查助手AI合同",
   "skill_id": "doc-compliance-review",
   "latest": {
-    "version": "v3.22.0",
+    "version": "v3.22.1",
     "date": "2026-10-22",
-    "summary": "联网口径改为默认关闭；修掉「安全声明说零联网、脚本却会联网」的文档自证伪，并把这两条做成门禁",
+    "summary": "给联网边界与缓存防护两条门禁补上反向注入用例：证明改坏了会被拦住，不再是只在终端手工验过一次",
     "changes": [
-      "在线检查更新改为默认关闭：--notice 出厂零请求，须显式 --check-online 或把 check_online_by_default 设为 true",
-      "修正 SECURITY.md 的 C1／C7：原文称「21 个脚本全部不含联网库」与事实不符（version.py 确有 urllib）",
-      "自检命令由「输出 0 即零联网」改为如实列出命中文件（预期仅 version.py），并补一条只看行为、不读代码的核验法",
-      "check.py 新增联网边界门禁：联网代码越界、默认开关被打开，两种情况均报出",
-      "修掉 4 个脚本（verify／imbalance／tpl-engine／legal-verify、legal-crosscheck）未在文件头关闭字节码写入的问题：被 import 时会在技能目录留下 __pycache__",
-      "check.py 新增缓存防护门禁：任一脚本未关闭字节码写入即报错",
-      "冒烟 128 → 132 项：新增联网边界与缓存防护各 2 项",
-      "「脚本数」口径校验放宽：允许同时写「21 个脚本」与「处理文档的 20 个脚本」"
+      "冒烟 132 → 136 项：新增 4 项反向注入（联网越界／字节码开关／联网开关告警／未改坏时零误报的对照组）",
+      "注入跑法改为「只导入副本、只调那一个门禁函数」，不再跑整个 check.py：副本缺 SKILL.md 会让退出码为 1 而与门禁无关",
+      "判据收紧为「报错文本含该门禁专属措辞且点名被改的脚本」，不再以退出码代替理由",
+      "对照组的必要性：只验「改坏了会报」，见谁报谁的门禁同样能通过；必须同时证明「没改坏时不报」",
+      "README／安装使用教程／SKILL 的冒烟项数同步 136"
     ],
     "download_page": "https://github.com/asktai/doc-compliance-review/releases",
     "files": {
-      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.22.0/文档合规审查助手AI合同_v3.22.0_20261022_(doc-compliance-review).skill",
-      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.22.0/文档合规审查助手AI合同_v3.22.0_20261022_(doc-compliance-review).zip"
+      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.22.1/文档合规审查助手AI合同_v3.22.1_20261022_(doc-compliance-review).skill",
+      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.22.1/文档合规审查助手AI合同_v3.22.1_20261022_(doc-compliance-review).zip"
     }
   },
   "history": [
+    {
+      "version": "v3.22.1",
+      "date": "2026-10-22",
+      "summary": "给联网边界与缓存防护两条门禁补上反向注入用例：证明改坏了会被拦住，不再是只在终端手工验过一次",
+      "changes": [
+        "冒烟 132 → 136 项：新增 4 项反向注入（联网越界／字节码开关／联网开关告警／未改坏时零误报的对照组）",
+        "注入跑法改为「只导入副本、只调那一个门禁函数」，不再跑整个 check.py：副本缺 SKILL.md 会让退出码为 1 而与门禁无关",
+        "判据收紧为「报错文本含该门禁专属措辞且点名被改的脚本」，不再以退出码代替理由",
+        "对照组的必要性：只验「改坏了会报」，见谁报谁的门禁同样能通过；必须同时证明「没改坏时不报」",
+        "README／安装使用教程／SKILL 的冒烟项数同步 136"
+      ]
+    },
+    {
+      "version": "v3.22.0",
+      "date": "2026-10-22",
+      "summary": "把「零联网」从一句承诺改成一条可核验的事实，并修掉 5 个脚本的缓存泄漏",
+      "changes": [
+        "在线检查更新改为默认关闭：--notice 出厂零请求，须显式 --check-online 或把 check_online_by_default 设为 true",
+        "修正 SECURITY.md 的 C1／C7：原文称「21 个脚本全部不含联网库」与事实不符（version.py 确有 urllib）",
+        "自检命令由「输出 0 即零联网」改为如实列出命中文件（预期仅 version.py），并补一条只看行为、不读代码的核验法",
+        "check.py 新增联网边界门禁：联网代码越界、默认开关被打开，两种情况均报出",
+        "修掉 verify／imbalance／tpl-engine／legal-verify／legal-crosscheck 未在文件头关闭字节码写入的问题",
+        "check.py 新增缓存防护门禁：任一脚本未关闭字节码写入即报错",
+        "冒烟 128 → 132 项：新增联网边界 3 项与缓存防护 1 项",
+        "「脚本数」口径校验放宽：允许同时写「21 个脚本」与「处理文档的 20 个脚本」"
+      ]
+    },
     {
       "version": "v3.21.0",
       "date": "2026-10-22",

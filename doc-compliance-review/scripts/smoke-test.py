@@ -186,6 +186,157 @@ def tail_line(text, budget=90):
     return last if len(last) <= budget else "…" + last[-(budget - 1):]
 
 
+# 反向注入用的跑法：**不跑整个 check.py**，只在本进程里导入副本的 check 模块、
+# 直接调那一个门禁函数，再把 err()/warn() 收到的文本取出来。
+# 为什么不做 `python check.py` 整个跑：check.py 有 30 多个检查，前 20 多个都要读
+# 技能根的文件（SKILL.md / rules/ …），临时副本里没有，会先抛 FileNotFoundError——
+# 退出码同样是 1，但报错跟被注入的门禁毫无关系，就成了「退出码对、理由错」的假过。
+# 当天已经踩过一次这个坑，故这里把注入点与门禁一一对应，判据只认该门禁的专属措辞。
+_INJECT_RUNNER = r'''
+import importlib.util, json, sys
+spec = importlib.util.spec_from_file_location("dcr_check_probe", sys.argv[1])
+m = importlib.util.module_from_spec(spec)
+sys.modules["dcr_check_probe"] = m
+spec.loader.exec_module(m)
+which = sys.argv[2]
+# 第三个参数是 config 路径；不给就读副本自带的 config.json。
+# （早先漏了这一步，argv[3] 越界 → 崩溃信息与门禁无关，差点又变成"退出码对、理由错"）
+cfgp = sys.argv[3] if len(sys.argv) > 3 else None
+try:
+    if which == "online":
+        data = {}
+        if cfgp:
+            with open(cfgp, encoding="utf-8") as f:
+                data = json.load(f)
+        m._check_online_gate(data)
+    else:
+        m._check_no_bytecode()
+except BaseException as e:
+    import traceback
+    print(json.dumps({"crash": repr(e), "tb": traceback.format_exc()}, ensure_ascii=False))
+    sys.exit(0)
+print(json.dumps({"errs": m.ERRS, "warns": m.WARNS}, ensure_ascii=False))
+'''
+
+
+def _inject_gate_tests(tmp):
+    """反向注入：把门禁故意改坏，断言门禁**必须报错**（铁律 25.5.3）。
+
+    为什么非要这一组：正向用例只能说"现在的代码是对的"，说不了"以后改坏了会被拦住"。
+    不可测的承诺等于没有承诺——这正是 SECURITY.md 那次事故的根源（句子写了、没人验）。
+
+    做法：临时目录造一个假技能目录（只拷 `scripts/`），逐项改坏后**只调对应门禁函数**，
+    断言它报出了该门禁的专属措辞。不入技能目录、不改正式文件，跑完即删。
+    返回 [(用例名, 是否通过, 说明)]。
+    """
+    out = []
+    real_scripts = HERE
+    base = os.path.join(tmp, "skillsim")
+    tgt = os.path.join(base, "scripts")
+    try:
+        shutil.copytree(real_scripts, tgt,
+                        ignore=shutil.ignore_patterns("__pycache__", "*.pyc",
+                                                      ".integrity.json"))
+    except Exception as e:
+        return [("反向注入：准备临时副本", False, repr(e))]
+
+    runner = os.path.join(tmp, "_inject_runner.py")
+    with open(runner, "w", encoding="utf-8") as f:
+        f.write(_INJECT_RUNNER)
+
+    def run_gate(which, cfgp=None):
+        """跑单个门禁，返回 (是否崩溃说明, errs, warns)。崩溃时 errs=[崩溃说明]。"""
+        cmd = [PY, runner, os.path.join(tgt, "check.py"), which]
+        if cfgp:
+            cmd.append(cfgp)
+        env = dict(os.environ)
+        env["PYTHONDONTWRITEBYTECODE"] = "1"   # 别让探针自己往副本里扔 .pyc
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=300, env=env)
+        txt = (r.stdout or "").strip()
+        try:
+            d = json.loads(txt.splitlines()[-1]) if txt else {}
+        except Exception:
+            d = {}
+        if "crash" in d:
+            # 崩溃也算失败：门禁没跑完，结论不可信。把最后一行 traceback 带进详情，便于定位。
+            tb = [l for l in (d.get("tb") or "").splitlines() if l.strip()]
+            return "门禁执行崩溃（%s）｜%s" % (d["crash"], tb[-1] if tb else ""), [], []
+        if not d:
+            return ("门禁无输出（退出码 %s）：%s"
+                    % (r.returncode, tail_line(r.stderr or r.stdout))), [], []
+        return "", d.get("errs") or [], d.get("warns") or []
+
+    def rewrite(fn, old, new):
+        fp = os.path.join(tgt, fn)
+        t = open(fp, encoding="utf-8").read()
+        if old not in t:
+            return False
+        open(fp, "w", encoding="utf-8").write(t.replace(old, new, 1))
+        return True
+
+    # ① 联网门禁：给一个处理文档的脚本偷塞联网调用 → ERR 里必须点名"联网调用越界"
+    #    注：注入点故意用 `import sys as _sys`（每个脚本都有的一行），不挑业务 import，
+    #    否则换个脚本就"注入点未命中"——那种失败是测试自己脆，不是门禁失效。
+    ok_hit = rewrite("preprocess.py", "import sys as _sys",
+                     "import sys as _sys\nimport urllib.request")
+    if ok_hit:
+        bad, errs, _ = run_gate("online")
+        hit = any("联网调用越界" in m and "preprocess.py" in m for m in errs)
+        out.append(("反向注入①：处理脚本偷加 urllib → 联网门禁必须拦下",
+                    hit,
+                    "已报越界" if hit else ("未报越界；" + (bad or "errs=%s" % errs))))
+        rewrite("preprocess.py", "import sys as _sys\nimport urllib.request",
+                "import sys as _sys")
+    else:
+        out.append(("反向注入①：处理脚本偷加 urllib → 联网门禁必须拦下",
+                    False, "注入点未命中（preprocess.py 里找不到 `import sys as _sys`）"))
+
+    # ② 缓存门禁：删掉某脚本的字节码开关 → ERR 里必须点名"未在文件头关闭字节码写入"
+    ok_hit = rewrite("verify.py",
+                     "import sys as _sys\n_sys.dont_write_bytecode = True",
+                     "import sys as _sys")
+    if ok_hit:
+        bad, errs, _ = run_gate("bytecode")
+        hit = any("关闭字节码写入" in m and "verify.py" in m for m in errs)
+        out.append(("反向注入②：删掉 verify.py 的字节码开关 → 缓存门禁必须拦下",
+                    hit,
+                    "已报漏写" if hit else ("未报漏写；" + (bad or "errs=%s" % errs))))
+        # 还原（否则后面 ④ 对照组会把这条注入当成"副本未改坏"来判，误报）
+        rewrite("verify.py", "import sys as _sys",
+                "import sys as _sys\n_sys.dont_write_bytecode = True")
+    else:
+        out.append(("反向注入②：删掉 verify.py 的字节码开关 → 缓存门禁必须拦下",
+                    False, "注入点未命中（verify.py 里找不到标准开关写法）"))
+
+    # ③ 联网开关门禁：把出厂默认改成 true → WARN 里必须提示"设为 true"
+    cfgp = os.path.join(tgt, "config.json")
+    try:
+        cfg = json.loads(open(cfgp, encoding="utf-8").read())
+        cfg.setdefault("update", {})["check_online_by_default"] = True
+        open(cfgp, "w", encoding="utf-8").write(
+            json.dumps(cfg, ensure_ascii=False, indent=1))
+        bad, errs, warns = run_gate("online", cfgp)
+        hit = any("check_online_by_default 设为 true" in m for m in warns)
+        out.append(("反向注入③：把联网开关改回 true → 必须告警（默认不发请求的承诺被打破）",
+                    hit,
+                    "已告警" if hit else ("未告警；" + (bad or "warns=%s" % warns))))
+    except Exception as e:
+        out.append(("反向注入③：把联网开关改回 true → 必须告警", False, repr(e)))
+
+    # ④ 对照组：副本**没改坏**时两个门禁都必须零 ERR。
+    #    为什么要这一组：只验"改坏了会报"还不够——一个见谁报谁的门禁同样能通过 ①②③。
+    #    必须同时证明"没改坏时不报"，才能说明报错是被注入的那一处触发的。
+    bad, errs, _ = run_gate("online")
+    bad2, errs2, _ = run_gate("bytecode")
+    out.append(("反向注入④（对照）：副本未改坏时两门禁必须零报错",
+                (not errs and not errs2),
+                "均零报错" if (not errs and not errs2)
+                else ("误报：" + (bad or bad2 or str(errs + errs2)))))
+
+    shutil.rmtree(tmp, ignore_errors=True)
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser(description="文档合规审查助手AI合同·端到端冒烟测试")
     ap.add_argument("--base", default=None, help="工作根目录（默认取 config.json 的 base_dir）")
@@ -1014,6 +1165,14 @@ def main():
                 leak.append(fn)
         check("缓存防护：每个脚本在 import 前关闭字节码写入", not leak,
               "漏写: %s" % ", ".join(leak))
+
+        # ── 反向注入（铁律 25.5.3：门禁须证明拦得住，不做注入等于"尚未落实"）──
+        # 上面几条是**正向断言**（现状必须合规），只能证明"现在是对的"；
+        # 证明不了"将来改坏了会被拦住"。故在临时目录造一个**假技能目录**（拷 scripts/），
+        # 故意改坏一处，跑一次 check.py，要求它**必须报错**。用完即删。
+        inj = _inject_gate_tests(tempfile.mkdtemp(prefix="dcr-inject-"))
+        for name, ok, detail in inj:
+            check(name, ok, detail)
     except Exception as e:
         check("版本与依赖自检", False, repr(e))
 
