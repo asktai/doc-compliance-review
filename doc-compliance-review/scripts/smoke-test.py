@@ -1143,17 +1143,22 @@ def main():
         check("联网边界：默认配置下 version.py --notice 零输出、退 0（不发任何请求）",
               n.returncode == 0 and not (n.stdout or "").strip(),
               "退出码 %s，输出 %r" % (n.returncode, (n.stdout or "")[:80]))
-        # 处理文档的脚本一个网络库都不许有（version.py 是唯一例外，且已默认关闭）
+        # 处理文档的脚本一个网络库都不许有。
+        # **v3.23.0**：白名单由 1 个增至 3 个（version.py 查更新／freshness-patrol.py 巡检／
+        # legal-parse.py 抓法规页）——三者共同点是**接触不到文档**且须显式调用才联网。
+        # 本清单与 check.py 的 _NET_OK 是同一份口径，改一处须同步另一处。
         net_ks = ("import urllib", "import requests", "import socket",
                   "import http.client", "import aiohttp", "import httpx", "urlopen(")
+        net_ok = ("version.py", "freshness-patrol.py", "legal-parse.py")
         bad = []
         for fn in sorted(os.listdir(HERE)):
-            if not fn.endswith(".py") or fn in ("version.py", "check.py", "smoke-test.py"):
+            if not fn.endswith(".py") or fn in net_ok or fn in ("check.py", "smoke-test.py"):
                 continue
             src = open(os.path.join(HERE, fn), encoding="utf-8").read()
             if any(k in src for k in net_ks):
                 bad.append(fn)
-        check("联网边界：处理文档的脚本零网络库（仅 version.py 例外）",
+        check("联网边界：处理文档的脚本零网络库（仅 %s 例外，均接触不到文档）"
+              % "／".join(net_ok),
               not bad, "越界: %s" % ", ".join(bad))
         # 每个脚本都在 import 前关掉字节码写入（否则被 import 时在技能目录留 .pyc）
         leak = []

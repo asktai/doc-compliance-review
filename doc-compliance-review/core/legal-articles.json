@@ -21,392 +21,504 @@
    "url": "https://www.ce.cn/xwzx/gnsz/gdxw/202006/01/t20200601_35019528.shtml",
    "name": "中国经济网",
    "articles": 917,
-   "fetched": "2026-10-22"
+   "fetched": "2026-10-22",
+   "grp": 0,
+   "enc": "gbk"
   },
   {
    "law": "民法典",
    "url": "https://www.hefucheng.jcy.gov.cn/jcyw/202010/t20201028_3000545.shtml",
    "name": "阜城县检察院",
    "articles": 1,
-   "fetched": "2026-10-22"
+   "fetched": "2026-10-22",
+   "grp": 0,
+   "enc": "gbk"
   },
   {
    "law": "民法典",
    "url": "https://www.guzhen.gov.cn/gzdt/ztzl/fzzfjs2/81249562.html",
    "name": "固镇县政府",
    "articles": 95,
-   "fetched": "2026-10-22"
+   "fetched": "2026-10-22",
+   "grp": 0,
+   "enc": "utf-8"
   },
   {
    "law": "民法典",
    "url": "https://cpc.people.com.cn/n1/2020/0602/c419242-31731828.html",
    "name": "人民网·中国共产党新闻网",
    "articles": 204,
-   "fetched": "2026-10-22"
+   "fetched": "2026-10-22",
+   "grp": 1,
+   "enc": "utf-8"
   },
   {
    "law": "民法典",
    "url": "https://cpc.people.com.cn/n1/2020/0602/c419242-31731828-2.html",
    "name": "人民网·中国共产党新闻网",
    "articles": 258,
-   "fetched": "2026-10-22"
+   "fetched": "2026-10-22",
+   "grp": 1,
+   "enc": "utf-8"
   },
   {
    "law": "民法典",
    "url": "https://cpc.people.com.cn/n1/2020/0602/c419242-31731828-3.html",
    "name": "人民网·中国共产党新闻网",
    "articles": 526,
-   "fetched": "2026-10-22"
+   "fetched": "2026-10-22",
+   "grp": 1,
+   "enc": "utf-8"
   },
   {
    "law": "民法典",
    "url": "https://cpc.people.com.cn/n1/2020/0602/c419242-31731828-4.html",
    "name": "人民网·中国共产党新闻网",
    "articles": 51,
-   "fetched": "2026-10-22"
+   "fetched": "2026-10-22",
+   "grp": 1,
+   "enc": "utf-8"
   },
   {
    "law": "民法典",
    "url": "https://cpc.people.com.cn/n1/2020/0602/c419242-31731828-5.html",
    "name": "人民网·中国共产党新闻网",
    "articles": 79,
-   "fetched": "2026-10-22"
+   "fetched": "2026-10-22",
+   "grp": 1,
+   "enc": "utf-8"
   },
   {
    "law": "民法典",
    "url": "https://cpc.people.com.cn/n1/2020/0602/c419242-31731828-6.html",
    "name": "人民网·中国共产党新闻网",
    "articles": 45,
-   "fetched": "2026-10-22"
+   "fetched": "2026-10-22",
+   "grp": 1,
+   "enc": "utf-8"
   },
   {
    "law": "民法典",
    "url": "https://cpc.people.com.cn/n1/2020/0602/c419242-31731828-7.html",
    "name": "人民网·中国共产党新闻网",
    "articles": 97,
-   "fetched": "2026-10-22"
+   "fetched": "2026-10-22",
+   "grp": 1,
+   "enc": "utf-8"
   },
   {
    "law": "劳动合同法",
    "url": "https://www.longling.gov.cn/info/7359/2410199.htm",
    "name": "龙陵县政府",
    "articles": 98,
-   "fetched": "2026-10-22"
+   "fetched": "2026-10-22",
+   "grp": 0,
+   "enc": "utf-8"
   },
   {
    "law": "劳动合同法",
    "url": "https://www.gzns.gov.cn/rd/flfg/gjflfg/201705/t20170505_345140.html",
    "name": "广州南沙区人大",
    "articles": 98,
-   "fetched": "2026-10-22"
+   "fetched": "2026-10-22",
+   "grp": 1,
+   "enc": "utf-8"
   },
   {
    "law": "个人信息保护法",
    "url": "https://www.cac.gov.cn/2021-08/20/c_1631050028355286.htm",
    "name": "中央网信办",
    "articles": 74,
-   "fetched": "2026-10-22"
+   "fetched": "2026-10-22",
+   "grp": 0,
+   "enc": "utf-8"
   },
   {
    "law": "个人信息保护法",
    "url": "https://www.trs.gov.cn/zwgk/zfxxgkzl/fdzdgknr/zcwj/flfg/202302/t20230227_78316401.html",
    "name": "铜仁市政府",
    "articles": 74,
-   "fetched": "2026-10-22"
+   "fetched": "2026-10-22",
+   "grp": 1,
+   "enc": "utf-8"
   },
   {
    "law": "个人信息保护法",
    "url": "https://police.xa.gov.cn/zwgk/zcfg/619f4376f8fd1c0bdc6dfdfb.html",
    "name": "西安市公安局",
    "articles": 74,
-   "fetched": "2026-10-22"
+   "fetched": "2026-10-22",
+   "grp": 2,
+   "enc": "utf-8"
   },
   {
    "law": "民事诉讼法",
    "url": "http://huaiyin.jnjcy.gov.cn/page/zhifabanangongzuoliucheng/minshixingzhengjian/202601204353.html",
    "name": "槐荫区检察院",
    "articles": 306,
-   "fetched": "2026-10-22"
+   "fetched": "2026-10-22",
+   "grp": 0,
+   "enc": "utf-8"
   },
   {
    "law": "民事诉讼法",
    "url": "https://www.gzcourt.gov.cn/other/swsdpt/ck634/2025/08/06170325835.html",
    "name": "广州审判网",
    "articles": 306,
-   "fetched": "2026-10-22"
+   "fetched": "2026-10-22",
+   "grp": 1,
+   "enc": "utf-8"
   },
   {
    "law": "民事诉讼法",
    "url": "https://zy.wxfy.gov.cn/article/detail/2024/02/id/7817306.shtml",
    "name": "无锡法院",
    "articles": 306,
-   "fetched": "2026-10-22"
+   "fetched": "2026-10-22",
+   "grp": 2,
+   "enc": "utf-8"
   },
   {
    "law": "反不正当竞争法",
    "url": "http://www.npc.gov.cn/c2/c30834/202506/t20250627_446247.html",
    "name": "中国人大网",
    "articles": 41,
-   "fetched": "2026-10-22"
+   "fetched": "2026-10-22",
+   "grp": 0,
+   "enc": "utf-8"
   },
   {
    "law": "反不正当竞争法",
    "url": "https://www.jhx.gov.cn/zfbm/scjdglj/zcwj/202510/t20251022_88716728.html",
    "name": "剑河县政府",
    "articles": 41,
-   "fetched": "2026-10-22"
+   "fetched": "2026-10-22",
+   "grp": 1,
+   "enc": "utf-8"
   },
   {
    "law": "反不正当竞争法",
    "url": "https://www.ahxx.gov.cn/grassroots/247/163076811.html",
    "name": "萧县政府",
    "articles": 41,
-   "fetched": "2026-10-22"
+   "fetched": "2026-10-22",
+   "grp": 2,
+   "enc": "utf-8"
   },
   {
    "law": "反不正当竞争法",
    "url": "http://www.jiangdu.gov.cn/zfxxgk/fdzdgknr/scgzbzhjgzfxx/scgzbz/art/2025/art_e58aaecdef144f4ab239ac2ad1e44fcb.html",
    "name": "扬州江都区政府",
    "articles": 41,
-   "fetched": "2026-10-22"
+   "fetched": "2026-10-22",
+   "grp": 3,
+   "enc": "utf-8"
   },
   {
    "law": "反垄断法",
    "url": "https://www.samr.gov.cn/zw/zfxxgk/fdzdgknr/fgs/art/2023/art_f0fae9eb3a684fc39e84d89eabfc2caa.html",
    "name": "市场监管总局",
    "articles": 70,
-   "fetched": "2026-10-22"
+   "fetched": "2026-10-22",
+   "grp": 0,
+   "enc": "utf-8"
   },
   {
    "law": "反垄断法",
    "url": "https://dzscjg.dezhou.gov.cn/n47758756/n47758827/n50006369/n78413861/c78675184/content.html",
    "name": "德州市市场监管局",
    "articles": 70,
-   "fetched": "2026-10-22"
+   "fetched": "2026-10-22",
+   "grp": 1,
+   "enc": "utf-8"
   },
   {
    "law": "著作权法",
    "url": "http://www.npc.gov.cn/npc/c2/c30834/202011/t20201119_308796.html",
    "name": "中国人大网",
    "articles": 67,
-   "fetched": "2026-10-22"
+   "fetched": "2026-10-22",
+   "grp": 0,
+   "enc": "utf-8"
   },
   {
    "law": "著作权法",
    "url": "https://www.gov.cn/guoqing/2021-10/29/content_5647633.htm",
    "name": "中国政府网",
    "articles": 67,
-   "fetched": "2026-10-22"
+   "fetched": "2026-10-22",
+   "grp": 1,
+   "enc": "utf-8"
   },
   {
    "law": "商标法",
    "url": "http://www.npc.gov.cn/c2/c30834/201906/t20190608_298036.html",
    "name": "中国人大网",
    "articles": 71,
-   "fetched": "2026-10-22"
+   "fetched": "2026-10-22",
+   "grp": 0,
+   "enc": "utf-8"
   },
   {
    "law": "商标法",
    "url": "https://ip.people.com.cn/GB/n1/2019/1106/c179663-31440313.html",
    "name": "人民网·知识产权频道",
    "articles": 72,
-   "fetched": "2026-10-22"
+   "fetched": "2026-10-22",
+   "grp": 1,
+   "enc": "utf-8"
   },
   {
    "law": "广告法",
    "url": "https://www.samr.gov.cn/zw/zfxxgk/fdzdgknr/fgs/art/2023/art_5474cf75173c45d6a0379730fb4e8d97.html",
    "name": "市场监管总局",
    "articles": 74,
-   "fetched": "2026-10-22"
+   "fetched": "2026-10-22",
+   "grp": 0,
+   "enc": "utf-8"
   },
   {
    "law": "广告法",
    "url": "https://www.xjbz.gov.cn/xjbz/c101593/202110/9ddf313d369947b58acba03e86173507.shtml",
    "name": "巴音郭楞州政府",
    "articles": 74,
-   "fetched": "2026-10-22"
+   "fetched": "2026-10-22",
+   "grp": 1,
+   "enc": "utf-8"
   },
   {
    "law": "广告法",
    "url": "https://www.fy.gov.cn/InKnowledgeBase/show/25174.html",
    "name": "阜阳市政府",
    "articles": 74,
-   "fetched": "2026-10-22"
+   "fetched": "2026-10-22",
+   "grp": 2,
+   "enc": "utf-8"
   },
   {
    "law": "劳动法",
    "url": "https://hrss.yn.gov.cn/NewsView.aspx?pid=971&nid=63414&cid=682&isZt=7",
    "name": "云南省人社厅",
    "articles": 107,
-   "fetched": "2026-10-22"
+   "fetched": "2026-10-22",
+   "grp": 0,
+   "enc": "utf-8"
   },
   {
    "law": "劳动法",
    "url": "https://scjgj.yibin.gov.cn/xbsy/xxfb/flfggz/202411/t20241128_2062379.html",
    "name": "宜宾市市场监管局",
    "articles": 107,
-   "fetched": "2026-10-22"
+   "fetched": "2026-10-22",
+   "grp": 1,
+   "enc": "utf-8"
   },
   {
    "law": "食品安全法",
    "url": "https://sj.al.gov.cn/info/3222/15361.htm",
    "name": "阿里地区市场监管局",
    "articles": 154,
-   "fetched": "2026-10-22"
+   "fetched": "2026-10-22",
+   "grp": 0,
+   "enc": "utf-8"
   },
   {
    "law": "食品安全法",
    "url": "https://jkj.hlj.gov.cn/hljjkj/countrynews/202510/c00_31879849.shtml",
    "name": "黑龙江省疾控局",
    "articles": 154,
-   "fetched": "2026-10-22"
+   "fetched": "2026-10-22",
+   "grp": 1,
+   "enc": "utf-8"
   },
   {
    "law": "食品安全法",
    "url": "https://gxq.neijiang.gov.cn/gxq/spypxgzc/202601/459a265bbe484e289b478920620c75f0.shtml",
    "name": "内江高新区管委会",
    "articles": 154,
-   "fetched": "2026-10-22"
+   "fetched": "2026-10-22",
+   "grp": 2,
+   "enc": "utf-8"
   },
   {
    "law": "合同编通则解释",
    "url": "https://www.court.gov.cn/fabu/xiangqing/419382.html",
    "name": "最高人民法院",
    "articles": 69,
-   "fetched": "2026-10-22"
+   "fetched": "2026-10-22",
+   "grp": 0,
+   "enc": "utf-8"
   },
   {
    "law": "合同编通则解释",
    "url": "http://www.huancui.gov.cn/art/2023/12/12/art_78980_4204746.html",
    "name": "威海环翠区政府",
    "articles": 69,
-   "fetched": "2026-10-22"
+   "fetched": "2026-10-22",
+   "grp": 1,
+   "enc": "utf-8"
   },
   {
    "law": "公司法",
    "url": "http://www.npc.gov.cn/npc/c2/c30834/202312/t20231229_433999.html",
    "name": "中国人大网",
    "articles": 266,
-   "fetched": "2026-10-22"
+   "fetched": "2026-10-22",
+   "grp": 0,
+   "enc": "utf-8"
   },
   {
    "law": "公司法",
    "url": "https://www.gov.cn/yaowen/liebiao/202312/content_6923395.htm",
    "name": "中国政府网",
    "articles": 266,
-   "fetched": "2026-10-22"
+   "fetched": "2026-10-22",
+   "grp": 1,
+   "enc": "utf-8"
   },
   {
    "law": "网络安全法",
    "url": "https://www.cac.gov.cn/2016-11/07/c_1119867116.htm",
    "name": "中央网信办",
    "articles": 20,
-   "fetched": "2026-10-22"
+   "fetched": "2026-10-22",
+   "grp": 0,
+   "enc": "utf-8"
   },
   {
    "law": "网络安全法",
    "url": "https://www.cac.gov.cn/2016-11/07/c_1119867116_2.htm",
    "name": "中央网信办",
    "articles": 30,
-   "fetched": "2026-10-22"
+   "fetched": "2026-10-22",
+   "grp": 0,
+   "enc": "utf-8"
   },
   {
    "law": "网络安全法",
    "url": "https://www.cac.gov.cn/2016-11/07/c_1119867116_3.htm",
    "name": "中央网信办",
    "articles": 29,
-   "fetched": "2026-10-22"
+   "fetched": "2026-10-22",
+   "grp": 0,
+   "enc": "utf-8"
   },
   {
    "law": "网络安全法",
    "url": "https://npc.people.com.cn/n1/2016/1124/c14576-28892612.html",
    "name": "人民网（全国人大频道）",
    "articles": 79,
-   "fetched": "2026-10-22"
+   "fetched": "2026-10-22",
+   "grp": 1,
+   "enc": "utf-8"
   },
   {
    "law": "网络安全法",
    "url": "https://jyj.bozhou.gov.cn/XxgkContent/show/2558525.html",
    "name": "亳州市教育局",
    "articles": 79,
-   "fetched": "2026-10-22"
+   "fetched": "2026-10-22",
+   "grp": 2,
+   "enc": "utf-8"
   },
   {
    "law": "消费者权益保护法",
    "url": "http://www.npc.gov.cn/zgrdw/npc/xinwen/2013-10/26/content_1811773.htm",
    "name": "中国人大网",
    "articles": 63,
-   "fetched": "2026-10-22"
+   "fetched": "2026-10-22",
+   "grp": 0,
+   "enc": "utf-8"
   },
   {
    "law": "消费者权益保护法",
    "url": "https://www.als.gov.cn/art/2019/8/20/art_74_255699.html",
    "name": "阿拉善盟行署",
    "articles": 63,
-   "fetched": "2026-10-22"
+   "fetched": "2026-10-22",
+   "grp": 1,
+   "enc": "utf-8"
   },
   {
    "law": "电子商务法",
    "url": "https://www.rmzxw.com.cn/c/2018-08-31/2158330.shtml",
    "name": "人民政协网",
    "articles": 15,
-   "fetched": "2026-10-22"
+   "fetched": "2026-10-22",
+   "grp": 0,
+   "enc": "utf-8"
   },
   {
    "law": "电子商务法",
    "url": "https://www.rmzxw.com.cn/c/2018-08-31/2158330_1.shtml",
    "name": "人民政协网",
    "articles": 19,
-   "fetched": "2026-10-22"
+   "fetched": "2026-10-22",
+   "grp": 0,
+   "enc": "utf-8"
   },
   {
    "law": "电子商务法",
    "url": "https://www.rmzxw.com.cn/c/2018-08-31/2158330_2.shtml",
    "name": "人民政协网",
    "articles": 17,
-   "fetched": "2026-10-22"
+   "fetched": "2026-10-22",
+   "grp": 0,
+   "enc": "utf-8"
   },
   {
    "law": "电子商务法",
    "url": "https://www.rmzxw.com.cn/c/2018-08-31/2158330_3.shtml",
    "name": "人民政协网",
    "articles": 18,
-   "fetched": "2026-10-22"
+   "fetched": "2026-10-22",
+   "grp": 0,
+   "enc": "utf-8"
   },
   {
    "law": "电子商务法",
    "url": "https://www.rmzxw.com.cn/c/2018-08-31/2158330_4.shtml",
    "name": "人民政协网",
    "articles": 20,
-   "fetched": "2026-10-22"
+   "fetched": "2026-10-22",
+   "grp": 0,
+   "enc": "utf-8"
   },
   {
    "law": "电子商务法",
    "url": "http://www.npc.gov.cn/zgrdw/npc/lfzt/rlyw/2018-08/31/content_2060827.htm",
    "name": "中国人大网",
    "articles": 89,
-   "fetched": "2026-10-22"
+   "fetched": "2026-10-22",
+   "grp": 1,
+   "enc": "utf-8"
   },
   {
    "law": "电子商务法",
    "url": "https://www.longyang.gov.cn/info/13225/13672779.htm",
    "name": "隆阳区政府",
    "articles": 89,
-   "fetched": "2026-10-22"
+   "fetched": "2026-10-22",
+   "grp": 2,
+   "enc": "utf-8"
   },
   {
    "law": "数据安全法",
    "url": "https://www.cac.gov.cn/2021-06/11/c_1624994566919140.htm",
    "name": "中央网信办",
    "articles": 55,
-   "fetched": "2026-10-22"
+   "fetched": "2026-10-22",
+   "grp": 0,
+   "enc": "utf-8"
   },
   {
    "law": "数据安全法",
    "url": "https://www.gc.gov.cn/columns/8e15378c-0a26-4abf-b213-3a302d59a699/202204/08/3dc38a27-1d9f-4e93-a3f8-09b70600afc5.html",
    "name": "石家庄藁城区政府",
    "articles": 55,
-   "fetched": "2026-10-22"
+   "fetched": "2026-10-22",
+   "grp": 1,
+   "enc": "utf-8"
   }
  ],
  "laws": {

@@ -338,8 +338,13 @@ def check_config():
     _check_online_gate(data)
 
 
-# 唯一允许出现网络调用的脚本：查更新。它接触不到任何文档内容。
-_NET_OK = {"version.py"}
+# 允许出现网络调用的脚本（v3.23.0 由 1 个增至 3 个）。
+# 三者共同点：**都接触不到使用者的文档**——没有读文档的参数，也不回传任何内容。
+#   · version.py           查更新（默认关闭，须显式 --check-online）
+#   · freshness-patrol.py  法规库失效巡检（须显式调用）
+#   · legal-parse.py       抓取+解析核心，只抓公开法规页（被上面那个调用）
+# 增至 3 个不是放宽口径，而是把「承诺能碰什么」写清楚：处理文档的脚本仍然零联网。
+_NET_OK = {"version.py", "freshness-patrol.py", "legal-parse.py"}
 
 
 def _check_online_gate(data=None):
@@ -383,10 +388,42 @@ def _check_online_gate(data=None):
              "对外分发前请确认这是有意为之（SECURITY.md 声称默认不发请求）")
     else:
         url = (u.get("manifest_url") or "").strip()
-        info("联网边界: 仅 version.py 含网络代码，且默认关闭（%s）——不开开关、不打 --check-online "
-             "即零请求；其余 %d 个脚本零联网"
-             % ("已预置清单地址，需显式开启" if url else "未配置清单地址",
-                len([p for p in _script_files() if p.endswith(".py")]) - 1))
+        n_all = len([p for p in _script_files() if p.endswith(".py")])
+        info("联网边界: %d 个脚本含网络代码（%s），均**接触不到文档**：version.py 查更新默认关闭；"
+             "freshness-patrol.py 巡检与 legal-parse.py 抓法规页须显式调用。"
+             "其余 %d 个脚本零联网"
+             % (len(_NET_OK), "／".join(sorted(_NET_OK)), n_all - len(_NET_OK)))
+
+
+def check_freshness_engine():
+    """法规库失效巡检门禁：判据必须真的能分辨「一致／换版」，且库内源可定位。
+
+    为什么要门禁：v3.22.2 的教训是「库里存着失效条文，隔 4 个月才发现」。
+    巡检脚本建起来之后，真正需要防的是它**悄悄变成摆设**——判据一松，
+    换版就漏；库内 sources 缺 grp/enc，巡检就找不到源。故跑一次**离线自检**
+    （不联网：出包不能依赖源站活着，且要验的是判据不是源站），非 0 即拦下。
+    """
+    p = os.path.join(HERE, "freshness-patrol.py")
+    if not os.path.exists(p):
+        err("缺少 scripts/freshness-patrol.py（法规库失效巡检）——库的时效无从核验")
+        return
+    try:
+        r = subprocess.run([sys.executable, p, "--self-test"],
+                           capture_output=True, text=True, timeout=120)
+    except Exception as e:
+        err("巡检自检跑不起来：%s" % e)
+        return
+    out = (r.stdout or "") + (r.stderr or "")
+    if r.returncode != 0:
+        err("法规库失效巡检自检未通过（退出 %d）：%s"
+            % (r.returncode, out.strip().splitlines()[-1] if out.strip() else "无输出"))
+        return
+    for must in ("同一条文必判一致", "混入条目标题须判不一致", "库内 sources 均带 grp/enc"):
+        if must not in out:
+            err("巡检自检缺少关键判据项「%s」——判据被删或改名，门禁等于失效" % must)
+            return
+    n_ok = len(re.findall(r"\[OK\]", out))
+    info("法规库失效巡检：离线自检 %d 项全过（判据可分辨一致/换版，库内源可定位）" % n_ok)
 
 
 def check_hardcoded_paths():
@@ -1778,6 +1815,7 @@ def main():
         check_legal_db()
         check_legal_crosscheck()
         check_cite_alignment()
+        check_freshness_engine()
         check_tpl_engine()
         check_verify_engine()
         check_imbalance_engine()

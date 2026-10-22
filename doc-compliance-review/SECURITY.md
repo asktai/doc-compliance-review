@@ -1,6 +1,6 @@
 # 数据安全声明（一页版）｜ Data Security Statement
 
-**文档合规审查助手AI合同· doc-compliance-review** ｜ 版本：v3.22.3 ｜ 作者：胡皓 ｜ 2026-10-22
+**文档合规审查助手AI合同· doc-compliance-review** ｜ 版本：v3.23.0 ｜ 作者：胡皓 ｜ 2026-10-23
 
 > 本文可供**客户 IT / 法务 / 合规部门**审阅留档，是数据安全的**完整版**；`SKILL.md` 第十二节为其常驻摘要（四条要点＋脱敏口径），二者口径一致。
 
@@ -12,7 +12,7 @@
 
 | 编号 | 承诺 |
 |---|---|
-| **C1** | **文档数据不进入任何 AI 模型的训练 / 微调 / 评测语料。** 本技能不收集、不上传、不缓存、不回传任何文档内容。**脚本层分两类说清**：**处理文档的 20 个脚本零联网**（`scripts/` 下共 **21 个脚本**，第 21 个是查更新的 `version.py`）——不含 `requests`/`urllib`/`socket`/`http.client`/`aiohttp`/`httpx` 等联网库，也不调用 `curl`/`wget`/`Invoke-WebRequest`/`smtplib` 等外部网络命令；**唯一例外是 `version.py`（查更新）**，它的网络代码只出现在一个函数里、只 GET 一份公开的版本清单，且**默认不发任何请求**（须使用者显式打 `--check-online`，或把 `config.json` 的 `update.check_online_by_default` 显式设为 true），**任何情况下都不读取、不上传文档内容**，因为它接触不到文档。逐脚本自检方法见第五节。 |
+| **C1** | **文档数据不进入任何 AI 模型的训练 / 微调 / 评测语料。** 本技能不收集、不上传、不缓存、不回传任何文档内容。**脚本层按「能不能碰到文档」分两类说清**（v3.23.0 起 `scripts/` 下共 **23 个脚本**）：**处理文档的 20 个脚本零联网**——不含 `requests`/`urllib`/`socket`/`http.client`/`aiohttp`/`httpx` 等联网库，也不调用 `curl`/`wget`/`Invoke-WebRequest`/`smtplib` 等外部网络命令；**另有 3 个脚本含网络代码，但它们接触不到文档**——没有读文档的参数，也不会回传任何内容：① `version.py` 查更新，网络代码只在一个函数里、只 GET 一份公开版本清单，**默认不发任何请求**（须使用者显式打 `--check-online`，或把 `update.check_online_by_default` 显式设为 true）；② `freshness-patrol.py` 法规库失效巡检，**须使用者显式调用**才联网，只抓公开法规页面；③ `legal-parse.py` 抓取与解析核心，被 ② 调用，只抓公开法规页面。三者**都不读取、不上传文档内容**，因为它们在代码里就碰不到文档。逐脚本自检方法见第五节。 |
 | **C2** | **不改动原始文件。** 原件只读、永远留存；全部交付物均为新建文件。 |
 | **C3** | **最小必要。** 只读取必要范围；脱敏只脱必要类别；凡数据出域，**先脱敏**。 |
 | **C4** | **脱敏可逆、映射表隔离。** 映射表（含真实值的明文对照表）默认只落**本机隔离目录** `~/.dcr-maps/`，**不随交付物外发**；可 `--irreversible` 选择不生成映射表。 |
@@ -65,7 +65,7 @@
 
 | 措施 | 说明 |
 |---|---|
-| 零联网 / 断网可用 | **处理文档的 20 个脚本全部**不含联网库与外部网络命令；第 21 个 `version.py` 的联网代码只在一个函数内、只 GET 公开清单、**默认关闭**（不开开关、不打 `--check-online` 就是一个请求都不发）。依赖仅标准库＋ `python-docx`/`openpyxl`/`Pillow`；除"审查判断"外，其余环节均可离线完成 |
+| 零联网 / 断网可用 | **处理文档的 20 个脚本全部**不含联网库与外部网络命令；另有 3 个脚本含网络代码但**接触不到文档**：`version.py` 查更新默认关闭、`freshness-patrol.py` 巡检与 `legal-parse.py` 抓法规页须显式调用。依赖仅标准库＋ `python-docx`/`openpyxl`/`Pillow`；除"审查判断"外，其余环节均可离线完成（巡检本身需要联网，但它不是审查环节） |
 | 无缓存留痕 | 脚本禁止生成 `__pycache__`；`check.py --clean` 可清残留 |
 | 脚本防篡改 | `check.py --sign` 建指纹基线、`--verify` 校验，被改动即告警 |
 | 无执行策略绕过 | 校验用纯 Python `check.py`，不需要 PowerShell 执行策略绕过参数 |
@@ -75,18 +75,18 @@
 | 私有库默认空 | 根 `rules.md` 为空库、示例移入 `_template/`，避免企业未填写时示例规则误生效 |
 | 输出隔离与限权 | 按文档名分目录；可选关闭权限继承、仅授权本机账户 |
 
-**零联网自检**（在技能目录下执行）。**预期结果**：命中名单只有 `version.py` 一个——它是**如实计入**，不是漏网：网络代码只用于读那份公开清单，且默认关闭（见 C7）。
+**零联网自检**（在技能目录下执行）。**预期结果**：命中名单只有 `version.py`、`freshness-patrol.py`、`legal-parse.py` 三个——它们是**如实计入**，不是漏网：三者的网络代码都只用于抓公开内容（版本清单／法规页面），**且都默认不联网**（查更新须显式开，巡检须显式跑）。三者均不接触文档。
 
-> **另有两个文件会命中，但它们不是联网**：`check.py` 与 `smoke-test.py` 是**查别人的检查器**，里面写着这串关键字本身（`"import urllib"` 这类字符串字面量），用来扫描其他脚本。它们不 import 任何网络库、也不发请求。所以若用 grep 自检，看到 `check.py`／`smoke-test.py` 属正常，**看到其余任何文件才是问题**。
+> **另有两个文件会命中，但它们不是联网**：`check.py` 与 `smoke-test.py` 是**查别人的检查器**，里面写着这串关键字本身（`"import urllib"` 这类字符串字面量），用来扫描其他脚本。它们不 import 任何网络库、也不发请求。所以若用 grep 自检，看到 `check.py`／`smoke-test.py` 属正常，**看到这三个之外的任何文件才是问题**。
 
 ```bash
 python -c "import pathlib; ks=('requests','urllib','socket','http.client','aiohttp','httpx','curl','wget','Invoke-WebRequest','smtplib'); print([f.name for f in pathlib.Path('scripts').glob('*.py') if any(k in f.read_text(encoding='utf-8',errors='ignore') for k in ks)])"
-# 预期：['version.py']
+# 预期：['version.py', 'freshness-patrol.py', 'legal-parse.py']
 ```
 
 **不用读代码、只看行为**的核验（更能说服客户 IT）：清空 `config.json` 的 `update` 段后跑 `python scripts/version.py --notice`，**零输出、退出码 0** 即证明默认不发请求。
 ```powershell
-# PowerShell 等价写法（预期同样只列出 version.py）
+# PowerShell 等价写法（预期同样只列出那三个）
 Select-String -Path scripts\*.py -Pattern 'requests|urllib|socket|aiohttp|httpx|curl|wget|Invoke-WebRequest|smtplib' | Select-Object -ExpandProperty Filename -Unique
 ```
 
