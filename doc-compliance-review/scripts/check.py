@@ -1283,6 +1283,114 @@ def check_tpl_engine():
     info("模板引擎：正例通过、4 类负例全部拦下（占位符必填／漏登记／条件段未闭合／无版本留痕）")
 
 
+def check_legal_crosscheck():
+    """法规库交叉验证（出包硬闸）：比对算法可用、库内置信字段齐全、一致率不低于下限且不回退。
+
+    为什么必须拦而不是只报：单源抓取的条文一旦网页本身有错字、漏字、串行，
+    核验会把错的判成对的——比没有库更危险。交叉验证是唯一能自动发现这类错误的手段，
+    它一旦静默失效（字段丢了、比对恒真、源集体失效），整个法条库就退化成「看起来有校验」。
+
+    三道关：
+      ① 算法关：给 legal-crosscheck.py 灌三组已知答案（全等/标点差异/漏一句），
+         结果不对说明比对失效——比「率低了」更严重，直接报错。
+      ② 字段关：每条必须带 verified(bool) 与 status(枚举)，且 verified 与 status 自洽；
+         带 verified=true 的必须同时在 sources 里给出 ≥2 个来源标识。
+      ③ 水位关：多源一致率不得低于 FLOOR（历史最低水位）——防回退。
+         回退通常意味着「某个源失效了却没人发现」，这正是要拦的。
+    """
+    dbp = os.path.join(ROOT, "core", "legal-articles.json")
+    modp = os.path.join(HERE, "legal-crosscheck.py")
+    if not os.path.exists(modp):
+        err("交叉验证模块缺失：scripts/legal-crosscheck.py（法规库失去多源比对能力）")
+        return
+    try:
+        import importlib.util as _ilu
+        s = _ilu.spec_from_file_location("_ck_cross", modp)
+        m = _ilu.module_from_spec(s)
+        s.loader.exec_module(m)
+    except Exception as e:
+        err("交叉验证模块无法加载：%s" % e)
+        return
+
+    # ① 算法关：三组已知答案
+    a = "用人单位应当建立职工名册备查"
+    cases = [
+        ("全等", a, a, 1.0),
+        ("标点差异", a + "。", a + "，", 1.0),
+        ("漏一句", a + "用人单位自用工之日起即与劳动者建立劳动关系", a, None),
+    ]
+    for label, x, y, want in cases:
+        c = m.compare(x, y)
+        if want is not None:
+            if abs(c["ratio"] - want) > 1e-6:
+                err("交叉验证算法失灵（%s 场景应得 %.2f，实得 %s）——比对已不可信"
+                    % (label, want, c["ratio"]))
+        else:
+            if c["ratio"] >= 0.985:
+                err("交叉验证算法失灵（漏一句仍判一致，ratio=%s）——阈值形同虚设"
+                    % c["ratio"])
+    v = m.verdict([("A", a), ("B", a)])
+    if not v.get("verified"):
+        err("交叉验证判决失灵（两源全等却判未核）")
+    v = m.verdict([("A", a)])
+    if v.get("verified"):
+        err("交叉验证判决失灵（单源却判已核）——这是最危险的错误，会把未核伪装成已核")
+
+    # ② 字段关 + ③ 水位关
+    if not os.path.exists(dbp):
+        return          # 缺失由 check_legal_db 报，不重复
+    try:
+        db = json.loads(_read(dbp))
+    except Exception:
+        return
+    laws = db.get("laws") or {}
+    total = verified = 0
+    bad = []
+    for law, ents in laws.items():
+        for no, e in ents.items():
+            total += 1
+            st = e.get("status")
+            vf = e.get("verified")
+            if not isinstance(vf, bool):
+                bad.append("%s第%s条 缺 verified 字段" % (law, no))
+                continue
+            if st not in ("multi-ok", "single", "conflict"):
+                bad.append("%s第%s条 status 非法（%r）" % (law, no, st))
+                continue
+            if vf != (st == "multi-ok"):
+                bad.append("%s第%s条 verified 与 status 不自洽（%s/%s）" % (law, no, vf, st))
+            if vf:
+                verified += 1
+                srcs = e.get("sources") or []
+                if len(srcs) < 2:
+                    bad.append("%s第%s条 标了已核却不足 2 个来源" % (law, no))
+    if bad:
+        err("法规库交叉验证字段有问题 %d 处：%s" % (len(bad), "；".join(bad[:5])))
+        return
+    if not total:
+        return
+
+    rate = verified / float(total)
+    mc = db.get("_交叉验证") or {}
+    claimed = (mc.get("统计") or {}).get("多源一致")
+    if claimed is not None and claimed != verified:
+        err("法规库口径失准：_交叉验证 记「多源一致 %d」，实测 %d" % (claimed, verified))
+
+    # 水位线：写在本文件里，改它需要过 code review，避免「悄悄调低标准」
+    FLOOR = 0.36
+    if rate < FLOOR:
+        err("法规库交叉验证覆盖率回退：多源一致 %d/%d＝%.1f%%，低于水位线 %.0f%%。"
+            "通常是某个独立来源失效了——补源或查明原因后再出包，别调低水位线。"
+            % (verified, total, rate * 100, FLOOR * 100))
+    n_conf = sum(1 for ents in laws.values() for e in ents.values()
+                 if e.get("status") == "conflict")
+    if n_conf:
+        err("法规库存在 %d 条多源冲突未裁决：引用前必须人工比对官方文本"
+            "（明细见 report/legal-crosscheck.json）" % n_conf)
+    info("法规库交叉验证：%d/%d 条多源一致（%.1f%%），单源 %d 条，冲突 %d 条"
+         % (verified, total, rate * 100, total - verified - n_conf, n_conf))
+
+
 def check_legal_db():
     """法条核验库自洽：结构完整、条文非空、sha256 与正文对得上、文档口径与实收条数一致。
     背景：库是「核验真值源」，一旦混入残缺/错位条文，核验会把错的判成对的——
@@ -1415,6 +1523,7 @@ def main():
         check_platform_limit()
         check_sample_baseline()
         check_legal_db()
+        check_legal_crosscheck()
         check_tpl_engine()
         check_reproducible_build()
         check_gitignore()

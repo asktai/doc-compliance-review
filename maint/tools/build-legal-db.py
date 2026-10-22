@@ -15,6 +15,7 @@
 """
 import argparse
 import html
+import importlib.util
 import json
 import os
 import re
@@ -24,13 +25,20 @@ import time
 import socket
 import hashlib
 import datetime
+import urllib.parse
 import urllib.request
+
+CROSS = None   # 由 _load_crosscheck() 注入（legal-crosscheck.py）
 
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
       "(KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36")
 
 # 数据源：只用公开可访问的官方或官方转载页；每部法可给篇；抓完合并去重
 SOURCES = {
+    # 每个法名下可给多个 URL。注意区分两种「多 URL」：
+    #   · 分页/补篇（同一份文本拆成几页）→ 拼起来是一份，**不构成交叉验证**
+    #   · 独立来源（不同机构、不同网页各自发布全文）→ 才算交叉验证
+    # 用 GROUPS 显式标注：同一组的 URL 视为「同一份文本的分页」，不同组之间才比。
     "民法典": [
         # 中国经济网转载新华社《民法典》全文（GBK），覆盖第 1–917 条
         ("https://www.ce.cn/xwzx/gnsz/gdxw/202006/01/t20200601_35019528.shtml", "gbk"),
@@ -41,6 +49,8 @@ SOURCES = {
     ],
     "劳动合同法": [
         ("https://www.longling.gov.cn/info/7359/2410199.htm", "utf-8"),
+        # 交叉验证源：广州市南沙区人大转载 2012 年修订全文（98 条，独立于龙陵县政府）
+        ("https://www.gzns.gov.cn/rd/flfg/gjflfg/201705/t20170505_345140.html", "utf-8"),
     ],
     "个人信息保护法": [
         # 中央网络安全和信息化委员会办公室（国家网信办）全文
@@ -84,20 +94,32 @@ SOURCES = {
     "合同编通则解释": [
         # 最高人民法院《关于适用〈民法典〉合同编通则若干问题的解释》全文（法释〔2023〕13 号）
         ("https://www.court.gov.cn/fabu/xiangqing/419382.html", "utf-8"),
+        # 交叉验证源：威海市环翠区政府转载全文（69 条，独立于最高法官网）
+        ("http://www.huancui.gov.cn/art/2023/12/12/art_78980_4204746.html", "utf-8"),
     ],
     "公司法": [
         # 中国人大网 2023-12-29 修订全文（2024-07-01 施行）
         ("http://www.npc.gov.cn/npc/c2/c30834/202312/t20231229_433999.html", "utf-8"),
+        # 交叉验证源：中国政府网转载新华社全文（266 条，独立于人大网）
+        ("https://www.gov.cn/yaowen/liebiao/202312/content_6923395.htm", "utf-8"),
     ],
     "网络安全法": [
         # 中央网信办 2016 年全文（分 3 页，合一为一）；2025-10-28 修正，2026-01-01 施行，见 META.pending
         ("https://www.cac.gov.cn/2016-11/07/c_1119867116.htm", "utf-8"),
         ("https://www.cac.gov.cn/2016-11/07/c_1119867116_2.htm", "utf-8"),
         ("https://www.cac.gov.cn/2016-11/07/c_1119867116_3.htm", "utf-8"),
+        # 曾试作交叉验证源、已弃用：宁蒗县政府 2016 版整页（79 条）——
+        # 该页把「法律责任对照表」混排在全文之后，表内以「第二十五条」「第四十一条」
+        # 开头的单元格被当成条头，导致 25/41/64 条正文串位。交叉验证正是靠这个
+        # 才发现的（三源相比，它单方面对不上）。不换新版的理由：2025-10-28 修正后
+        # 条号后移（新第八十一条＝旧第七十九条），跨版本比对必全冲突。
+        # 结论：**本库仍为 2016 版单源，标 verified=false**，待找可用的同版本独立源。
     ],
     "消费者权益保护法": [
         # 中国人大网 2013 年第二次修正全文（2014-03-15 施行，共 63 条）
         ("http://www.npc.gov.cn/zgrdw/npc/xinwen/2013-10/26/content_1811773.htm", "utf-8"),
+        # 交叉验证源：阿拉善盟行政公署转载全文（63 条，独立于人大网）
+        ("https://www.als.gov.cn/art/2019/8/20/art_74_255699.html", "utf-8"),
     ],
     "电子商务法": [
         # 人民政协网受权发布全文（分 5 页：.shtml,_1,_2,_3,_4，共 89 条；2019-01-01 施行）
@@ -110,7 +132,30 @@ SOURCES = {
     "数据安全法": [
         # 中央网信办全文（2021-09-01 施行，共 55 条）
         ("https://www.cac.gov.cn/2021-06/11/c_1624994566919140.htm", "utf-8"),
+        # 交叉验证源：石家庄市藁城区政府转载全文（55 条，独立于网信办）
+        ("https://www.gc.gov.cn/columns/8e15378c-0a26-4abf-b213-3a302d59a699/202204/08/"
+         "3dc38a27-1d9f-4e93-a3f8-09b70600afc5.html", "utf-8"),
     ],
+}
+
+# 哪些 URL 属于「同一份文本的分页/补篇」——同组内的条号会自动拼接，**不与同组互证**。
+# 只有跨组之间才做交叉验证，否则把同一页拆成几页就会误判成「两源一致」。
+GROUPS = {
+    "民法典": [0, 0, 0],       # 三处都是转新华社同一篇，属补篇，非独立源
+    "网络安全法": [0, 0, 0],    # cac 分 3 页（同组）
+    "电子商务法": [0, 0, 0, 0, 0],  # 人民政协 分 5 页
+}
+# 独立来源标注：给每个 URL 一个可读的「来源机构」名，写进库里的 sources 字段
+SRC_NAMES = {
+    "ce.cn": "中国经济网", "hefucheng.jcy.gov.cn": "阜城县检察院",
+    "guzhen.gov.cn": "固镇县政府", "longling.gov.cn": "龙陵县政府",
+    "cac.gov.cn": "中央网信办", "huaiyin.jnjcy.gov.cn": "槐荫区检察院",
+    "npc.gov.cn": "中国人大网", "samr.gov.cn": "市场监管总局",
+    "zhongshan.jcy.gov.cn": "中山检察在线", "court.gov.cn": "最高人民法院",
+    "gov.cn": "中国政府网", "rmzxw.com.cn": "人民政协网",
+    "huancui.gov.cn": "威海环翠区政府", "gc.gov.cn": "石家庄藁城区政府",
+    "gzns.gov.cn": "广州南沙区人大", "als.gov.cn": "阿拉善盟行署",
+    "ynnl.gov.cn": "宁蒗县政府",
 }
 
 # 法律版本元信息：核验时必须能回答「引的是哪一版、什么时候生效」。
@@ -217,10 +262,10 @@ WANTED = {
     "食品安全法": [148],
     # 合同编通则解释：合同订立、效力、履行、违约责任四大块
     "合同编通则解释": [
-        1, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
-        21, 22, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37,
+        1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
+        21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37,
         38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53,
-        54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68,
+        54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69,
     ],
     # 公司法：出资、股权转让、股东权利、董监高义务、清算
     "公司法": [
@@ -348,6 +393,7 @@ def parse_articles(text):
         body = re.split(r"\n\s*(?:第[一二三四五六七八九十]+[编章节]|附\s*则)", body)[0]
         body = re.sub(r"\s*\n\s*", "", body).strip()
         body = re.sub(r"（责任编辑：[^）]*）.*$", "", body).strip()
+        body = strip_tail_noise(body)
         # 部分来源（如最高法司法解释）用「三、合同的效力」这种序号式章节标题分隔，
         # 会被并进上一条正文尾，须砍掉。只认**已知章节标题词**，不做泛化缩写，
         # 否则会把正文末尾真正的「三、……」列举项一并砍掉。
@@ -374,6 +420,29 @@ _FOOT_RE = re.compile(r"(相关链接|版权所有|Copyright|ICP备|举报电话
 def strip_footer(body):
     m = _FOOT_RE.search(body)
     if m and m.start() > 20:
+        return body[:m.start()].strip()
+    return body
+
+
+# 页面编辑署名尾巴：位置固定在各页正文末条之后，属噪声但不在 _FOOT_RE 词表里。
+# 只在正文已经够长（>40 字）时才砍，避免把正常的短条文砍没。
+_TAIL_NOISE = re.compile(
+    r"(?:编\s*辑[：:]\s*[\u4e00-\u9fa5]{2,4}\s*责\s*编[：:]\s*[\u4e00-\u9fa5]{2,4}"
+    r"|责\s*编[：:]\s*[\u4e00-\u9fa5]{2,4}"
+    r"|【我要纠错】"
+    r"|扫一扫在手机打开当前页|扫一扫在手机上打开当前页"
+    r"|上一篇[：:]|下一篇[：:]|打印本页|打印页面|【TOP】|【打印页面】|【关闭页面】"
+    r"|网站地图"
+    r"|相关文章|相关稿件|相关链接)"
+)
+
+
+def strip_tail_noise(body, floor=8):
+    """砍页面署名尾巴。判据是「噪声出现的位置不太靠前」，而非正文有多长——
+    按长度判会把「本法自2008年1月1日起施行。」这类短条文连带砍没（它只有 16 字，
+    但后续 40 字全是「扫一扫/上一篇/下一篇」导航）。"""
+    m = _TAIL_NOISE.search(body)
+    if m and m.start() >= floor:
         return body[:m.start()].strip()
     return body
 
@@ -448,9 +517,17 @@ def strip_line_title(body, law=None, no=None):
     """剥离条文小标题。先查人工核对过的对照表；不命中就原样返回（不猜）。"""
     titles = LINE_TITLES.get(law or "")
     t = titles.get(no) if titles else None
-    if t and body.startswith(t) and len(body) - len(t) >= 10:
-        return body[len(t):]
-    return body
+    if not (t and body.startswith(t)):
+        return body
+    rest = body[len(t):]
+    # 两道守卫，防「把正文当标题剥掉」：
+    #   ① 剥完不能太短（短了说明这一条本来就只是那一行）
+    #   ② 剥完不能以标点开头——条文正文不会以「，」「。」起头，
+    #      以标点起头说明 t 其实是正文的一部分（如「固定期限劳动合同，是指……」里的
+    #      「固定期限劳动合同」正是本条首句的主语，不是小标题）。
+    if len(rest) < 10 or rest[:1] in "，。、；：,.;:":
+        return body
+    return rest
 
 
 def short_anchor(body, n=40):
@@ -461,31 +538,88 @@ def short_anchor(body, n=40):
     return head[:n].strip()
 
 
+def src_name(url):
+    host = urllib.parse.urlparse(url).netloc.replace("www.", "")
+    for k, v in SRC_NAMES.items():
+        if host.endswith(k):
+            return v
+    return host
+
+
+def is_garbage_text(body):
+    return looks_garbage(body) or len(body) < 4
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=None, help="输出路径（默认 core/legal-articles.json）")
+    ap.add_argument("--dump-raw", default=None,
+                    help="把每个 URL 的原始抽条结果落盘（调试/复核用）")
     a = ap.parse_args()
     here = os.path.dirname(os.path.abspath(__file__))
     root = os.path.abspath(os.path.join(here, "..", "..", "doc-compliance-review"))
     out = a.out or os.path.join(root, "core", "legal-articles.json")
 
+    _load_crosscheck(here)
+
     result, missing, srcs = {}, {}, []
+    stats = {}          # 法名 → {"multi-ok": n, "single": n, "conflict": n, "missing": n}
+    conflicts = []      # 冲突明细（写进 report/legal-conflicts.json）
+    raw_dump = {}
+
     for law, urls in SOURCES.items():
-        merged = {}
-        for url, enc in urls:
+        groups = GROUPS.get(law) or list(range(len(urls)))
+        if len(groups) != len(urls):
+            print("[!] %s 的 GROUPS 长度(%d) 与 SOURCES(%d) 不符，按「每 URL 独立」处理"
+                  % (law, len(groups), len(urls)))
+            groups = list(range(len(urls)))
+
+        # 逐 URL 抽条
+        per_url = []
+        for idx, (url, enc) in enumerate(urls):
+            p = {"url": url, "grp": groups[idx], "name": src_name(url),
+                 "got": {}, "ok": False}
             try:
                 text = to_text(fetch(url, enc))
             except Exception as ex:
                 print("[抓取失败] %s：%s" % (url, ex))
+                per_url.append(p)
                 continue
             got = parse_articles(text)
             print("[抓取] %-8s %s → %d 条" % (law, url[:52], len(got)))
-            srcs.append({"law": law, "url": url, "fetched": datetime.date.today().isoformat()})
-            for k, v in got.items():
-                if k not in merged or len(v) > len(merged[k]):
-                    merged[k] = v
+            p["got"], p["ok"] = got, bool(got)
+            per_url.append(p)
+            srcs.append({"law": law, "url": url, "name": src_name(url),
+                         "articles": len(got),
+                         "fetched": datetime.date.today().isoformat()})
+        raw_dump[law] = {p["url"]: len(p["got"]) for p in per_url}
+
+        # 组分页拼接：同组内的条号是同一份文本的不同页，先拼后比
+        grp_texts, grp_names = {}, {}       # grp → {条号: 正文} / grp → 来源名
+        for p in per_url:
+            if not p["ok"]:
+                continue
+            g = grp_texts.setdefault(p["grp"], {})
+            grp_names.setdefault(p["grp"], p["name"])
+            for k, v in p["got"].items():
+                if k not in g or len(v) > len(g[k]):
+                    g[k] = v
+
+        # 逐条判定：同条号跨组比对（同组内是分页，不算独立源）
+        merged, verdicts, cand_srcs = {}, {}, {}
+        for no in sorted({k for g in grp_texts.values() for k in g}):
+            # 比对前先剥「条文小标题」：部分转载页把「服务期」这类标题挤在条号后，
+            # 另一源没有——不先剥就会把标题当正文差异，整部法误报冲突。
+            cand = [("G%d·%s" % (gi, grp_names[gi]), strip_line_title(g[no], law, no))
+                    for gi, g in sorted(grp_texts.items()) if no in g]
+            merged[no] = cand[0][1] if len(cand) == 1 else _pick_best(cand)
+            cand_srcs[no] = [s for s, _t in cand]
+            verdicts[no] = CROSS.verdict(cand) if len(cand) > 1 else {
+                "status": "single", "verified": False, "ratio": None, "conflict": None}
+
         want = WANTED.get(law) or sorted(merged)
         arts = {}
+        stat = {"multi-ok": 0, "single": 0, "conflict": 0, "missing": 0}
         for no in want:
             body = merged.get(no)
             if body:
@@ -494,22 +628,60 @@ def main():
             if body and looks_garbage(body):
                 print("[可疑] %-8s 第%s条 疑似解析垃圾，已剔除 → %s" % (law, no, body[:40]))
                 body = None
-            if body:
-                arts[str(no)] = {
-                    "no": no,
-                    "anchor": short_anchor(body),
-                    "text": body,
-                    "sha256": hashlib.sha256(body.encode("utf-8")).hexdigest()[:16],
-                }
-            else:
+            if not body:
                 missing.setdefault(law, []).append(no)
+                stat["missing"] += 1
+                continue
+            v = verdicts.get(no) or {}
+            ent = {
+                "no": no,
+                "anchor": short_anchor(body),
+                "text": body,
+                "sha256": hashlib.sha256(body.encode("utf-8")).hexdigest()[:16],
+                "verified": bool(v.get("verified")),
+                "status": v.get("status") or "single",
+            }
+            if len(cand_srcs.get(no) or []) > 1:
+                ent["sources"] = cand_srcs[no]
+            if v.get("ratio") is not None:
+                ent["ratio"] = v["ratio"]
+            if v.get("conflict"):
+                ent["conflict"] = v["conflict"]
+                conflicts.append({"law": law, "no": no, "ratio": v["ratio"],
+                                  **v["conflict"]})
+            arts[str(no)] = ent
+            key = ("multi-ok" if v.get("verified")
+                   else "conflict" if v.get("conflict") else "single")
+            stat[key] += 1
         result[law] = arts
+        stats[law] = stat
+
+    # 全局统计
+    all_ents = [e for v in result.values() for e in v.values()]
+    n_all = len(all_ents)
+    n_ver = sum(1 for e in all_ents if e.get("verified"))
+    n_con = sum(1 for e in all_ents if e.get("status") == "conflict")
+    n_single = n_all - n_ver - n_con
 
     db = {
         "_说明": "法条原文核验库（开发侧生成，随技能包分发）。审查引法条时以本库为唯一真值来源；"
                  "本库没有的条号一律标「待核验」，不得凭记忆引用。条文以现行有效版本为准。",
         "_用法": "核验三件事：①条号存不存在 ②引述的句子能不能在本条原文里找到 ③引的是哪一版。"
                  "三者任一不过，一律降级为「待核验」并在报告里写明差在哪。",
+        "_交叉验证": {
+            "机制": "同一部法从 ≥2 个彼此独立的来源抓同一批条号，逐条比对正文；"
+                    "一致记 verified=true，不一致记 verified=false + status=conflict 并保留两版差异，"
+                    "只有一源记 verified=false + status=single。**不猜谁对**——冲突交人工裁决。",
+            "比对口径": "只比中文字与数字，剔除标点空白；4 字片段双向覆盖率取较小值；"
+                        "阈值 0.985（允许全半角/的 字等转载噪声，漏一句必跌破）。",
+            "分页处理": "同一份文本拆成多页的 URL 记在 GROUPS 同组，先拼后比，"
+                        "**不把分页当独立源**，否则会把「同一页」误判成「两源一致」。",
+            "统计": {"总条数": n_all, "多源一致": n_ver, "单源未核": n_single,
+                     "多源冲突": n_con,
+                     "多源一致率": round(n_ver / float(n_all), 4) if n_all else 0},
+            "口径": "verified=true 只表示「多源一致」，不等于「现行有效」；"
+                    "冲突条与单源条引用时必须人工复核官方文本（flk.npc.gov.cn）。",
+        },
         "generated": datetime.date.today().isoformat(),
         "sources": srcs,
         "laws": result,
@@ -521,9 +693,53 @@ def main():
     with open(out, "w", encoding="utf-8") as f:
         json.dump(db, f, ensure_ascii=False, indent=1)
     total = sum(len(v) for v in result.values())
-    print("\n落盘：%s（%d 条）" % (out, total))
+    print("\n落盘：%s（%d 部法 / %d 条）" % (out, len(result), total))
+
+    # 交叉验证报告
+    rep = os.path.join(root, "report", "legal-crosscheck.json")
+    os.makedirs(os.path.dirname(rep), exist_ok=True)
+    with open(rep, "w", encoding="utf-8") as f:
+        json.dump({"generated": db["generated"], "stats": stats,
+                   "overall": db["_交叉验证"]["统计"],
+                   "conflicts": conflicts}, f, ensure_ascii=False, indent=1)
+    print("交叉验证报告：%s" % rep)
+
+    print("\n%-14s %6s %8s %8s %8s" % ("法律", "条数", "多源一致", "单源", "冲突"))
+    for law, st in stats.items():
+        print("%-14s %6d %8d %8d %8d" % (law, len(result[law]), st.get("multi-ok", 0),
+                                         st.get("single", 0), st.get("conflict", 0)))
+    print("%-14s %6d %8d %8d %8d" % ("合计", total, n_ver, n_single, n_con))
+    if n_con:
+        print("\n[冲突] 以下条号多源不一致，须人工裁决（原文已保留，未择一）：")
+        for c in conflicts[:20]:
+            print("  《%s》第%s条  一致度 %.3f" % (c["law"], c["no"], c["ratio"]))
+            print("    仅基准源有：%s" % (c.get("only_base") or "—"))
+            print("    仅对比源有：%s" % (c.get("only_other") or "—"))
     if missing:
-        print("未抓到（须人工补或标待核验）：", json.dumps(missing, ensure_ascii=False))
+        print("\n未抓到（须人工补或标待核验）：", json.dumps(missing, ensure_ascii=False))
+    if a.dump_raw:
+        with open(a.dump_raw, "w", encoding="utf-8") as f:
+            json.dump(raw_dump, f, ensure_ascii=False, indent=1)
+
+
+def _pick_best(cand):
+    """多源时选「最长」作底本——通常最完整；差异另记在 conflict 里，不丢信息。"""
+    return max((t for _s, t in cand), key=len)
+
+
+def _load_crosscheck(here):
+    """加载比对模块。优先同目录（开发侧），其次随包 scripts/（已装运行实例）。"""
+    global CROSS
+    for p in (os.path.join(here, "legal-crosscheck.py"),
+              os.path.join(here, "..", "..", "doc-compliance-review", "scripts",
+                           "legal-crosscheck.py")):
+        if os.path.exists(p):
+            spec = importlib.util.spec_from_file_location("legal_crosscheck", p)
+            m = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(m)
+            CROSS = m
+            return
+    raise SystemExit("[E] 找不到 legal-crosscheck.py（比对模块），无法做交叉验证")
 
 
 if __name__ == "__main__":

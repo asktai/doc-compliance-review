@@ -3,7 +3,7 @@
   "product": "文档合规审查助手AI合同",
   "skill_id": "doc-compliance-review",
   "latest": {
-    "version": "v3.17.1",
+    "version": "v3.18.0",
     "date": "2026-10-22",
     "summary": "补正「三库」两层含义：产品级三库（规则／法规／模板）与规则库内三层（通用／行业／私有）分别成表",
     "changes": [
@@ -14,8 +14,8 @@
     ],
     "download_page": "https://github.com/asktai/doc-compliance-review/releases",
     "files": {
-      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.17.1/文档合规审查助手AI合同_v3.17.1_20261022_(doc-compliance-review).skill",
-      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.17.1/文档合规审查助手AI合同_v3.17.1_20261022_(doc-compliance-review).zip"
+      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.18.0/文档合规审查助手AI合同_v3.18.0_20261022_(doc-compliance-review).skill",
+      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.18.0/文档合规审查助手AI合同_v3.18.0_20261022_(doc-compliance-review).zip"
     }
   },
   "history": [
@@ -96,5 +96,6 @@
     }
   ],
   "_维护说明": "出包后请同步更新本文件（latest 段与 history）。真源是 SKILL.md 的 version 与 VERSION.md 的沿革；本文件是'对外公布的清单'，须与真源一致，否则使用者会被引向旧版。",
-  "schema": 1
+  "schema": 1,
+  "version": "v3.18.0"
 }

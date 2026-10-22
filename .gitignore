@@ -24,7 +24,13 @@ config.local.json
 
 # 重排映射临时产物：由重排脚本每次跑自动覆盖，属运行期产物，不入档
 maint/scratch/.last-clause-map.txt
-
 # 在线版（目录去锚点）：由 maint/tools/make-online-md.py 从 DEV-RULES.md 派生，
 # 每次上传前重生成；属派生物，不入档（第 (14) 维守卫会查它是否与源同步）。
 maint/scratch/DEV-RULES.online.md
+
+# 审查产物目录：每次审查的报告与核验结果都落这里，属运行期产物，不入档。
+# 交叉验证明细 report/legal-crosscheck.json 也是每次建库重写，随建随弃。
+doc-compliance-review/report/
+
+# 出包产物：由 scripts/pack.py 每次生成，不入档（发布走 release 附件）。
+doc-compliance-review/_发布包/

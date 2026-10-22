@@ -195,6 +195,25 @@ def extract_cites(text):
     return out
 
 
+# 置信来源说明：库里这条有没有被多源交叉验证过。
+# 交叉验证只管「多个独立来源的同一段文字是否一致」，管不了「这条法还现行有效没有」——
+# 两者必须分开说，否则「已核」会被读成「绝对正确」。
+CONF_NOTE = {
+    "multi-ok": "",                    # 已多源一致，无需额外提示
+    "single": "本条在库里为**单源收录**，未做多源交叉验证；引用前建议人工比对官方文本",
+    "conflict": "本条在库里有**多源冲突未裁决**，两版原文差异较大；引用前必须人工裁定",
+}
+CONF_LABEL = {"multi-ok": "多源一致", "single": "单源未核", "conflict": "多源冲突"}
+
+
+def _join(a, b):
+    if not a:
+        return b
+    if not b:
+        return a
+    return a + "；" + b
+
+
 def verify(cites, db, strict=0.72):
     """对每条引用给出判定。判定只有四档，不发明第五档。
 
@@ -218,6 +237,7 @@ def verify(cites, db, strict=0.72):
             "version": m.get("version", ""), "effective": m.get("effective", ""),
             "pending": m.get("pending"),
             "status": "", "score": None, "cov": None, "anchor": "", "note": "",
+            "verified": None, "vs": "",
         }
         if ent is None:
             row["status"] = "待核验"
@@ -225,9 +245,14 @@ def verify(cites, db, strict=0.72):
                 len(v) for v in laws.values())
         else:
             row["anchor"] = ent.get("anchor", "")
+            # 置信来源：本条在库里有没有被多源交叉验证过
+            row["verified"] = bool(ent.get("verified"))
+            row["vs"] = ent.get("status") or ("multi-ok" if row["verified"] else "single")
+            if not row["verified"]:
+                row["note"] = CONF_NOTE.get(row["vs"], CONF_NOTE["single"])
             if not c["quote"] or len(norm(c["quote"])) < 6:
                 row["status"] = "条号成立"
-                row["note"] = "仅核到条号存在，未提供引述正文可比对"
+                row["note"] = _join(row["note"], "仅核到条号存在，未提供引述正文可比对")
             else:
                 sc, cov = best_window(c["quote"], ent["text"])
                 row["score"] = round(sc, 3)
@@ -236,10 +261,14 @@ def verify(cites, db, strict=0.72):
                     row["status"] = "通过"
                 elif cov >= 0.35:
                     row["status"] = "表述存疑"
-                    row["note"] = "引述能落到本条，但用词与原文偏差较大，请对照原文补正或改为转述"
+                    row["note"] = _join(row["note"],
+                                        "引述能落到本条，但用词与原文偏差较大，"
+                                        "请对照原文补正或改为转述")
                 else:
                     row["status"] = "待核验"
-                    row["note"] = "引述内容在本条原文中找不到对应，疑条号错位或引述失真"
+                    row["note"] = _join(row["note"],
+                                        "引述内容在本条原文中找不到对应，"
+                                        "疑条号错位或引述失真")
         if row["pending"]:
             p = row["pending"]
             row["note"] = (row["note"] + "；" if row["note"] else "") + \
@@ -257,11 +286,12 @@ def render_md(rows, src=""):
     L = ["## 法条核验表", "",
          "> 核验对象：%s ｜ 核验方式：本地原文库逐条比对（离线，未联网）" % (src or "本报告"),
          "> 结果：共 %d 条引用，通过 %d，需人工复核 %d。" % (len(rows), ok, bad),
-         "", "| # | 法律 | 条号 | 判定 | 匹配度 | 片段覆盖 | 所据版本 | 库里原文（节选） |",
-         "|---|---|---|---|---|---|---|"]
+         "", "| # | 法律 | 条号 | 判定 | 库内置信 | 匹配度 | 片段覆盖 | 所据版本 | 库里原文（节选） |",
+         "|---|---|---|---|---|---|---|---|"]
     for i, r in enumerate(rows, 1):
-        L.append("| %d | 《%s》 | 第%s条 | %s | %s | %s | %s | %s |" % (
+        L.append("| %d | 《%s》 | 第%s条 | %s | %s | %s | %s | %s | %s |" % (
             i, r["law"], r["no"], r["status"],
+            CONF_LABEL.get(r.get("vs") or "", "库外"),
             ("%.0f%%" % (r["score"] * 100)) if r["score"] is not None else "—",
             ("%.0f%%" % (r["cov"] * 100)) if r.get("cov") is not None else "—",
             r["version"] + ("（%s 施行）" % r["effective"] if r["effective"] else ""),
@@ -272,6 +302,16 @@ def render_md(rows, src=""):
         L += ["", "**逐条说明**", ""]
         for r in notes:
             L.append("- 《%s》第%s条：%s" % (r["law"], r["no"], r["note"]))
+    n_multi = sum(1 for r in rows if (r.get("vs") == "multi-ok"))
+    n_single = sum(1 for r in rows if (r.get("vs") == "single"))
+    n_conf = sum(1 for r in rows if (r.get("vs") == "conflict"))
+    L += ["", "**库内置信说明**（两个「置信」是不同的东西，别混）",
+          "",
+          "- **判定**：你引的这段话能不能在库中该条原文里找到——比的是**引述与原文**。",
+          "- **库内置信**：库中该条原文自身有没有被 ≥2 个独立来源比对过——比的是**源与源**。"
+          "「多源一致」 %d 条、「单源未核」 %d 条、「多源冲突」 %d 条。" % (n_multi, n_single, n_conf),
+          "- 两者都过，才叫「引述准确且原文可信」；任一存疑都要人工复核后再写入正式意见。",
+          ""]
     L += ["", "> **本表只证明「与本地库一致」，不证明「现行有效」。**条文以国家法律法规数据库"
               "（flk.npc.gov.cn）与官方公报为准；标注「待核验」者不得写入正式意见。", ""]
     return "\n".join(L)
