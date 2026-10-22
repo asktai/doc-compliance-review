@@ -952,6 +952,20 @@ def main():
             check("失衡画像：样本不足 3 条时明说不判（不硬凑系统性结论）",
                   r3.returncode == 0 and "未发现系统性偏移" in (r3.stdout or "")
                   and "不足 3 条" in (r3.stdout or ""), head_lines(r3.stdout))
+
+            # 没立场 → 不许给偏向结论，也不许印百分比（数字会被直接抄走）
+            r4 = run([PY, im, "--rows", p_rows])
+            o4 = r4.stdout or ""
+            check("失衡画像：未指定立场时不给偏向结论，也不印百分比",
+                  r4.returncode == 0 and "不做偏向判断" in o4
+                  and "占 " not in o4 and "维度分布" not in o4, head_lines(o4))
+
+            # 坏数据必须报错退出，不能静默给一份假结论
+            p_badrows = os.path.join(work, "imb-bad.json")
+            open(p_badrows, "w", encoding="utf-8").write('{"a": 1}')
+            r5 = run([PY, im, "--rows", p_badrows, "--side", "甲方"])
+            check("失衡画像：数据格式不对时报错退出（不静默给假结论）",
+                  r5.returncode == 2, tail_line(r5.stdout))
     except Exception as e:
         check("失衡画像自检", False, repr(e))
 

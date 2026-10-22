@@ -14,7 +14,8 @@
       "新增 scripts/imbalance.py：阈值写死为常量，判定可复现，不用心算",
       "★ 提示项不参与统计；最集中维度设 2 条门槛，避免谈判重点被稀释",
       "check.py 新增 check_imbalance_engine()：7 组用例＋常量区间校验＋禁止 ★ 计入",
-      "脚本 20 → 21，冒烟 120 → 126 项"
+      "脚本 20 → 21，冒烟 120 → 128 项",
+      "质检修正：未指定立场时不得输出偏向结论（原先照给结论只加备注，属严重缺陷）；数据格式不对时报错退出而非静默给假结论"
     ],
     "download_page": "https://github.com/asktai/doc-compliance-review/releases",
     "files": {

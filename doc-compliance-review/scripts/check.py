@@ -1081,8 +1081,9 @@ def check_imbalance_engine():
     if "★" in m.WEIGHT:
         err("失衡画像把 ★ 提示项计入了统计（会把结论稀释成没结论）")
 
-    info("失衡画像：7 组判定用例全过，阈值常量在合理区间（计入≥%d 条、同向≥%d 条且占≥%d%%），"
-         "★ 提示项不参与统计" % (m.MIN_ROWS, m.MIN_SAME, int(m.MAJORITY * 100)))
+    info("失衡画像：%d 组判定用例全过，阈值常量在合理区间（计入≥%d 条、同向≥%d 条且占≥%d%%），"
+         "★ 提示项不参与统计，无立场时不输出偏向结论"
+         % (len(m.CASES), m.MIN_ROWS, m.MIN_SAME, int(m.MAJORITY * 100)))
 
 
 def check_verify_engine():

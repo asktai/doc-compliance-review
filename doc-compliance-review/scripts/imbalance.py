@@ -56,6 +56,7 @@ VERDICT_AGAINST = "系统性有利于对方"
 VERDICT_FOR = "系统性有利于我方"
 VERDICT_BALANCED = "基本均衡"
 VERDICT_NA = "未发现系统性偏移"
+VERDICT_NO_SIDE = "未指定我方立场，不做偏向判断"
 
 
 def normalize(rows):
@@ -145,10 +146,18 @@ def judge(rows, side=""):
     if res["unclassified"]:
         res["notes"].append("有 %d 条维度未归类，未计入集中度排序，请人工确认归属"
                             % res["unclassified"])
-    if not side:
-        res["notes"].append("未指定我方立场，本结论无意义——同一份合同换个立场结论相反")
     if dropped:
         res["notes"].append("已剔除 %d 条 ★ 提示项（不参与统计）" % dropped)
+
+    # 没立场就不给偏向结论——同一份合同，我方是甲方还是乙方结论完全相反。
+    # 这里必须把结论整体作废，而不是「照常给结论再加一句备注」：
+    # 备注没人看，结论会被直接抄进报告。
+    if not side:
+        res["verdict"] = VERDICT_NO_SIDE
+        res["systemic"] = False
+        res["top_dims"] = []
+        res["notes"].append("未指定我方立场，不做偏向判断——"
+                            "同一份合同换个立场结论相反，无立场的偏向结论是错的")
     return res
 
 
@@ -163,6 +172,17 @@ def render(res, fmt="md"):
     L.append("【失衡画像】本件整体偏向：%s" % res["verdict"])
     L.append("")
     L.append("· 我方立场：%s" % side)
+
+    # 无立场：整体作废，不印任何百分比与维度分布，免得被当成结论抄走
+    if res["verdict"] == VERDICT_NO_SIDE:
+        L.append("")
+        L.append("· 本节不作偏向判断。**同一份合同，我方是甲方还是乙方，结论完全相反**——")
+        L.append("  在立场未定的情况下谈「偏向谁」，得到的数字是错的，抄进报告会误导谈判。")
+        L.append("· 请先在谈判地位档位（1.6）选定我方立场，再重新生成本节。")
+        for n in res.get("notes", []):
+            if "未指定我方立场" not in n:
+                L.append("· 注：%s" % n)
+        return "\n".join(L)
 
     if res["count"] == 0:
         L.append("· 无计入条款（★★★／★★），未作偏移判断。")
@@ -212,7 +232,8 @@ def render(res, fmt="md"):
 # ---------------------------------------------------------------- 自检
 
 CASES = ["系统性有利于对方", "样本不足", "占比不足60%", "系统性有利于我方",
-         "空数据", "维度未归类", "最集中维度门槛"]
+         "空数据", "维度未归类", "最集中维度门槛",
+         "无立场不给偏向结论", "无立场时不印百分比"]
 
 
 def self_test():
@@ -264,6 +285,18 @@ def self_test():
     if r["unclassified"] != 3:
         fails.append("维度认不出应计入未归类 3 条，实为 %d" % r["unclassified"])
 
+    # ⑧ 没立场 → 结论整体作废，不许照常给出偏向
+    rows = [{"no": str(i), "level": "★★", "dim": "违约责任", "against": True} for i in range(9)]
+    r = judge(rows, "")
+    if r["verdict"] != VERDICT_NO_SIDE or r["systemic"]:
+        fails.append("未指定立场时仍给出了偏向结论：%s/%s" % (r["verdict"], r["systemic"]))
+    # ⑨ 无立场的输出里不得出现百分比与维度分布——数字会被当成结论抄走
+    out = render(r)
+    if "占 100%" in out or "维度分布" in out:
+        fails.append("未指定立场时输出里仍印了百分比/维度分布，会被当成结论抄走")
+    if "选定我方立场" not in out:
+        fails.append("未指定立场时没告诉使用者该怎么办")
+
     # ⑦ 「最集中维度」不得把只有 1 条的维度算进去（否则谈判重点被稀释）
     rows = [{"no": "8.%d" % i, "level": "★★", "dim": "违约责任", "against": True}
             for i in range(1, 5)]
@@ -306,9 +339,16 @@ def main():
         print("[E] 读不了 %s：%s" % (a.rows, e))
         return 2
     if isinstance(rows, dict):
+        # 只认 {"rows": [...]} 这一种包法；其余 dict 一律当错误，不静默当空数据
+        if "rows" not in rows:
+            print("[E] %s 是对象但没有 rows 字段；请传数组或 {\"rows\": [...]}" % a.rows)
+            return 2
         rows = rows.get("rows") or []
     if not isinstance(rows, list):
-        print("[E] rows 应为数组")
+        print("[E] rows 应为数组，实为 %s" % type(rows).__name__)
+        return 2
+    if not rows:
+        print("[E] rows 为空，无从判断；拒绝输出一份「未发现偏移」的假结论")
         return 2
 
     res = judge(rows, a.side)
