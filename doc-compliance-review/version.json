@@ -3,7 +3,7 @@
   "product": "文档合规审查助手AI合同",
   "skill_id": "doc-compliance-review",
   "latest": {
-    "version": "v3.13.0",
+    "version": "v3.13.1",
     "date": "2026-10-21",
     "summary": "感谢语人物名单扩至 32 位：新增貂蝉、贵妃、昭君、躲在树后看不见、楚霸王、刘皇叔、的火车",
     "changes": [
@@ -11,8 +11,8 @@
     ],
     "download_page": "https://github.com/asktai/doc-compliance-review/releases",
     "files": {
-      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.13.0/文档合规审查助手AI合同_v3.13.0_20261021_(doc-compliance-review).skill",
-      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.13.0/文档合规审查助手AI合同_v3.13.0_20261021_(doc-compliance-review).zip"
+      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.13.1/文档合规审查助手AI合同_v3.13.1_20261021_(doc-compliance-review).skill",
+      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.13.1/文档合规审查助手AI合同_v3.13.1_20261021_(doc-compliance-review).zip"
     }
   },
   "history": [
