@@ -21,6 +21,7 @@
 import sys as _sys
 _sys.dont_write_bytecode = True   # 不在技能目录留下 __pycache__（避免缓存残留）
 import argparse
+import datetime
 import difflib
 import io
 import json
@@ -280,16 +281,44 @@ def verify(cites, db, strict=0.72):
     return rows
 
 
-def render_md(rows, src=""):
+def lib_note(db, rows=None):
+    """**v3.22.3 新增**：报告头部的「法条库截至」一行。
+
+    为什么要有：v3.22.2 撞见的教训是「库自称唯一真值来源，却存着失效条文」。
+    核验表如果只给结论、不给「依据的是哪一版库」，使用者无从判断这句话的时效。
+    库龄逾 90 天时显式提醒——不是为了吓人，是把「该更新库了」从想起来才有
+    变成看见了就躲不掉。库龄只按 generated 日期粗算，不作精确承诺。
+    """
+    laws = db.get("laws") or {}
+    nlaws = len(laws)
+    nart = sum(len(v) for v in laws.values() if isinstance(v, dict))
+    gen = str(db.get("generated") or "")[:10] or "未知"
+    note = "法条库截至 %s（%d 部 %d 条，离线比对，更新时点见生成日期）" % (gen, nlaws, nart)
+    try:
+        d0 = datetime.date.fromisoformat(gen)
+        age = (datetime.date.today() - d0).days
+        if age > 90:
+            note += " ｜ **库龄 %d 天，逾 90 天：建议更新法规库后重新核验**" % age
+    except ValueError:
+        pass
+    return note
+
+
+def render_md(rows, src="", note=""):
     if not rows:
-        return "## 法条核验表\n\n本次未检出可核验的法条引用。\n"
+        head = "## 法条核验表\n\n本次未检出可核验的法条引用。\n"
+        if note:
+            head += "\n> " + note + "\n"
+        return head
     ok = sum(1 for r in rows if r["status"] in ("通过", "条号成立"))
     bad = len(rows) - ok
     L = ["## 法条核验表", "",
          "> 核验对象：%s ｜ 核验方式：本地原文库逐条比对（离线，未联网）" % (src or "本报告"),
-         "> 结果：共 %d 条引用，通过 %d，需人工复核 %d。" % (len(rows), ok, bad),
-         "", "| # | 法律 | 条号 | 判定 | 库内置信 | 匹配度 | 片段覆盖 | 所据版本 | 库里原文（节选） |",
-         "|---|---|---|---|---|---|---|---|"]
+         "> 结果：共 %d 条引用，通过 %d，需人工复核 %d。" % (len(rows), ok, bad)]
+    if note:
+        L.insert(2, "> " + note)
+    L += ["", "| # | 法律 | 条号 | 判定 | 库内置信 | 匹配度 | 片段覆盖 | 所据版本 | 库里原文（节选） |",
+          "|---|---|---|---|---|---|---|---|"]
     for i, r in enumerate(rows, 1):
         L.append("| %d | 《%s》 | 第%s条 | %s | %s | %s | %s | %s | %s |" % (
             i, r["law"], r["no"], r["status"],
@@ -529,7 +558,7 @@ def main():
 
     cites = extract_cites(text)
     rows = verify(cites, db, strict=a.strict)
-    md = render_md(rows, src)
+    md = render_md(rows, src, note=lib_note(db))
     sys.stdout.write(md)
 
     if a.json:

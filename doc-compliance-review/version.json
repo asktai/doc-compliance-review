@@ -3,27 +3,43 @@
   "product": "文档合规审查助手AI合同",
   "skill_id": "doc-compliance-review",
   "latest": {
-    "version": "v3.22.2",
+    "version": "v3.22.3",
     "date": "2026-10-22",
-    "summary": "清掉三笔老账：查出并修复《反不正当竞争法》《食品安全法》版本失效（条款号整体错位、规则库引错条），法规库补齐 712 条全多源一致，新增规则库条号对位自检",
+    "summary": "核验表固定标注「法条库截至」日期（库龄逾 90 天显式提醒），开发侧新增源一致性巡检",
     "changes": [
-      "《反不正当竞争法》换到 2025-06-27 第二次修订版（2025-10-15 施行，41 条）：库内原为 2019 版 33 条，且规则库正引旧条号，指向的行为已不同",
-      "条号后移已全部改正：商业贿赂 7→8、商业秘密 9→10、民事责任 17→22、举证责任 32→39",
-      "《食品安全法》换到 2025-09-12 修正版（2025-12-01 施行，仍 154 条）",
-      "《广告法》剔除中国政府网上实为 2015 版的页面（第 55 条仍含 2021 修正已删去的「吊销广告发布登记证件」），改用 74 条且不含该短语的来源",
-      "法规库 708 → 712 条，且 712/712 全部多源一致（单源 450 → 0，冲突 0）",
-      "新增 legal-verify.py --audit-rules：核对规则库「《法》N 条」引用与该条实际内容是否对位，38 条引用建基线并纳入出包门禁",
-      "修正 src_name：县级站点不再被误标为「中国政府网」、法院站不再被误标为「最高人民法院」（库内 sources 字段此前不实）",
-      "多源一致率水位线由 36% 上调至 95%（36% 是单源时期的低位线，已失去防回退作用）",
-      "口径同步：SKILL／README 的库规模改为 17 部 712 条"
+      "legal-verify.py 核验表头部新增一行「法条库截至 YYYY-MM-DD（N 部 M 条）」：不写明依据哪一版库的核验结论没有时效边界",
+      "库龄逾 90 天时在核验表中显式提醒「建议更新法规库后重新核验」",
+      "开发侧新增 freshness-patrol.py：重抓库内已登记的全部源页面，与库内条文逐条比对（同一解析链与 0.985 阈值），源页换版即报警——v3.22.2 中「反法 2025 修订隔 4 个月才发现」的缺口由此补上",
+      "巡检如实登记能力边界：flk.npc.gov.cn 搜索接口实测需签名（HTTP 500），「发现库外新法」仍靠人工核对＋条号对位守卫兜底"
     ],
     "download_page": "https://github.com/asktai/doc-compliance-review/releases",
     "files": {
-      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.22.2/文档合规审查助手AI合同_v3.22.2_20261022_(doc-compliance-review).skill",
-      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.22.2/文档合规审查助手AI合同_v3.22.2_20261022_(doc-compliance-review).zip"
+      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.22.3/文档合规审查助手AI合同_v3.22.3_20261022_(doc-compliance-review).skill",
+      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.22.3/文档合规审查助手AI合同_v3.22.3_20261022_(doc-compliance-review).zip"
     }
   },
   "history": [
+    {
+      "version": "v3.22.2",
+      "date": "2026-10-22",
+      "summary": "清掉三笔老账：查出并修复《反不正当竞争法》《食品安全法》版本失效（条款号整体错位、规则库引错条），法规库补齐 712 条全多源一致，新增规则库条号对位自检",
+      "changes": [
+        "《反不正当竞争法》换到 2025-06-27 第二次修订版（2025-10-15 施行，41 条）：库内原为 2019 版 33 条，且规则库正引旧条号，指向的行为已不同",
+        "条号后移已全部改正：商业贿赂 7→8、商业秘密 9→10、民事责任 17→22、举证责任 32→39",
+        "《食品安全法》换到 2025-09-12 修正版（2025-12-01 施行，仍 154 条）",
+        "《广告法》剔除中国政府网上实为 2015 版的页面（第 55 条仍含 2021 修正已删去的「吊销广告发布登记证件」），改用 74 条且不含该短语的来源",
+        "法规库 708 → 712 条，且 712/712 全部多源一致（单源 450 → 0，冲突 0）",
+        "新增 legal-verify.py --audit-rules：核对规则库「《法》N 条」引用与该条实际内容是否对位，38 条引用建基线并纳入出包门禁",
+        "修正 src_name：县级站点不再被误标为「中国政府网」、法院站不再被误标为「最高人民法院」（库内 sources 字段此前不实）",
+        "多源一致率水位线由 36% 上调至 95%（36% 是单源时期的低位线，已失去防回退作用）",
+        "口径同步：SKILL／README 的库规模改为 17 部 712 条"
+      ],
+      "download_page": "https://github.com/asktai/doc-compliance-review/releases",
+      "files": {
+        "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.22.2/文档合规审查助手AI合同_v3.22.2_20261022_(doc-compliance-review).skill",
+        "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.22.2/文档合规审查助手AI合同_v3.22.2_20261022_(doc-compliance-review).zip"
+      }
+    },
     {
       "version": "v3.22.1",
       "date": "2026-10-22",
