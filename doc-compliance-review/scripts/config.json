@@ -28,10 +28,10 @@
   "per_source_subdir": true,
   "harden_acl": false
  },
- "_update_说明": "在线检查更新（可选）。manifest_url＝在线版本清单地址（version.json）；download_page＝下载指引页（人去看的页面）。两者留空即**关闭在线检查**，退回纯本地模式。**只读、不上传任何信息**；连不上或读不到时静默降级、不报错。仓库地址变更只需改这里一处。",
+ "_update_说明": "在线检查更新（**默认关闭**）。check_online_by_default 是总闸：仅当它被**显式设为 true** 时，`version.py --notice` 才会自动联网检查；留 false 或删掉该键＝一个请求都不发（此时仍可用 `version.py --check-online` 手动查一次）。manifest_url＝在线版本清单地址（version.json）；download_page＝下载指引页（人去看的页面）。**只读、不上传任何信息**；连不上或读不到时静默降级、不报错。这是本技能唯一会联网的地方，默认关是为了让联网永远由人先开口。",
  "update": {
   "manifest_url": "https://raw.githubusercontent.com/asktai/doc-compliance-review/main/version.json",
   "download_page": "https://github.com/asktai/doc-compliance-review/releases",
-  "check_online_by_default": true
+  "check_online_by_default": false
  }
 }

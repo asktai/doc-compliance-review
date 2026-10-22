@@ -982,6 +982,38 @@ def main():
         g = run([PY, os.path.join(HERE, "detect-tools.py"), "--install-guide"])
         check("detect-tools.py --install-guide 可执行（只给命令、不代装）",
               g.returncode == 0, tail_line(g.stdout))
+        # 联网边界：默认配置下 --notice 必须零请求、零输出、退 0
+        cfg_p = os.path.join(HERE, "config.json")
+        cfg = json.loads(open(cfg_p, encoding="utf-8").read())
+        gate = ((cfg.get("update") or {}).get("check_online_by_default"))
+        check("联网边界：config.json 出厂默认关闭在线检查（check_online_by_default=false）",
+              gate is False, "实为 %r" % (gate,))
+        n = run([PY, os.path.join(HERE, "version.py"), "--notice"])
+        check("联网边界：默认配置下 version.py --notice 零输出、退 0（不发任何请求）",
+              n.returncode == 0 and not (n.stdout or "").strip(),
+              "退出码 %s，输出 %r" % (n.returncode, (n.stdout or "")[:80]))
+        # 处理文档的脚本一个网络库都不许有（version.py 是唯一例外，且已默认关闭）
+        net_ks = ("import urllib", "import requests", "import socket",
+                  "import http.client", "import aiohttp", "import httpx", "urlopen(")
+        bad = []
+        for fn in sorted(os.listdir(HERE)):
+            if not fn.endswith(".py") or fn in ("version.py", "check.py", "smoke-test.py"):
+                continue
+            src = open(os.path.join(HERE, fn), encoding="utf-8").read()
+            if any(k in src for k in net_ks):
+                bad.append(fn)
+        check("联网边界：处理文档的脚本零网络库（仅 version.py 例外）",
+              not bad, "越界: %s" % ", ".join(bad))
+        # 每个脚本都在 import 前关掉字节码写入（否则被 import 时在技能目录留 .pyc）
+        leak = []
+        for fn in sorted(os.listdir(HERE)):
+            if not fn.endswith(".py") or fn == "_config.py":
+                continue
+            head = open(os.path.join(HERE, fn), encoding="utf-8").read()[:4000]
+            if "dont_write_bytecode" not in head:
+                leak.append(fn)
+        check("缓存防护：每个脚本在 import 前关闭字节码写入", not leak,
+              "漏写: %s" % ", ".join(leak))
     except Exception as e:
         check("版本与依赖自检", False, repr(e))
 

@@ -333,6 +333,58 @@ def check_config():
         info("工作根目录解析结果：%s [来源：%s]" % (_b, _src))
     except Exception as e:
         warn("工作根目录解析失败：%s" % e)
+    _check_online_gate(data)
+
+
+# 唯一允许出现网络调用的脚本：查更新。它接触不到任何文档内容。
+_NET_OK = {"version.py"}
+
+
+def _check_online_gate(data=None):
+    """联网边界守两条：① 联网脚本只有一个 ② 它默认不发请求。
+
+    为什么必须用门禁锁：SECURITY.md 对客户做了「零联网」承诺，而这句话一旦被代码打破，
+    错的性质比任何功能缺陷都重——客户 IT 拿一个 `grep` 就能证伪，整套信任崩塌。
+    实测踩过：SECURITY.md 写「21 个脚本全部不含联网库」、`version.py` 里却实实在在 import
+    了 urllib 并会 urlopen，自检命令跑出来是 1 而文档写「输出 0 即零联网」——文档自己证伪自己。
+    故这里把口径钉死：**联网代码只许出现在 _NET_OK 内的脚本；且随包 config 必须默认关闭**。
+    """
+    hits = []
+    for p in _script_files():
+        if not p.endswith(".py"):
+            continue
+        n = os.path.basename(p)
+        # check.py 与 smoke-test.py 自身要写"网络关键字"清单来查别人，会命中自己——
+        # 故这两个只做白名单豁免（本函数与冒烟里都有同一份清单，改一处须同步另一处）。
+        if n in _NET_OK or n in ("check.py", "smoke-test.py"):
+            continue
+        txt = _read(p)
+        for k in ("import urllib", "import requests", "import socket", "import http.client",
+                  "import aiohttp", "import httpx", "import smtplib", "urlopen("):
+            if k in txt:
+                hits.append("%s(%s)" % (n, k))
+                break
+    if hits:
+        err("联网调用越界：以下脚本不该联网却含网络代码 %s；若确需，须同步改写 SECURITY.md 的"
+            " C1／C7 与 SKILL.md 常驻要点，不能一边承诺零联网一边留调用"
+            % ", ".join(hits))
+        return
+
+    if data is None:
+        try:
+            data = json.loads(_read(os.path.join(HERE, "config.json")))
+        except Exception:
+            data = {}
+    u = (data.get("update") or {}) if isinstance(data, dict) else {}
+    if u.get("check_online_by_default") is True:
+        warn("config.json 把 update.check_online_by_default 设为 true：查更新会自动联网。"
+             "对外分发前请确认这是有意为之（SECURITY.md 声称默认不发请求）")
+    else:
+        url = (u.get("manifest_url") or "").strip()
+        info("联网边界: 仅 version.py 含网络代码，且默认关闭（%s）——不开开关、不打 --check-online "
+             "即零请求；其余 %d 个脚本零联网"
+             % ("已预置清单地址，需显式开启" if url else "未配置清单地址",
+                len([p for p in _script_files() if p.endswith(".py")]) - 1))
 
 
 def check_hardcoded_paths():
@@ -381,6 +433,32 @@ def check_security():
              % (len(caches), ", ".join(os.path.relpath(c, ROOT) for c in caches)))
     else:
         info("缓存残留: 无 __pycache__")
+    _check_no_bytecode()
+
+
+def _check_no_bytecode():
+    """每个脚本都必须在 import 之前关掉字节码写入——文档承诺「脚本禁止生成 __pycache__」。
+
+    为什么要逐个查：`sys.dont_write_bytecode = True` 只有写在**模块被 import 之前**才管用，
+    写在文件中间或漏写，被别的脚本 import 一次就会在技能目录里留下 .pyc。
+    实测漏写是静默的——CLI 直跑不报错，只有被 import 时才留痕，肉眼看不出来。
+    这既是「无缓存留痕」的技术措施，也影响 `pack.py` 出包的确定性（包里会混进 .pyc）。
+    """
+    bad = []
+    for p in _script_files():
+        if not p.endswith(".py") or os.path.basename(p) == "_config.py":
+            continue   # _config.py 自身就是这个开关的实现方，也是被 import 的第一站
+        src = _read(p)
+        head = src[:4000]            # 只看文件头，开关必须在真正的业务 import 之前
+        if "_sys.dont_write_bytecode" not in head and "sys.dont_write_bytecode" not in head:
+            bad.append(os.path.basename(p))
+    if bad:
+        err("以下脚本未在文件头关闭字节码写入（被 import 时会在技能目录留下 __pycache__）："
+            "%s；应在首个 import 前加 `import sys as _sys` ＋ `_sys.dont_write_bytecode = True`"
+            % ", ".join(bad))
+        return
+    info("缓存防护: %d 个脚本均在 import 前关闭字节码写入（被 import 也不留 .pyc）"
+         % len([p for p in _script_files() if p.endswith(".py")]))
 
 
 # ---------------------------------------------------------------- 指纹
@@ -962,6 +1040,8 @@ def check_version_consistency():
         if not os.path.exists(p):
             continue
         hits = set(re.findall(r"(\d+)\s*个脚本", _read(p)))
+        # 允许文档同时写「21 个脚本」与「处理文档的 20 个脚本」——后者是上一句的细分，
+        # 不是口径冲突；只要「21」这个全量数在，就不算漂。
         if hits and str(n_py) not in hits:
             bad.append("%s(脚本数=%d，文档写%s)" % (rel, n_py, "/".join(sorted(hits))))
     if bad:

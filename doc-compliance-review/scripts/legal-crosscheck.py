@@ -16,6 +16,8 @@
   允许极少量噪声，但漏一句（十几字）必然跌破。
 """
 
+import sys as _sys
+_sys.dont_write_bytecode = True   # 不在技能目录留下 __pycache__（避免缓存残留）
 import re
 
 STRIP_RE = re.compile(r"[^\u4e00-\u9fa5A-Za-z0-9]")

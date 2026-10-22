@@ -1,6 +1,6 @@
 # 数据安全声明（一页版）｜ Data Security Statement
 
-**文档合规审查助手AI合同· doc-compliance-review** ｜ 版本：v3.21.0 ｜ 作者：胡皓 ｜ 2026-10-22
+**文档合规审查助手AI合同· doc-compliance-review** ｜ 版本：v3.22.0 ｜ 作者：胡皓 ｜ 2026-10-22
 
 > 本文可供**客户 IT / 法务 / 合规部门**审阅留档，是数据安全的**完整版**；`SKILL.md` 第十二节为其常驻摘要（四条要点＋脱敏口径），二者口径一致。
 
@@ -12,13 +12,13 @@
 
 | 编号 | 承诺 |
 |---|---|
-| **C1** | **文档数据不进入任何 AI 模型的训练 / 微调 / 评测语料。** 本技能不收集、不上传、不缓存、不回传任何文档内容；脚本层**零联网**：`scripts/` 下 **21 个脚本全部**不含 `requests`/`urllib`/`socket`/`http.client`/`aiohttp`/`httpx` 等联网库，也不调用 `curl`/`wget`/`Invoke-WebRequest`/`smtplib` 等外部网络命令，依赖仅标准库＋本地库（自检方法见第五节）。 |
+| **C1** | **文档数据不进入任何 AI 模型的训练 / 微调 / 评测语料。** 本技能不收集、不上传、不缓存、不回传任何文档内容。**脚本层分两类说清**：**处理文档的 20 个脚本零联网**（`scripts/` 下共 **21 个脚本**，第 21 个是查更新的 `version.py`）——不含 `requests`/`urllib`/`socket`/`http.client`/`aiohttp`/`httpx` 等联网库，也不调用 `curl`/`wget`/`Invoke-WebRequest`/`smtplib` 等外部网络命令；**唯一例外是 `version.py`（查更新）**，它的网络代码只出现在一个函数里、只 GET 一份公开的版本清单，且**默认不发任何请求**（须使用者显式打 `--check-online`，或把 `config.json` 的 `update.check_online_by_default` 显式设为 true），**任何情况下都不读取、不上传文档内容**，因为它接触不到文档。逐脚本自检方法见第五节。 |
 | **C2** | **不改动原始文件。** 原件只读、永远留存；全部交付物均为新建文件。 |
 | **C3** | **最小必要。** 只读取必要范围；脱敏只脱必要类别；凡数据出域，**先脱敏**。 |
 | **C4** | **脱敏可逆、映射表隔离。** 映射表（含真实值的明文对照表）默认只落**本机隔离目录** `~/.dcr-maps/`，**不随交付物外发**；可 `--irreversible` 选择不生成映射表。 |
 | **C5** | **涉密文件不进模型。** 读取全文前**先问一句「这份文件能不能给 AI 看」**（读全文＝把整份文件交给 AI 看，属数据出域），确认密级后再决定；涉密文件走**纯本地链路**（本机提取清洗 → 本机正则脱敏，全程不联网、不调用 AI）。 |
 | **C6** | **输出可隔离、可限权。** 交付物按文档名自动分目录存放；输出目录可关闭权限继承、仅授权本机指定账户（只改权限、不删文件）。 |
-| **C7** | **不代装依赖、不联网取更新。** 依赖缺失时只**生成安装命令**（`detect-tools.py --install-guide`，可写成脚本文件供核对），**执行与否由使用者决定**；版本更新检测只比对**使用者自给的本地更新源**（目录或未解开的 zip），`version.py` 不访问任何网络。 |
+| **C7** | **不代装依赖、联网取更新由使用者先开口。** 依赖缺失时只**生成安装命令**（`detect-tools.py --install-guide`，可写成脚本文件供核对），**执行与否由使用者决定**；**从不自动下载、从不自动安装**新版。版本检测支持两条路：**本地源**（目录或未解开的 zip，`--watch` 登记，全程不联网）；**在线源**（只 GET 一份公开版本清单）**默认关闭**，须使用者显式 `--check-online`、或把 `update.check_online_by_default` 显式设为 true 才生效。默认配置下 `version.py` **一个请求都不发**。 |
 
 **"是否用于训练模型"须分两层看**：**本技能层完全可控**——文本提取、清洗、脱敏、Word/Excel/PDF 生成**全部在本机完成**，可断网运行，**不产生任何训练语料、不做任何数据上传**；使用"只要脱敏、不要审查"或"纯本地链路"时，**文档内容根本不进入任何模型**。**模型层须由使用方确认**——"审查判断"一步需把文档**全文读入模型上下文**（架构决定），该层数据是否用于训练**取决于所用平台/服务商的策略，非本技能所能控制**。
 
@@ -65,7 +65,7 @@
 
 | 措施 | 说明 |
 |---|---|
-| 零联网 / 断网可用 | `scripts/` 下 **21 个脚本全部**不含联网库与外部网络命令，依赖仅标准库＋ `python-docx`/`openpyxl`/`Pillow`；除"审查判断"外，其余环节均可离线完成 |
+| 零联网 / 断网可用 | **处理文档的 20 个脚本全部**不含联网库与外部网络命令；第 21 个 `version.py` 的联网代码只在一个函数内、只 GET 公开清单、**默认关闭**（不开开关、不打 `--check-online` 就是一个请求都不发）。依赖仅标准库＋ `python-docx`/`openpyxl`/`Pillow`；除"审查判断"外，其余环节均可离线完成 |
 | 无缓存留痕 | 脚本禁止生成 `__pycache__`；`check.py --clean` 可清残留 |
 | 脚本防篡改 | `check.py --sign` 建指纹基线、`--verify` 校验，被改动即告警 |
 | 无执行策略绕过 | 校验用纯 Python `check.py`，不需要 PowerShell 执行策略绕过参数 |
@@ -75,14 +75,19 @@
 | 私有库默认空 | 根 `rules.md` 为空库、示例移入 `_template/`，避免企业未填写时示例规则误生效 |
 | 输出隔离与限权 | 按文档名分目录；可选关闭权限继承、仅授权本机账户 |
 
-**零联网自检**（在技能目录下执行，输出 **0** 即零联网）：
+**零联网自检**（在技能目录下执行）。**预期结果**：命中名单只有 `version.py` 一个——它是**如实计入**，不是漏网：网络代码只用于读那份公开清单，且默认关闭（见 C7）。
+
+> **另有两个文件会命中，但它们不是联网**：`check.py` 与 `smoke-test.py` 是**查别人的检查器**，里面写着这串关键字本身（`"import urllib"` 这类字符串字面量），用来扫描其他脚本。它们不 import 任何网络库、也不发请求。所以若用 grep 自检，看到 `check.py`／`smoke-test.py` 属正常，**看到其余任何文件才是问题**。
 
 ```bash
-python -c "import pathlib; ks=('requests','urllib','socket','http.client','aiohttp','httpx','curl','wget','Invoke-WebRequest','smtplib'); print(sum(1 for f in pathlib.Path('scripts').glob('*.py') if any(k in f.read_text(encoding='utf-8',errors='ignore') for k in ks)))"
+python -c "import pathlib; ks=('requests','urllib','socket','http.client','aiohttp','httpx','curl','wget','Invoke-WebRequest','smtplib'); print([f.name for f in pathlib.Path('scripts').glob('*.py') if any(k in f.read_text(encoding='utf-8',errors='ignore') for k in ks)])"
+# 预期：['version.py']
 ```
+
+**不用读代码、只看行为**的核验（更能说服客户 IT）：清空 `config.json` 的 `update` 段后跑 `python scripts/version.py --notice`，**零输出、退出码 0** 即证明默认不发请求。
 ```powershell
-# PowerShell 等价写法
-(Select-String -Path scripts\*.py -Pattern 'requests|urllib|socket|aiohttp|httpx|curl|wget|Invoke-WebRequest|smtplib' | Measure-Object).Count
+# PowerShell 等价写法（预期同样只列出 version.py）
+Select-String -Path scripts\*.py -Pattern 'requests|urllib|socket|aiohttp|httpx|curl|wget|Invoke-WebRequest|smtplib' | Select-Object -ExpandProperty Filename -Unique
 ```
 
 ## 六、合规对标与边界

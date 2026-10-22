@@ -18,6 +18,8 @@
 
 退出码：0 全部通过（或全部不涉及）；1 存在「待核验／表述存疑」（不阻断出件，但须在报告中标注）。
 """
+import sys as _sys
+_sys.dont_write_bytecode = True   # 不在技能目录留下 __pycache__（避免缓存残留）
 import argparse
 import difflib
 import io

@@ -25,6 +25,8 @@
   python scripts/tpl-engine.py render <spec.json> [--switch 有第三方=1 ...]
   python scripts/tpl-engine.py manifest <模板目录>              # 派生模板清单
 """
+import sys as _sys
+_sys.dont_write_bytecode = True   # 不在技能目录留下 __pycache__（避免缓存残留）
 import argparse
 import io
 import json

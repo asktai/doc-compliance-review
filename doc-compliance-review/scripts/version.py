@@ -31,10 +31,12 @@
 > 预演（dry-run），只列出会覆盖/新增/保留什么，一个字节都不动。发现新版就自动替使用者升级，
 > 是明确排除的行为——版本换季可能改变审查口径与产出形态，必须由人判断何时切。
 
-**联网口径（分级，2026-10-14 起）**——本脚本把"查更新"与"拿更新"分成两件事：
-  · **查有无新版**：**默认联网**（读 config.json 的 `update.manifest_url`，一个公开的
-    `version.json` 清单）。**只读、不上传任何信息**；离线／连不上／未配置时**静默降级**，
-    退回本地已登记的更新源，绝不报错、绝不卡住。想完全离线：把 `manifest_url` 留空即关闭。
+**联网口径（分级，2026-10-22 起默认关闭）**——本脚本把"查更新"与"拿更新"分成两件事：
+  · **查有无新版**：**默认不联网**。只有两种情形才发请求——(a) 使用者命令行显式打
+    `--check-online`（一次性知情同意）；(b) config.json 里 `update.check_online_by_default`
+    **被显式设为 true**（长期知情同意）。发请求时只读一份公开 `version.json` 清单，
+    **不上传任何使用者信息**；离线／连不上／未配置时**静默降级**，退回本地已登记的更新源，
+    绝不报错、绝不卡住。这是本技能唯一会联网的脚本，默认关闭是为了让"联网"永远由人先开口。
   · **下载新版包**：**由使用者手动**——工具只给出"下载页地址"，包由使用者在浏览器里自己下。
     工具**从不自动下载、从不自动安装**。
   · **本地方式始终可用**：更新源也可以是本地目录或已下载的 zip（`--watch` 登记），
@@ -109,11 +111,17 @@ def _load_update_cfg():
 
 
 def _online_enabled(u):
-    """在线检查是否可用：须有清单地址，且开关未显式关闭。"""
+    """在线检查是否可用：须有清单地址，且开关未显式关闭。
+
+    默认**关闭**：config.json 的 `update.check_online_by_default` 须显式为 true 才启用。
+    为什么默认关：这是唯一会联网的脚本，而联网这件事一旦默认打开，
+    使用者在完全不知情的情况下就产生了外连记录——即便只读、即便不带任何使用者信息。
+    想用在线检查须自己显式打开一次，这一步就是「知情」本身。
+    """
     url = (u.get("manifest_url") or "").strip()
     if not url or "<your-org>" in url:      # 占位地址＝尚未配置真源，等同于关闭
         return False
-    if u.get("check_online_by_default") is False:
+    if u.get("check_online_by_default") is not True:   # 缺省即关，只有显式 true 才开
         return False
     return True
 
@@ -165,10 +173,16 @@ def _manifest_latest(m):
     }
 
 
-def online_check(quiet=False):
+def online_check(quiet=False, forced=False):
     """在线检查更新：**展示新版版本号 + 更新了哪些内容 + 下载指引**。
 
     返回：0＝已是最新（或在线不可用，静默）／1＝有新版本（已展示指引）／2＝未配置在线源。
+
+    联网前置条件（两道都过才发请求）：
+      · `forced=True`（使用者命令行显式打 `--check-online`）**或**
+        `config.json` 的 `update.check_online_by_default` **显式为 true**；
+      · `update.manifest_url` 已填真地址。
+    默认配置**不发任何请求**——脚本层"零联网"是靠这条守住的，不是靠自觉。
 
     quiet=True 时（供 --notice 用）：
       · 已是最新 → 一个字都不输出，退 0；
@@ -177,12 +191,17 @@ def online_check(quiet=False):
     quiet=False 时（供 --check-online 用）：把"已是最新""在线不可用"也说明白。
     """
     u = _load_update_cfg()
-    if not _online_enabled(u):
+    enabled = _online_enabled(u)
+    if not enabled and forced:
+        # 使用者显式要求（--check-online）＝这一次的知情同意，只要地址填了就走。
+        enabled = bool((u.get("manifest_url") or "").strip())
+    if not enabled:
         if not quiet:
-            print("[version] 未配置在线更新清单（config.json 的 update.manifest_url），"
-                  "在线检查已关闭。")
-            print("[version] 想启用：把 manifest_url / download_page 填成你自己的在线地址；"
-                  "留空即纯本地模式。")
+            print("[version] 在线检查已关闭（config.json 的 update.manifest_url 未填，"
+                  "或 update.check_online_by_default 未显式设为 true）。")
+            print("[version] 想启用：把 manifest_url / download_page 填成你自己的在线地址，"
+                  "并把 check_online_by_default 设为 true；留空即纯本地模式。")
+            print("[version] 只查这一次不改配置：python version.py --check-online")
         return 2
     m = _fetch_manifest(u["manifest_url"])
     if m is None:
@@ -753,7 +772,7 @@ def main():
     if a.notice:
         return notice()
     if a.check_online:
-        return online_check(quiet=False)
+        return online_check(quiet=False, forced=True)
     if a.dismiss:
         return set_dismiss(a.dismiss)
     if a.undismiss:

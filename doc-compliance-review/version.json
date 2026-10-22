@@ -3,27 +3,38 @@
   "product": "文档合规审查助手AI合同",
   "skill_id": "doc-compliance-review",
   "latest": {
-    "version": "v3.21.0",
+    "version": "v3.22.0",
     "date": "2026-10-22",
-    "summary": "新增「失衡画像」：单文档内部多处问题的横向归纳，一屏答「整体往哪偏／偏在哪／是系统性还是个案」",
+    "summary": "联网口径改为默认关闭；修掉「安全声明说零联网、脚本却会联网」的文档自证伪，并把这两条做成门禁",
     "changes": [
-      "审查报告固定新增「失衡画像」一节，置于总体风险评估之后、逐条分析之前",
-      "三个问题：整体往哪偏（四档判定）／偏在哪些维度（七类按集中度排序）／是系统性还是个案",
-      "判为系统性偏移时必须同时给出证据计数、最集中维度带条号、可打的反制点",
-      "三条硬约束：不脱离立场谈偏向、样本不足就说不判、不外推成行业规律",
-      "新增 scripts/imbalance.py：阈值写死为常量，判定可复现，不用心算",
-      "★ 提示项不参与统计；最集中维度设 2 条门槛，避免谈判重点被稀释",
-      "check.py 新增 check_imbalance_engine()：7 组用例＋常量区间校验＋禁止 ★ 计入",
-      "脚本 20 → 21，冒烟 120 → 128 项",
-      "质检修正：未指定立场时不得输出偏向结论（原先照给结论只加备注，属严重缺陷）；数据格式不对时报错退出而非静默给假结论"
+      "在线检查更新改为默认关闭：--notice 出厂零请求，须显式 --check-online 或把 check_online_by_default 设为 true",
+      "修正 SECURITY.md 的 C1／C7：原文称「21 个脚本全部不含联网库」与事实不符（version.py 确有 urllib）",
+      "自检命令由「输出 0 即零联网」改为如实列出命中文件（预期仅 version.py），并补一条只看行为、不读代码的核验法",
+      "check.py 新增联网边界门禁：联网代码越界、默认开关被打开，两种情况均报出",
+      "修掉 4 个脚本（verify／imbalance／tpl-engine／legal-verify、legal-crosscheck）未在文件头关闭字节码写入的问题：被 import 时会在技能目录留下 __pycache__",
+      "check.py 新增缓存防护门禁：任一脚本未关闭字节码写入即报错",
+      "冒烟 128 → 132 项：新增联网边界与缓存防护各 2 项",
+      "「脚本数」口径校验放宽：允许同时写「21 个脚本」与「处理文档的 20 个脚本」"
     ],
     "download_page": "https://github.com/asktai/doc-compliance-review/releases",
     "files": {
-      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.21.0/文档合规审查助手AI合同_v3.21.0_20261022_(doc-compliance-review).skill",
-      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.21.0/文档合规审查助手AI合同_v3.21.0_20261022_(doc-compliance-review).zip"
+      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.22.0/文档合规审查助手AI合同_v3.22.0_20261022_(doc-compliance-review).skill",
+      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.22.0/文档合规审查助手AI合同_v3.22.0_20261022_(doc-compliance-review).zip"
     }
   },
   "history": [
+    {
+      "version": "v3.21.0",
+      "date": "2026-10-22",
+      "summary": "新增「失衡画像」：单文档内部多处问题的横向归纳，一屏答「整体往哪偏／偏在哪／是系统性还是个案」",
+      "changes": [
+        "审查报告固定新增「失衡画像」一节，置于总体风险评估之后、逐条分析之前",
+        "三个问题：整体往哪偏（四档判定）／偏在哪些维度（七类按集中度排序）／是系统性还是个案",
+        "判为系统性偏移时必须同时给出证据计数、最集中维度带条号、可打的反制点",
+        "三条硬约束：不脱离立场谈偏向、样本不足就说不判、不外推成行业规律",
+        "新增 scripts/imbalance.py：阈值写死为常量，判定可复现，不用心算"
+      ]
+    },
     {
       "version": "v3.20.0",
       "date": "2026-10-22",

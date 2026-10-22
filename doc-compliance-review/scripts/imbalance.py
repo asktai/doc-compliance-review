@@ -29,6 +29,8 @@ rows.json 格式（由审查流程生成）：
 
 退出码：0 正常；2 参数或数据错误
 """
+import sys as _sys
+_sys.dont_write_bytecode = True   # 不在技能目录留下 __pycache__（避免缓存残留）
 import argparse
 import json
 import os

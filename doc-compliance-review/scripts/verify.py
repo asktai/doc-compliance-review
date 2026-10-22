@@ -33,6 +33,8 @@
 
 退出码：0 通过；1 有需人工复核或拦下项；2 参数或环境错误
 """
+import sys as _sys
+_sys.dont_write_bytecode = True   # 不在技能目录留下 __pycache__（避免缓存残留）
 import argparse
 import io
 import json
