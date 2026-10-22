@@ -569,6 +569,109 @@ def main():
     except Exception as e:
         check("半档C 自检", False, str(e))
 
+    # --- 3.z 原稿级修订（1 修订版 / 4 红线版：在原稿 run 之间插痕迹）---
+    print("\n[3.z] 原稿级修订（1 修订版 / 4 红线版）")
+    try:
+        import docx as _dxr
+        from docx.oxml.ns import qn as _qn
+        sd = os.path.join(sdir, "合同比对A版.docx")
+        if not os.path.exists(sd):
+            for n in ("原稿修订：插入 w:ins/w:del 痕迹",
+                      "原稿修订：接受全部修订＝改后文本",
+                      "原稿修订：拒绝全部修订＝原文",
+                      "原稿修订：红线版删除线/下划线并存",
+                      "原稿修订：定位失败时降级并标注"):
+                skip(n, "无 A 版样本（自检样本缺失）")
+        else:
+            _src = _dxr.Document(sd)
+            _paras = [_p.text.strip() for _p in _src.paragraphs if _p.text.strip()]
+            # 取「第一条 项目内容：…」整段做用例（标题＝首个分句，原文＝其后的正文）
+            _whole = next((t for t in _paras if t.startswith("第一条")), _paras[-1])
+            _head = _whole.split("：")[0] + "：" if "：" in _whole else _whole
+            _orig = _whole[_whole.index("：") + 1:] if "：" in _whole else _whole
+            _new = _orig.replace("四个阶段", "五个阶段") if "四个阶段" in _orig else _orig + "（已改）"
+            rspec = {"name": "原稿修订自检", "source": "合同比对A版", "clauses": [
+                {"heading": _head, "original": _orig, "revised": _new,
+                 "comment": "自检用", "basis": "自检", "rating": "★"}]}
+            rsp = os.path.join(work, "rev-spec.json")
+            with open(rsp, "w", encoding="utf-8") as f:
+                json.dump(rspec, f, ensure_ascii=False)
+            rout = os.path.join(work, "原稿修订")
+            rc = run([PY, os.path.join(HERE, "make-docx.py"), rsp,
+                      "--reviewer", "SMOKE-TEST", "--types", "tracked,redline",
+                      "--source-docx", sd, "--out", rout, "--ts", "20260101-0000"])
+            check("原稿级修订：make-docx 执行", rc.returncode == 0,
+                  (rc.stderr or "")[-160:] if rc.returncode else "")
+            _fs = sorted(os.listdir(rout)) if os.path.isdir(rout) else []
+            _tr = [f for f in _fs if "修订版" in f]
+            _rl = [f for f in _fs if "红线" in f]
+
+            def _acc(p):
+                return "".join(t.text or "" for t in p._p.iter(_qn("w:t")))
+
+            def _rej(p):
+                out = []
+                for el in p._p.iter():
+                    if el.tag == _qn("w:t") and el.getparent().getparent().tag != _qn("w:ins"):
+                        out.append(el.text or "")
+                    elif el.tag == _qn("w:delText"):
+                        out.append(el.text or "")
+                return "".join(out)
+
+            if not _tr:
+                check("原稿修订：产出修订版", False, "未见修订版文件")
+            else:
+                d = _dxr.Document(os.path.join(rout, _tr[0]))
+                ins = d.element.body.findall(".//" + _qn("w:ins"))
+                dele = d.element.body.findall(".//" + _qn("w:del"))
+                check("原稿修订：插入 w:ins/w:del 痕迹", bool(ins) and bool(dele),
+                      "ins=%d del=%d" % (len(ins), len(dele)))
+                _auth = {e.get(_qn("w:author")) for e in ins + dele}
+                check("原稿修订：修订者＝审查人", _auth == {"SMOKE-TEST"}, str(_auth))
+                _all = list(d.paragraphs)
+                _hit = [p for p in _all if _new in _acc(p)]
+                check("原稿修订：接受全部修订＝改后文本", bool(_hit),
+                      (_acc(_hit[0])[:60] if _hit else "未找到改后文本"))
+                _hit2 = [p for p in _all if _orig in _rej(p)]
+                check("原稿修订：拒绝全部修订＝原文", bool(_hit2),
+                      (_rej(_hit2[0])[:60] if _hit2 else "未找到原文"))
+                check("原稿修订：版式沿用原稿（段落数不变）",
+                      len(d.paragraphs) == len(_src.paragraphs),
+                      "%d 段 vs 原稿 %d 段" % (len(d.paragraphs), len(_src.paragraphs)))
+            if not _rl:
+                check("原稿修订：产出红线版", False, "未见红线版文件")
+            else:
+                d2 = _dxr.Document(os.path.join(rout, _rl[0]))
+                _st = [_r for p in d2.paragraphs for _r in p.runs if _r.font.strike]
+                _ul = [_r for p in d2.paragraphs for _r in p.runs
+                       if _r.font.underline and not _r.font.strike]
+                check("原稿修订：红线版删除线/下划线并存", bool(_st) and bool(_ul),
+                      "删除 %d 段／新增 %d 段" % (len(_st), len(_ul)))
+            # 负向：给一条原稿里根本没有的条款 → 必须降级并标注，不得静默
+            bspec = {"name": "原稿修订负向", "source": "合同比对A版", "clauses": [
+                {"heading": "第九十九条 原稿根本不存在", "original": "原稿中并无此段文字内容",
+                 "revised": "改后的内容"}]}
+            bsp = os.path.join(work, "rev-bad.json")
+            with open(bsp, "w", encoding="utf-8") as f:
+                json.dump(bspec, f, ensure_ascii=False)
+            bout = os.path.join(work, "原稿修订负向")
+            run([PY, os.path.join(HERE, "make-docx.py"), bsp, "--reviewer", "SMOKE-TEST",
+                 "--types", "tracked", "--source-docx", sd, "--out", bout,
+                 "--ts", "20260101-0000"])
+            _bf = [f for f in os.listdir(bout)] if os.path.isdir(bout) else []
+            _deg = [f for f in _bf if "降级" in f]
+            _cm = ""
+            if _bf:
+                try:
+                    _cm = _dxr.Document(os.path.join(bout, _bf[0])).core_properties.comments or ""
+                except Exception:
+                    _cm = ""
+            check("原稿修订：定位失败时降级并标注（文件名＋文档属性两处）",
+                  bool(_deg) and "降级" in _cm,
+                  "文件名降级=%s 属性含降级=%s" % (bool(_deg), "降级" in _cm))
+    except Exception as e:
+        check("原稿级修订自检", False, repr(e))
+
     # --- 3.5 版本与依赖（分发与落地成本）---
     print("\n[3.5] 版本与依赖")
     try:

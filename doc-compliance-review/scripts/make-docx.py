@@ -10,7 +10,9 @@
   · 未勾选时默认产出 1、2、3 三类（--types 可显式指定，亦可用中文类型名）。
   · 类型 1（修订版）：Word 原生修订痕迹（w:ins/w:del），可逐条接受/拒绝；
     **只标到改动的最小范围**——句读对齐后对改写块再做字符级细分，差异过大才整段替换。
+    **给 --source-docx 时走原稿级修订**：在原稿既有 run 之间插痕迹，版式沿用原稿。
   · 类型 4（红线修订格式版）：粒度同 1，痕迹改用灰色删除线／红色下划线，不依赖 Word 修订功能。
+    **给 --source-docx 时同样以原稿为底**（同一套定位逻辑，痕迹换成纯格式标记）。
   · 类型 2（批注版）：每条意见以 Word 批注锚定到对应条款；需 python-docx>=1.2，
     低版本自动降级为「意见附于条款之后」。`--comments` 为兼容保留的等价开关。
   · **不人为增加抬头（保持原版观感）**：1、3、4、6、7 五类＝还原原文的交付物，
@@ -56,8 +58,10 @@
                 可用 --out 覆盖；--subdir 建子文件夹）
   （--ts 建议由 AI 传入准确时间，勿依赖本机时钟）
   --types 可用 slug（tracked/redline/clean/report/reportc/masked/original/diff/compare/template）或中文类型名。
-  --source-docx <原稿.docx>：半档C 排版保真，仅对 3清洁版/6脱敏版/7照录版 生效（其余类型不受影响）；
-                             以原稿为底只替换段落文字，保留原稿版式；原稿不可用则自动回退样式档位。
+  --source-docx <原稿.docx>：半档C 排版保真，对 1修订版/3清洁版/4红线版/6脱敏版/7照录版 生效；
+                             1、4 在原稿既有 run 之间插修订痕迹（w:ins/w:del 或红线格式），
+                             3、6、7 只做段落级替换文字；均保留原稿版式。
+                             原稿不可用或条款定位不到则自动回退样式档位，并按降级口径标注。
 spec.json 关键字段：
   name / source / report_title / disclaimer / reviewer / round
   clauses[]: heading / original / revised / rating / basis / comment
@@ -77,12 +81,13 @@ try:
 except Exception:
     pass
 _sys.dont_write_bytecode = True   # 不在技能目录留下 __pycache__（避免缓存残留）
-import os, re, sys, json, argparse, datetime, random, difflib
+import os, re, sys, json, argparse, datetime, random, difflib, copy, unicodedata
 from docx import Document
 from docx.shared import RGBColor, Pt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
-from docx.oxml import parse_xml
-from docx.oxml.ns import nsdecls
+from docx.oxml import parse_xml, OxmlElement
+from docx.oxml.ns import nsdecls, qn
+from lxml import etree
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 try:
@@ -247,8 +252,21 @@ def sanitize(name):
     s = re.sub(r"[\\/:*?\"<>|（）()【】\[\]·、,，]+", "", s)
     return s[:40] or "contract"
 
+REV_SLUGS = ("tracked", "redline")      # 需要「在原稿上改」的两类（1 修订版 / 4 红线版）
+REV_DEGRADED = {}                       # slug → 降级原因；由 DOC_GEN 生成时写入，供 outname 判定
+
+
 def outname(slug, ext="docx"):
-    return f"{SOURCE}_{SLUGS[slug]}_{REVIEWER}_r{ROUND}_{TS}.{ext}"
+    """文件名＝源_类型_审查人_r轮次_时间.ext；降级件在类型后加「-降级」标记。
+
+    降级标记是「原稿底稿硬性要求」三处标注之一（另两处：文档属性、报告"总体评估"），
+    取的是本件是否降级，而非本轮是否降级——同一轮里 1 降级、3 以原稿做底是正常情形。
+    """
+    tag = ""
+    if slug in REV_SLUGS and REV_DEGRADED.get(slug):
+        # 部分落位（仍是原稿件）标「-降级-部分」，完全重建才标「-降级」
+        tag = "-降级-部分" if REV_FALLBACK.get("hit") else "-降级"
+    return f"{SOURCE}_{SLUGS[slug]}{tag}_{REVIEWER}_r{ROUND}_{TS}.{ext}"
 
 def tracked_ins(p, text):
     p._p.append(parse_xml(f'<w:ins {nsdecls("w")} w:id="{_rid()}" w:author="{esc(REVIEWER)}" w:date="{now()}"><w:r><w:t xml:space="preserve">{esc(text)}</w:t></w:r></w:ins>'))
@@ -273,21 +291,36 @@ def _units(text):
     return us
 
 
+def _tokenize(s):
+    """把字符串切成「不可再切」的最小单元：数字串（含千分位/小数/百分号）与英文单词各算一个。
+
+    不这么做就会出「30% → 20%」被切成「删 3 / 增 20…4 / 留 0%」这种碎渣式修订——
+    显示出来是「320%」，审阅者得逐片接受，人看着累也容易看漏。中文按字切即可（无词边界）。
+    """
+    return re.findall(
+        r"\d{4}\s*年\s*(?:\d{1,2}\s*月(?:\s*\d{1,2}\s*日)?)?"
+        r"|\d{1,2}\s*月\s*\d{1,2}\s*日"
+        r"|\d[\d,.]*%?"
+        r"|[A-Za-z]+(?:['-][A-Za-z]+)*"
+        r"|.", s or "")
+
+
 def _char_ops(a, b):
-    """字符级 diff：把一段「整体改写」拆到改动的最小范围。"""
+    """字符级 diff：把一段「整体改写」拆到改动的最小范围（数字与英文词不切开）。"""
+    ta, tb = _tokenize(a), _tokenize(b)
     ops = []
-    for tag, i1, i2, j1, j2 in difflib.SequenceMatcher(None, a, b, autojunk=False).get_opcodes():
+    for tag, i1, i2, j1, j2 in difflib.SequenceMatcher(None, ta, tb, autojunk=False).get_opcodes():
         if tag == "equal":
-            ops.append(("equal", a[i1:i2]))
+            ops.append(("equal", "".join(ta[i1:i2])))
         elif tag == "delete":
-            ops.append(("delete", a[i1:i2]))
+            ops.append(("delete", "".join(ta[i1:i2])))
         elif tag == "insert":
-            ops.append(("insert", b[j1:j2]))
+            ops.append(("insert", "".join(tb[j1:j2])))
         else:
-            if a[i1:i2]:
-                ops.append(("delete", a[i1:i2]))
-            if b[j1:j2]:
-                ops.append(("insert", b[j1:j2]))
+            if ta[i1:i2]:
+                ops.append(("delete", "".join(ta[i1:i2])))
+            if tb[j1:j2]:
+                ops.append(("insert", "".join(tb[j1:j2])))
     return ops
 
 
@@ -347,10 +380,12 @@ def inline_diff(old, new, thr=0.4, max_ops=80):
 
 
 # ---------- 交付物说明：写进文档属性／批注，不占正文版面 ----------
-def set_meta(doc, spec, slug):
+def set_meta(doc, spec, slug, fallback=""):
     """类型／审查人／轮次／时间 → docx 核心属性（资源管理器右键属性即见，正文不留痕）。
 
     10 类一律写入（报告类的标准 applicable 对象不同，但同样不该在正文里重复元数据）。
+    fallback 非空＝本件属「原稿底稿硬性要求」的降级产出，降级原因一并写进属性
+    （文件名与报告"总体评估"两处由调用方负责，三处缺一不可）。
     """
     try:
         cp = doc.core_properties
@@ -368,6 +403,14 @@ def set_meta(doc, spec, slug):
         cp.keywords = "%s; %s; r%s" % (SLUGS.get(slug, slug), REVIEWER, ROUND)
         cp.comments = ("交付物类型：%s ｜ 审查人：%s ｜ 轮次：r%s ｜ 生成时间：%s"
                        % (SLUGS.get(slug, slug), REVIEWER, ROUND, TS))
+        if fallback:
+            # 两种降级不能混为一谈：完全没落到原稿（重建）vs 部分条款没落位（仍是原稿件）
+            if REV_FALLBACK.get("hit"):
+                cp.comments += ("\n⚠ 降级（部分）：本件已在原稿上改，但%s——补全原稿或核对条款标题后可重跑"
+                                % fallback)
+            else:
+                cp.comments += ("\n⚠ 降级：非原稿修改（原因：%s）——补交可编辑原稿 .docx 后可重跑获得原稿级修改"
+                                % fallback)
     except Exception:
         pass
     return doc
@@ -499,9 +542,17 @@ def add_template_note(doc, runs, text):
 
 # ---------- docx 生成 ----------
 def doc_trackchanges(spec):
-    """1 修订版：标题保持原文标题，说明进文档属性＋批注，修订只标到改动的最小范围。"""
+    """1 修订版：标题保持原文标题，说明进文档属性＋批注，修订只标到改动的最小范围。
+
+    有原稿 .docx 时走**原稿级修订**（在既有 run 之间插 w:ins/w:del，版式沿用原稿）；
+    做不到则回退样式档位重建，并按「原稿底稿硬性要求」显式降级标注。
+    """
+    _sd = from_source_docx_rev(spec, "tracked")
+    if _sd is not None:
+        return set_meta(_sd, spec, "tracked", fallback=REV_FALLBACK["reason"])
     doc = Document(); h0 = add_title(doc, title(spec))
-    set_meta(doc, spec, "tracked"); add_delivery_note(doc, h0.runs[:1], "tracked", spec)
+    set_meta(doc, spec, "tracked", fallback=REV_FALLBACK["reason"])
+    add_delivery_note(doc, h0.runs[:1], "tracked", spec)
     for c in clauses(spec):
         h = add_clause_title(doc, c.get("heading", ""))
         o = c.get("original", ""); v = c.get("revised", "")
@@ -515,9 +566,16 @@ def doc_trackchanges(spec):
     return doc
 
 def doc_redline(spec):
-    """4 红线修订格式版：同 tracked 的呈现口径，痕迹用删除线/下划线而非 Word 修订。"""
+    """4 红线修订格式版：同 tracked 的呈现口径，痕迹用删除线/下划线而非 Word 修订。
+
+    有原稿 .docx 时同样走原稿级修订（痕迹是格式标记，不依赖 Word 修订功能）。
+    """
+    _sd = from_source_docx_rev(spec, "redline")
+    if _sd is not None:
+        return set_meta(_sd, spec, "redline", fallback=REV_FALLBACK["reason"])
     doc = Document(); h0 = add_title(doc, title(spec))
-    set_meta(doc, spec, "redline"); add_delivery_note(doc, h0.runs[:1], "redline", spec)
+    set_meta(doc, spec, "redline", fallback=REV_FALLBACK["reason"])
+    add_delivery_note(doc, h0.runs[:1], "redline", spec)
     for c in clauses(spec):
         h = add_clause_title(doc, c.get("heading", ""))
         o = c.get("original", ""); v = c.get("revised", "")
@@ -801,6 +859,339 @@ def from_source_docx(spec, kind):
 
 
 # ---------- 半档 C 结束 ----------
+
+# ---------- 半档 C·修订：以原稿做底注入修订痕迹（1 修订版 / 4 红线版） ----------
+# 与上面「半档 C」的区别：那一档是**整段换字**（供 3/6/7），这一档是**在既有 run 之间插痕迹**
+# （供 1/4）。前提是原稿段落与条款对得上：按 heading／原文片段定位；定位不到的逐处跳过，
+# **绝不猜** —— 猜错会把修订痕迹打到不相干的条款上，比降级严重得多。
+REV_FALLBACK = {"reason": "", "hit": 0, "miss": 0}   # 供主流程读取并在三处标注降级
+
+
+def _rev_norm(s):
+    """比对用归一：全半角、空白一律抹平，只留实质字符（原稿排版空格多，不归一会永远对不上）。"""
+    s = unicodedata.normalize("NFKC", s or "")
+    return re.sub(r"[\s\u3000]+", "", s)
+
+
+def _rev_para_text(p):
+    """段落可见文字：w:t 正常文字 ＋ w:delText 已删文字（防二次处理时偏移错位）。"""
+    try:
+        return "".join(t.text or "" for t in p._p.iter(qn("w:t")))
+    except Exception:
+        return p.text or ""
+
+
+def _rev_plain_runs(p):
+    """可参与改写的 run：排除图形、域、脚注引用、制表与换行（这些 run 动了会丢对象）。"""
+    out = []
+    for r in p.runs:
+        el = r._element
+        if any(el.findall(".//" + qn(t)) for t in
+               ("w:drawing", "w:pict", "w:object", "w:fldChar", "w:instrText",
+                "w:footnoteReference", "w:endnoteReference", "w:br", "w:tab")):
+            continue
+        if r.text:
+            out.append(r)
+    return out
+
+
+def _rev_merge_runs(p):
+    """run 合并预处理：同段落相邻纯文字 run 合为一个（保留首个 run 的字符格式）。
+
+    Word 常把一句话切成多个 run（拼写检查、中英混排、格式微差）；不合并则插入位置碎裂、
+    痕迹读数失真。返回合并掉的 run 数。
+    """
+    runs = _rev_plain_runs(p)
+    if len(runs) < 2:
+        return 0
+    head = runs[0]
+    for r in runs[1:]:
+        head.text = (head.text or "") + (r.text or "")
+        r._element.getparent().remove(r._element)
+    return len(runs) - 1
+
+
+def _rev_rpr(run):
+    """取 run 字符格式（rPr 深拷贝），供新建 run 继承原样式。"""
+    if run is None:
+        return None
+    rpr = run._element.find(qn("w:rPr"))
+    return copy.deepcopy(rpr) if rpr is not None else None
+
+
+def _rev_make_run(text, rpr, kind, tracked=True):
+    """构造 run。
+
+    tracked=True（修订版）：删除文字必须放 `<w:delText>` —— 这是 OOXML 规定，
+    放 `w:t` 进 `<w:del>` 里 Word 会当成非法内容；
+    tracked=False（红线版）：删除只是"打了个删除线的普通文字"，必须用 `w:t`，
+    否则离开修订功能后这段字在 Word 里根本不显示。
+    """
+    r = OxmlElement("w:r")
+    if rpr is not None:
+        r.append(copy.deepcopy(rpr))
+    t = OxmlElement("w:delText" if (kind == "del" and tracked) else "w:t")
+    t.set(qn("xml:space"), "preserve")
+    t.text = text
+    r.append(t)
+    return r
+
+
+def _rev_existing_ids(doc):
+    """收集全文档已用的 w:id，避免新痕迹 id 与原稿已有修订撞号（撞号 Word 会静默合并）。"""
+    used = set()
+    for el in doc.element.body.iter():
+        v = el.get(qn("w:id"))
+        if v and v.lstrip("-").isdigit():
+            used.add(int(v))
+    return used
+
+
+_REV_IDS = [set()]
+
+
+def _rev_next_id():
+    _REV_IDS[0].add(max(_REV_IDS[0] | {1000}) + 1)
+    return max(_REV_IDS[0])
+
+
+def _rev_write_para(p, ops, kind, author, date):
+    """按 diff 结果重建段落内的 run 序列，段落属性（pPr）与样式一概不动。
+
+    kind=tracked：新增包 `<w:ins>`、删除包 `<w:del>`（内为 `<w:delText>`）——Word 可逐条接受/拒绝；
+    kind=redline：不生成修订标记，改为红字下划线／灰字删除线。
+    返回痕迹处数。
+    """
+    runs = _rev_plain_runs(p)
+    if not runs:
+        return 0
+    base = _rev_rpr(runs[0])
+    # 原文逐字符 → 归属格式（"没改的字"尽量保持原样，中英混排不会整段变字体）
+    flat = []
+    for r in runs:
+        rpr = _rev_rpr(r) or base
+        for ch in r.text or "":
+            flat.append((ch, rpr))
+    for r in runs:
+        r._element.getparent().remove(r._element)
+
+    pend = []
+    marks = [0]
+
+    def flush():
+        if not pend:
+            return
+        buf = []
+        for txt, rpr, k in pend:
+            if buf and buf[-1][2] == k and _rev_rpr_key(buf[-1][1]) == _rev_rpr_key(rpr):
+                buf[-1] = (buf[-1][0] + txt, buf[-1][1], k)
+            else:
+                buf.append((txt, rpr, k))
+        for txt, rpr, k in buf:
+            el = _rev_make_run(txt, rpr, k, tracked=(kind == "tracked"))
+            if kind == "tracked" and k in ("ins", "del"):
+                wrap = OxmlElement("w:ins" if k == "ins" else "w:del")
+                wrap.set(qn("w:id"), str(_rev_next_id()))
+                wrap.set(qn("w:author"), author)
+                wrap.set(qn("w:date"), date)
+                wrap.append(el)
+                p._p.append(wrap)
+            else:
+                p._p.append(el)
+                if kind == "redline" and k in ("ins", "del"):
+                    from docx.text.run import Run as _Run
+                    _rev_style_mark(_Run(el, p), k)
+        pend.clear()
+
+    pos = 0
+    for op, txt in ops:
+        if op == "equal":
+            for ch in txt:
+                rpr = flat[pos][1] if pos < len(flat) else base
+                pos += 1
+                pend.append((ch, rpr, "keep"))
+        elif op == "delete":
+            rpr = flat[pos][1] if pos < len(flat) else base
+            pos += len(txt)
+            marks[0] += 1
+            pend.append((txt, rpr, "del"))
+        else:
+            rpr = flat[pos][1] if pos < len(flat) else (flat[-1][1] if flat else base)
+            marks[0] += 1
+            pend.append((txt, rpr, "ins"))
+        flush()
+    flush()
+    return marks[0]
+
+
+def _rev_rpr_key(rpr):
+    try:
+        return etree.tostring(rpr) if rpr is not None else b""
+    except Exception:
+        return b""
+
+
+def _rev_style_mark(run, kind):
+    """红线版：删除→灰色删除线；新增→红色下划线（与既有红线版同色值）。"""
+    try:
+        if kind == "del":
+            run.font.strike = True
+            run.font.color.rgb = RGBColor(0x80, 0x80, 0x80)
+        elif kind == "ins":
+            run.font.underline = True
+            run.font.color.rgb = RGBColor(0xC0, 0x00, 0x00)
+    except Exception:
+        pass
+
+
+def _rev_all_paras(doc):
+    """全文档段落（含表格内）——表格里的条款同样要能改。"""
+    out = list(doc.paragraphs)
+    for tb in doc.tables:
+        for row in tb.rows:
+            for cell in row.cells:
+                out.extend(cell.paragraphs)
+    return out
+
+
+def _rev_locate(paras, c, start=0):
+    """定位条款段落的索引：先标题精确等值，再标题包含，最后原文片段。
+
+    返回 (index, mode)，找不到返回 (-1, None)。start 用于顺序前进，避免同一标题重复命中。
+    **标题命中不算数**：标题对上但 original 不在该段时，视同没找到——否则修订痕迹会
+    打到不相干的段落上（AI 给的 heading 常带前缀，如把前言当标题、把条款正文当 original）。
+    """
+    texts = [_rev_norm(_rev_para_text(p)) for p in paras]
+    o = _rev_norm(c.get("original"))
+
+    def _fits(i):
+        if not o:
+            return True
+        return o[:40] in texts[i] if len(o) > 8 else True
+
+    h = _rev_norm(c.get("heading"))
+    if h:
+        for i in range(start, len(texts)):
+            if texts[i] == h and _fits(i):
+                return i, "heading"
+        for i in range(start, len(texts)):
+            if texts[i] and h in texts[i] and _fits(i):
+                return i, "heading~"
+    if len(o) >= 8:
+        probe = o[:24]
+        for i in range(start, len(texts)):
+            if probe and probe in texts[i]:
+                return i, "fragment"
+    # 标题/片段都对不上，但标题段存在 → 仍然返回标题段（调用方会因 original 不匹配而跳过）
+    if h:
+        for i in range(start, len(texts)):
+            if texts[i] and h in texts[i]:
+                return i, "heading!"
+    return -1, None
+
+
+def _rev_find_span(cur, o):
+    """在段落现存文字里找原文片段起止（归一化匹配后映射回原始下标）。"""
+    if not o:
+        return -1, -1
+    i = cur.find(o)
+    if i >= 0:
+        return i, i + len(o)
+    # 归一化差异（多空格/全角）时的模糊定位：逐字符在归一化后的串上定位
+    nc, no_ = _rev_norm(cur), _rev_norm(o)
+    j = nc.find(no_)
+    if j < 0:
+        return -1, -1
+    # 把归一化下标映射回原文下标
+    idx_map, k = [], 0
+    for ch in cur:
+        if not re.match(r"[\s\u3000]", ch):
+            idx_map.append(k)
+        k += 1
+    if j >= len(idx_map) or j + len(no_) - 1 >= len(idx_map):
+        return -1, -1
+    return idx_map[j], idx_map[j + len(no_) - 1] + 1
+
+
+def from_source_docx_rev(spec, kind):
+    """原稿级修订：以原稿 docx 为底，把 clauses 的修订注入为痕迹。
+
+    kind=tracked（1 修订版）／redline（4 红线版）。
+    成功返回 doc；返回 None 表示降级（原因已写入 REV_FALLBACK["reason"]）。
+    """
+    path = SOURCE_DOCX or (spec.get("source_docx") or "")
+    REV_FALLBACK.update({"reason": "", "hit": 0, "miss": 0})
+    if not path or not str(path).lower().endswith(".docx") or not os.path.exists(path):
+        REV_FALLBACK["reason"] = "未提供可编辑的 .docx 原稿"
+        return None
+    try:
+        doc = Document(path)
+    except Exception as e:
+        REV_FALLBACK["reason"] = "原稿打开失败（%s）" % str(e)[:60]
+        print("[make-docx] 原稿级修订回退：%s" % REV_FALLBACK["reason"])
+        return None
+    cs = clauses(spec)
+    if not cs:
+        REV_FALLBACK["reason"] = "审查规格缺条款（clauses），无法定位修改位置"
+        return None
+
+    paras = _rev_all_paras(doc)
+    for p in paras:                       # run 合并预处理
+        _rev_merge_runs(p)
+
+    author = (REVIEWER or "AI 文档合规审查助手").replace('"', "")
+    date = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")
+    _REV_IDS[0] = _rev_existing_ids(doc)
+
+    hit, miss, cursor = 0, [], 0
+    for c in cs:
+        o = (c.get("original") or "").strip()
+        v = (c.get("revised") or "").strip()
+        if not v or _rev_norm(v) == _rev_norm(o):
+            continue                        # 无修改项，原稿一个字都不动
+        idx, mode = _rev_locate(paras, c, cursor)
+        if idx < 0:
+            miss.append(c.get("heading") or o[:16] or "（无标题条款）")
+            continue
+        cursor = idx
+        p = paras[idx]
+        cur = _rev_para_text(p)
+        newtext = v
+        if _rev_norm(cur) != _rev_norm(v):
+            # 原稿段落与 spec 的 original 可能只是"包含"关系（AI 截取了片段）→ 局部替换
+            s, e = _rev_find_span(cur, o)
+            if s < 0:
+                if _rev_norm(v) and _rev_norm(v) in _rev_norm(cur):
+                    continue                # 原稿已是改后文字，无需痕迹
+                miss.append(c.get("heading") or o[:16] or cur[:16])
+                continue
+            newtext = cur[:s] + v + cur[e:]
+        ops = inline_diff(cur, newtext)
+        if not ops or [t for t in ops if t[0] != "equal"] == []:
+            continue
+        n = _rev_write_para(p, ops, kind, author, date)
+        if not n:
+            miss.append(c.get("heading") or o[:16])
+            continue
+        hit += 1
+        if c.get("heading"):
+            tail = [r for r in p.runs if r.text and r.text.strip()]
+            add_clause_note(doc, (tail or p.runs)[-1:], c)
+    REV_FALLBACK["hit"], REV_FALLBACK["miss"] = hit, len(miss)
+    if miss:
+        REV_FALLBACK["reason"] = ("%d 处修改无法在原稿中定位对应条款（%s），该部分未能落到原稿"
+                                  % (len(miss), "、".join(miss[:3])))
+        print("[make-docx] 原稿级修订（部分）：%s" % REV_FALLBACK["reason"])
+    if hit == 0:
+        REV_FALLBACK["reason"] = REV_FALLBACK["reason"] or "原稿中未能定位任何待修改条款"
+        return None
+    print("[make-docx] 原稿级修订：以原稿做底注入 %d 处%s痕迹（%s）"
+          % (hit, "修订" if kind == "tracked" else "红线", os.path.basename(path)))
+    return doc
+
+
+# ---------- 原稿级修订结束 ----------
+
 
 def doc_original(spec):
     """7 原文照录版：零批注，标题保持原文标题；"内部留存、勿对外"由文件名与文档属性承担。"""
@@ -1384,8 +1775,9 @@ def main():
     ap.add_argument("--style", default=None,
                     help="排版样式档位：default（不改动）/contract（合同风，默认）/official（公文风）；亦可写 spec.style 或 config.json 的 render.style；只对 1、3、4、6、7 五类生效")
     ap.add_argument("--source-docx", default=None,
-                    help="半档C 排版保真：原稿 .docx 路径。指定后 3清洁版/6脱敏版/7照录版 以原稿为底、"
-                         "只替换段落文字（保留字体/对齐/缩进/页边距/页眉页脚/表格），不可用则自动回退样式档位")
+                    help="半档C 排版保真：原稿 .docx 路径。指定后 1修订版/4红线版 在原稿 run 之间插修订痕迹、"
+                         "3清洁版/6脱敏版/7照录版 只替换段落文字（均保留字体/对齐/缩进/页边距/页眉页脚/表格），"
+                         "不可用或条款定位不到则自动回退样式档位并按降级口径标注")
     ap.add_argument("--cmp-a", default=None, help="文件比对报告：旧版文本文件（.txt/.md；亦可用 spec.compare.a_text）")
     ap.add_argument("--cmp-b", default=None, help="文件比对报告：新版文本文件（.txt/.md；亦可用 spec.compare.b_text）")
     a = ap.parse_args()
@@ -1424,7 +1816,7 @@ def main():
     SOURCE = sanitize(spec.get("source") or spec.get("name") or "contract")
     SOURCE_DOCX = (a.source_docx or spec.get("source_docx") or "")
     if SOURCE_DOCX and not os.path.exists(SOURCE_DOCX):
-        print("[make-docx] 提示：--source-docx 路径不存在，3、6、7 回退样式档位：%s" % SOURCE_DOCX)
+        print("[make-docx] 提示：--source-docx 路径不存在，1、3、4、6、7 回退样式档位：%s" % SOURCE_DOCX)
         SOURCE_DOCX = ""
     set_style(a.style or spec.get("style")
               or (_cfgmod.render_opt(_CFG, "style") if _cfgmod else None) or "contract")
@@ -1467,8 +1859,12 @@ def main():
         if t in ("original", "masked") and not _original_text(spec):
             print(f"[make-docx] 跳过 {SLUGS[t]}：spec 缺少 original_text。"); continue
         if "docx" in fmts:
+            # 先产对象再取名：1、4 是否降级只有生成完才知道（降级件名里要带「-降级」标记）
+            docobj = DOC_GEN[t](spec)
+            if t in REV_SLUGS:
+                REV_DEGRADED[t] = REV_FALLBACK.get("reason") or ""
             name = outname(t, "docx"); p = os.path.join(a.out, name)
-            DOC_GEN[t](spec).save(p); made.append(name); docx_paths.append(p)
+            docobj.save(p); made.append(name); docx_paths.append(p)
         if "md" in fmts and t in MD_GEN:
             name = outname(t, "md")
             open(os.path.join(a.out, name), "w", encoding="utf-8").write(MD_GEN[t](spec)); made.append(name)

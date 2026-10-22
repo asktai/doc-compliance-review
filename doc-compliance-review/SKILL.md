@@ -7,7 +7,7 @@ description_zh: "对合同、协议及授权书、承诺函、告知书、声明
 description_en: "Desensitize, review clause by clause, grade risks in three colors and produce redline revisions, comparison ledgers and opinion reports for contracts, agreements and business documents (authorization letters, commitment letters, notices, policies, NDAs, SLAs, DPAs and more); coverage includes payment and liquidated damages, delivery and acceptance, IP, confidentiality and non-compete, jurisdiction clauses, arbitration, dispute resolution, limitation of action, contract validity, standard terms and personal information protection; accepts background materials (files, images, photos or plain text) to sharpen the review, and adapts the review stance to a strong or weak bargaining position; drafts contracts and reusable templates, and converts existing documents into templates. Nine industry rule sets included; handles Word, PDF, images and scanned files. Advisory only, not legal advice; review by a licensed lawyer is required."
 category: writing
 argument-hint: "<文档路径或文本> [版本/角色/尺度] | 审查 | 起草 | 比对 | 背景资料 | 脱敏 | 精要总结 | 思维导图 | 向导 | 撰写合同 | 撰写模板 | 文档转模板 | 合同转模板 | 技能版本 | 技能更新 | 技能升级 | 立查得 | 小查 | 帮助|help|? | 教程 | 私有库维护/备份/回溯/导入/导出 | 行业库维护/备份/回溯/导入/导出"
-version: 3.12.3
+version: 3.13.0
 license: 个人使用授权 · 商业使用须取得书面授权（见 `LICENSE.md`）
 author: 胡皓
 examples_zh:
@@ -26,7 +26,7 @@ examples_en:
 
 ![文档合规审查助手AI合同 · 合同与商务文档逐条审查 · 风险三色分级](assets/banner-dark.png)
 
-**v3.12.3** ｜ 作者：胡皓 ｜ 许可：个人使用授权 · 商业使用须取得书面授权（详见 `LICENSE.md`）
+**v3.13.0** ｜ 作者：胡皓 ｜ 许可：个人使用授权 · 商业使用须取得书面授权（详见 `LICENSE.md`）
 
 > **免责声明**：本技能仅作辅助法律工作，**不构成法律意见**，输出内容须经**执业律师复核**；**同一对话内首次使用时由技能先输出全文**（同一对话只此一次）——见**步骤 0.0**，全文亦见 `LICENSE.md`。
 
@@ -373,14 +373,14 @@ Qn+10 11. 补充（选填，可跳过：截止时间／重点条款／交易背�
   对应参数 `--formats docx,md,excel,html,pdf`；五者均由 `make-docx.py` 实现——Excel 用 openpyxl，HTML 由 md 转换，PDF 由 docx 经 LibreOffice 转换。
   - **HTML 网页浏览版（第 5 种格式）**：产出**单文件网页**（CSS/JS 全内联、零外部资源，断网可开、可直接转发）；带**顶部固定目录导航**（锚点服务端生成，禁用 JS 也能跳转）、**点击标题折叠/展开条款**、右上角「**打印 / 存 PDF**」（`@media print` 已排 A4 版心并隐藏导航与按钮）；评级 ★/★★/★★★ 着色为**三色标签**（高红／中橙／低绿，与三色分级同色值）。由 md 转换，**优先用 `markdown` 库、缺失则自动降级内置转换器**（不报错、不阻断出件）。
 - **排版样式档位（3 档，`--style`，亦可写 `spec.style` 或 `config.json` 的 `render.style`）**：`default`（不改动版式）／`contract` 合同风（**默认**：文档标题居中、条款标题加粗不缩进、正文首行缩进 2 字符、行距 1.5、段前 6pt）／`official` 公文风（标题居中二号、正文三号首行缩进）。**只对 1、3、4、6、7 五类生效**（这五类要还原原文观感）；报告类 2、5、8、9、10 本就是新写文档，不套用（五类**标题一律居中**，不套指的是正文不按角色重排）。说明：10 类 Word 均按审查规格重建、**不读原文档格式**（扫描件/OCR/粘贴文本亦无格式可继承），故采用「按文本特征推断段落角色 ＋ 套用样式档位」补齐版式，而不是还原原稿版式——需要与原稿版式完全一致时，请使用者以原 `.docx` 另存后再人工套版。
-- **排版保真进阶（半档 C，`--source-docx <原稿.docx>`，可选）**：拿到原稿 `.docx` 时，**3. 修改后清洁版／6. 原文脱敏版／7. 原文照录版**改为「**以原稿做底 ＋ 段落级替换文字**」——不增删段落，只换文字，故**字体、字号、对齐、缩进、行距、页边距、页眉页脚、表格与图片全部沿用原稿**，保真度远高于样式档位；**1. 修订版／4. 红线修订格式版当前尚不支持原稿底稿**（需在既有 run 之间插入 `w:ins`/`w:del`，脚本暂未实现）——按上一条「原稿底稿硬性要求」，这两类在有原稿时**属"无法在原稿上改"，须按降级处理并三处显著标注**，不得假装是原稿修改；报告类 2、5、8、9、10 亦不适用（本就是新写文书）。原稿缺失/非 `.docx`/打开失败时**自动回退**样式档位，不影响产出。文本行数少于原稿段落数时，多余段落留空并给出提示。
+- **排版保真进阶（半档 C，`--source-docx <原稿.docx>`，可选）**：拿到原稿 `.docx` 时，**1 修订版／3 修改后清洁版／4 红线修订格式版／6 原文脱敏版／7 原文照录版**全部改为以原稿做底——**字体、字号、对齐、缩进、行距、页边距、页眉页脚、表格与图片全部沿用原稿**，保真度远高于样式档位。两条实现路线：**3、6、7 走「段落级替换文字」**（不增删段落、只换文字）；**1、4 走「原稿级修订」**——先做 run 合并预处理，再按「条款标题 ＋ 原文片段」把每处修改映射到原稿段落，在既有 run 之间插 `w:ins`（新增）／`w:del`（删除，内用 `w:delText` 保留原文），修订者＝审查人、`w:id` 全文档去重避开原稿已有修订；**只做局部替换，段落属性与样式一律不动**。红线版同一套定位逻辑，痕迹改为「红字下划线／灰字删除线」的纯格式并存（不依赖 Word 修订功能）。原稿缺失/非 `.docx`/打开失败/条款定位不到时**自动回退**样式档位并按下面「原稿底稿硬性要求」标注，不影响产出。文本行数少于原稿段落数时，多余段落留空并给出提示。
 - **审查人名称（必填·写死）**：由启动流程 **1.0.2 开场清单第 10 项（Qn+9）**收集（写入文件名 `<审查人>` 字段＋Word 修订者 `w:author` 显示）；**清单已收则全程不再为它打断**——只有当清单被跳过或该项为空时，才在产出前**补问一次**（这是**唯一必须打字的必填项**，题干写明「此项须打字」）；拿到才产出；纯自动化可显式指定 `--reviewer`。
 - **命名规范**：`<源文件名>_<类型>_<审查人>_r<轮次>_<YYYYMMDD-HHMM>.<ext>`（源名保留中文并做安全字符规范化；时间戳置末尾，由 AI 传准确时间 `--ts YYYYMMDD-HHMM`，勿依赖本机时钟；类型名即上述 10 类中文名；MD 与 Word 同名不同后缀；技能版本进内容不进文件名）。
 - **输出目录与隔离（安全）**：默认 `<工作根目录>\输出`（`--out` 改目录、`--subdir` 建子文件夹）；**未显式指定 `--out/--subdir` 时，交付物自动落到以文档名命名的子目录**，避免多客户文档平铺混放、被整体打包外泄（`config.json` 的 `output.per_source_subdir=false` 可关闭）；多客户建议另设 `base_dir`；输出目录属高敏感区，可用 `python scripts/harden-dir.py --dir <输出目录>` 限权（只改权限、不删文件，详见 `SECURITY.md`「二、数据流转四条路径」）。待审文档可拖入 `<工作根目录>\输入` 批量读取。**工作根目录如何确定**：默认 `auto`——按候选链自动探测（推荐盘 `D:\文档合规审查报告` → 文档库 `~/Documents/文档合规审查报告` → 用户目录 `~/文档合规审查报告`），前一档不可用自动顺延，**无 D 盘也能跑**；查看/切换用 `python scripts/set-workdir.py`（`--set <路径>`／`--auto` 还原／`--create` 建目录／`--path` 只打印路径），临时覆盖用环境变量 `DOC_REVIEW_BASE`。
 - **生成**：`scripts/make-docx.py` 依据审查规格(JSON) 产出各类型 Word/MD/Excel；PDF 由 Word 导出。`--types` 可用 slug（`tracked,reportc,clean,redline,report,masked,original,diff,compare,template`）或中文类型名；**不指定时默认产出 1、2、3 三类**，要全部 10 类须显式列出；`--comments` 为兼容保留开关（等价于选中 `reportc`）。第 10 类读 `spec.template{name,placeholders[],body,optional[],notes}`，**缺 `template` 段时退化为按条款拼骨架**（不报错、仍出件）。
 - **原稿底稿硬性要求（写死 · 审查修订必须在原稿上改）**：凡「在原文上改」的交付物——**1 修订版、3 修改后清洁版、4 红线修订格式版、6 原文脱敏版、7 原文照录版**——**必须以使用者提供的原稿为底**做段落级替换或修订痕迹注入（拿到原稿 `.docx` 即走半档 C，`--source-docx <原稿.docx>`），**不得脱离原稿凭空重建正文再冒充修改**。**无法在原稿上改时必须降级处理，且降级必须显式**：
-  1. **触发降级的情形**（任一即降级）：未拿到原稿文件（只有粘贴文本/图片/扫描件）；原稿非 `.docx`（`.doc`/`.wps`/`.rtf`/PDF 等，转换损失结构）；原稿损坏或加密打不开；脚本对该类型暂不支持原稿底稿（当前 `--source-docx` 仅对 3、6、7 生效，**1、4 的原稿级修订尚未支持**）。
-  2. **降级动作**：改用样式档位按审查规格重建（降级后的最高可用形态）；**在文件名、docx 文档属性、报告"总体评估"三处同时显著标注**「⚠ 降级：非原稿修改（原因：＿＿）——补交可编辑原稿 .docx 后可重跑获得原稿级修改」。
+  1. **触发降级的情形**（任一即降级）：未拿到原稿文件（只有粘贴文本/图片/扫描件）；原稿非 `.docx`（`.doc`/`.wps`/`.rtf`/PDF 等，转换损失结构）；原稿损坏或加密打不开；**部分条款在原稿中定位不到**（标题与原文片段都对不上，逐处跳过并在标注中列明是哪几处）。
+  2. **降级动作**：改用样式档位按审查规格重建（降级后的最高可用形态）；**在文件名、docx 文档属性、报告"总体评估"三处同时显著标注**。**两档标注要分清**：完全没落到原稿的标「⚠ 降级：非原稿修改（原因：＿＿）」，文件名加 `-降级`；已在原稿上改、只是部分条款没落位的标「⚠ 降级（部分）：本件已在原稿上改，但＿＿」，文件名加 `-降级-部分`——**不得把部分落位说成完全重建，也不得把完全重建说成原稿修改**。
   3. **红线**：**不得静默重建**、不得在产出或对话中声称"已按原稿修改"、不得把降级原因归咎使用者；使用者当场补交原稿的，立即按原稿路线重跑。
   4. **逐份判定**：多文档场景对每份各自判定（一份有原稿一份没有，就一份原稿改、一份降级标注，不得一刀切）。
 - **修订类两种形态（按平台适配，均由用户选择）**：**1. 修订版**＝Word 原生修订痕迹 `w:ins`/`w:del`（修订者=审查人，可逐条接受/拒绝；有本地文件/脚本能力时默认）；**4. 红线修订格式版**＝新增用下划线/红字、删除用删除线/灰字（纯对话/云 AI 默认）。MD 对应：`1.` 用 `<ins>/<del>`，`4.` 用 `~~删除~~`＋`**新增**`。
