@@ -3,27 +3,31 @@
   "product": "文档合规审查助手AI合同",
   "skill_id": "doc-compliance-review",
   "latest": {
-    "version": "v3.20.0",
+    "version": "v3.21.0",
     "date": "2026-10-22",
-    "summary": "把「三库」讲透：内层改称「层」，停用重复的「三库」；能力串新增「能理解」「能分析」「能归纳」共十七项",
+    "summary": "新增「失衡画像」：单文档内部多处问题的横向归纳，一屏答「整体往哪偏／偏在哪／是系统性还是个案」",
     "changes": [
-      "内层「三库」统一改称「通用层／行业层／私有层」，「三库」今后只指规则／法规／模板",
-      "补记法：三个库是并列的三兄弟，三层是规则库自己套的三层皮（并列 vs 包含）",
-      "附经得起追问的比喻：可批注的法典／活页插页／自家便签／空白表格",
-      "写明两种叫法指同一件事：讲层级写「层」，菜单与路径仍写「库」",
-      "新增能理解（读懂是什么，不套框架）、能分析（拆条款内部的权利义务与失衡）",
-      "新增能归纳（多份放一起理共性），并加触发词：归纳／提炼／共性／归总",
-      "划清 能理解／能诊断／能分析／能审 四格界限与不可颠倒的顺序",
-      "划清 能总结（一进一出）vs 能归纳（多进一出），归纳须连样本量说、不外推",
-      "能力串 十四项 → 十七项（十六项已可用）"
+      "审查报告固定新增「失衡画像」一节，置于总体风险评估之后、逐条分析之前",
+      "三个问题：整体往哪偏（四档判定）／偏在哪些维度（七类按集中度排序）／是系统性还是个案",
+      "判为系统性偏移时必须同时给出证据计数、最集中维度带条号、可打的反制点",
+      "三条硬约束：不脱离立场谈偏向、样本不足就说不判、不外推成行业规律",
+      "新增 scripts/imbalance.py：阈值写死为常量，判定可复现，不用心算",
+      "★ 提示项不参与统计；最集中维度设 2 条门槛，避免谈判重点被稀释",
+      "check.py 新增 check_imbalance_engine()：7 组用例＋常量区间校验＋禁止 ★ 计入",
+      "脚本 20 → 21，冒烟 120 → 126 项"
     ],
     "download_page": "https://github.com/asktai/doc-compliance-review/releases",
     "files": {
-      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.20.0/文档合规审查助手AI合同_v3.20.0_20261022_(doc-compliance-review).skill",
-      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.20.0/文档合规审查助手AI合同_v3.20.0_20261022_(doc-compliance-review).zip"
+      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.21.0/文档合规审查助手AI合同_v3.21.0_20261022_(doc-compliance-review).skill",
+      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.21.0/文档合规审查助手AI合同_v3.21.0_20261022_(doc-compliance-review).zip"
     }
   },
   "history": [
+    {
+      "version": "v3.20.0",
+      "date": "2026-10-22",
+      "summary": "把「三库」讲透：内层改称「层」，停用重复的「三库」；能力串新增「能理解」「能分析」「能归纳」共十七项"
+    },
     {
       "version": "v3.19.0",
       "date": "2026-10-22",
@@ -112,5 +116,5 @@
   ],
   "_维护说明": "出包后请同步更新本文件（latest 段与 history）。真源是 SKILL.md 的 version 与 VERSION.md 的沿革；本文件是'对外公布的清单'，须与真源一致，否则使用者会被引向旧版。",
   "schema": 1,
-  "version": "v3.20.0"
+  "version": "v3.21.0"
 }

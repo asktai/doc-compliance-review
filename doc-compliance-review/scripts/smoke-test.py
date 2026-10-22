@@ -910,6 +910,51 @@ def main():
     except Exception as e:
         check("核验引擎自检", False, repr(e))
 
+    # --- 3.48 失衡画像（单文档内部多处问题的横向归纳）---
+    print("\n[3.48] 失衡画像（横向归纳）")
+    try:
+        im = os.path.join(HERE, "imbalance.py")
+        if not os.path.exists(im):
+            check("失衡画像：脚本存在", False, "缺 scripts/imbalance.py")
+        else:
+            check("失衡画像：脚本存在", True, "scripts/imbalance.py")
+            r1 = run([PY, im, "--self-test"])
+            check("失衡画像：内置判定用例全过",
+                  r1.returncode == 0 and "自检通过" in (r1.stdout or ""), head_lines(r1.stdout))
+
+            # 真跑一组：11 条计入、9 条不利 → 系统性偏移，且只列真正集中的维度
+            p_rows = os.path.join(work, "imb-rows.json")
+            rows = [{"no": "8.%d" % i, "level": "★★", "dim": "违约责任", "against": True}
+                    for i in range(1, 5)]
+            rows += [{"no": "4.%d" % i, "level": "★★", "dim": "付款与结算", "against": True}
+                     for i in range(1, 4)]
+            rows += [{"no": "3.2", "level": "★★", "dim": "交付与验收", "against": True},
+                     {"no": "12.1", "level": "★★", "dim": "管辖与争议解决", "against": True},
+                     {"no": "6.5", "level": "★★", "dim": "解除与终止", "against": False},
+                     {"no": "2.1", "level": "★", "dim": "交付与验收", "against": True}]
+            json.dump(rows, open(p_rows, "w", encoding="utf-8"), ensure_ascii=False)
+            r2 = run([PY, im, "--rows", p_rows, "--side", "甲方"])
+            o2 = r2.stdout or ""
+            check("失衡画像：同向占多数即判系统性偏移，并给出证据计数",
+                  r2.returncode == 0 and "系统性有利于对方" in o2
+                  and "计入 10 条" in o2 and "占 90%" in o2, head_lines(o2))
+            check("失衡画像：★ 提示项不参与统计",
+                  "已剔除 1 条 ★" in o2, head_lines(o2))
+            check("失衡画像：最集中维度不把只有 1 条的维度算进去",
+                  "最集中维度：违约责任、付款与结算" in o2, head_lines(o2))
+
+            # 样本不足必须不判（宁可交诚实结论，不硬凑洞察）
+            p_empty = os.path.join(work, "imb-empty.json")
+            json.dump([{"no": "1", "level": "★★", "dim": "违约责任", "against": True},
+                       {"no": "2", "level": "★★", "dim": "违约责任", "against": True}],
+                      open(p_empty, "w", encoding="utf-8"), ensure_ascii=False)
+            r3 = run([PY, im, "--rows", p_empty, "--side", "甲方"])
+            check("失衡画像：样本不足 3 条时明说不判（不硬凑系统性结论）",
+                  r3.returncode == 0 and "未发现系统性偏移" in (r3.stdout or "")
+                  and "不足 3 条" in (r3.stdout or ""), head_lines(r3.stdout))
+    except Exception as e:
+        check("失衡画像自检", False, repr(e))
+
     # --- 3.5 版本与依赖（分发与落地成本）---
     print("\n[3.5] 版本与依赖")
     try:

@@ -1047,6 +1047,44 @@ def check_platform_limit():
         info("平台上限口径：文档与 pack.py 常量一致（≤%s MB）" % lim)
 
 
+def check_imbalance_engine():
+    """失衡画像判定逻辑自洽：脚本在、能加载、内置用例全过。
+
+    为什么要在 check 里跑：失衡画像会写出「**系统性偏移**」这样的强结论，
+    一旦阈值被悄悄调松（比如把「同向 3 条」改成 2 条、把 60% 改成 40%），
+    两份只沾一点边的条款就会被说成「整份合同系统性偏向对方」——
+    **这种结论错了比不写更糟**，律师拿去谈判会被对方一句话问穿。
+    所以阈值是常量、自检是硬闸。
+    """
+    p = os.path.join(ROOT, "scripts", "imbalance.py")
+    if not os.path.exists(p):
+        err("失衡画像脚本缺失：scripts/imbalance.py")
+        return
+    try:
+        import importlib.util as _ilu
+        s = _ilu.spec_from_file_location("_ck_imb", p)
+        m = _ilu.module_from_spec(s)
+        s.loader.exec_module(m)
+    except Exception as e:
+        err("失衡画像脚本无法加载：%s" % e)
+        return
+
+    fails = m.self_test()
+    for f in fails:
+        err("失衡画像判定错误：%s" % f)
+
+    # 阈值必须是常量且在合理区间——松到随便就判「系统性」，结论就没有意义
+    if not (2 <= m.MIN_ROWS <= 5):
+        err("失衡画像计入门槛异常：MIN_ROWS=%s（应在 2–5）" % m.MIN_ROWS)
+    if not (0.5 <= m.MAJORITY <= 0.8):
+        err("失衡画像占比阈值异常：MAJORITY=%s（应在 0.5–0.8）" % m.MAJORITY)
+    if "★" in m.WEIGHT:
+        err("失衡画像把 ★ 提示项计入了统计（会把结论稀释成没结论）")
+
+    info("失衡画像：7 组判定用例全过，阈值常量在合理区间（计入≥%d 条、同向≥%d 条且占≥%d%%），"
+         "★ 提示项不参与统计" % (m.MIN_ROWS, m.MIN_SAME, int(m.MAJORITY * 100)))
+
+
 def check_verify_engine():
     """核验引擎（第 11 引擎）自洽：在、能加载、正例放行、负例拦得住、出口分级正确。
 
@@ -1609,6 +1647,7 @@ def main():
         check_legal_crosscheck()
         check_tpl_engine()
         check_verify_engine()
+        check_imbalance_engine()
         check_reproducible_build()
         check_gitignore()
         check_skill_ext_lowercase()
