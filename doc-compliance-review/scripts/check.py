@@ -1047,6 +1047,89 @@ def check_platform_limit():
         info("平台上限口径：文档与 pack.py 常量一致（≤%s MB）" % lim)
 
 
+def check_verify_engine():
+    """核验引擎（第 11 引擎）自洽：在、能加载、正例放行、负例拦得住、出口分级正确。
+
+    为什么要在 check 里实跑：核验引擎是**产物出不出得去的裁判**。裁判死了不比错判好——
+    它只会静默放行，带病文件照出。所以每次改动都实跑正负例，确认三档出口还通着电。
+
+    特别要守住的一条：**「需人工复核」必须带定位**。没有行号/条号的复核项等于没说，
+    使用者根本不知道去哪儿改。
+    """
+    p = os.path.join(ROOT, "scripts", "verify.py")
+    if not os.path.exists(p):
+        err("核验引擎缺失：scripts/verify.py")
+        return
+    try:
+        import importlib.util as _ilu
+        s = _ilu.spec_from_file_location("_ck_verify", p)
+        m = _ilu.module_from_spec(s)
+        s.loader.exec_module(m)
+    except Exception as e:
+        err("核验引擎无法加载（语法错误或依赖越界）：%s" % e)
+        return
+
+    # ① 正例：干净文本必须判「通过」，不许误伤
+    clean = ("甲方：某公司。乙方：某公司。\n"
+             "第一条 甲方应于2025年3月1日前交货。\n"
+             "第二条 货款人民币12,000元（大写：壹万贰仟元整）。\n"
+             "第三条 未尽事宜依照第一条办理。\n")
+    r = m.run(clean, only=["caliber"])
+    if r["level"] != m.PASS:
+        err("核验引擎误伤干净文本（正例被判 %s）：%s"
+            % (r["level"], "；".join(f.title for f in m.run(clean, only=["caliber"])["findings"])))
+    # 补一条：条款总数与条号对得上，也不能报断号
+    ok_cnt = "本协议共三条。\n第一条 甲。\n第二条 乙。\n第三条 丙。\n"
+    if m.run(ok_cnt, only=["caliber"])["level"] != m.PASS:
+        err("核验引擎把「共三条／一至三条」误判为口径错误")
+
+    # ② 负例：每一类都必须拦得住，且必须给定位
+    cases = [
+        ("占位符残留", "第一条 甲方：{{甲方全称}}。\n第二条 乙方：某公司。\n",
+         "占位符", m.BLOCK),
+        ("日期区间倒置", "第一条 自2025年3月1日至2025年1月1日止。\n",
+         "日期区间倒置", m.BLOCK),
+        ("金额大小写不一致", "第一条 货款人民币12,000元（大写：壹拾贰万元整）。\n",
+         "金额大小写", m.BLOCK),
+        ("交叉引用悬空", "第一条 甲。\n第二条 乙。\n第三条 依照第九条办理。\n",
+         "交叉引用", m.MANUAL),
+        ("条款总数不符", "本协议共五条。\n第一条 甲。\n第二条 乙。\n第三条 丙。\n",
+         "共 5 条", m.MANUAL),
+    ]
+    for label, text, kw, want in cases:
+        rr = m.run(text, only=["caliber"])
+        hits = [f for f in rr["findings"] if kw in f.title]
+        if not hits:
+            err("核验引擎对「%s」没拦住（负例未命中「%s」）：%s"
+                % (label, kw, "；".join(f.title for f in rr["findings"]) or "无发现"))
+            continue
+        if hits[0].level != want:
+            err("核验引擎对「%s」分级不对：应为「%s」，实为「%s」" % (label, want, hits[0].level))
+        if not hits[0].loc:
+            err("核验引擎对「%s」只报问题不给定位（无行号/条号），使用者无从下手" % label)
+
+    # ③ 出口分级：BLOCK 必须压过 MANUAL，PASS 不得抬高整体结论
+    t = "第一条 自2025年3月1日至2025年1月1日止。\n第二条 依照第九条办理。\n"
+    rr = m.run(t, only=["caliber"])
+    if rr["level"] != m.BLOCK:
+        err("核验引擎出口分级错误：同类内同时有拦下与复核项时应判「拦下」，实判「%s」" % rr["level"])
+
+    # ④ 金额解析：合法写法不得误报（这是最容易出错的地方，写死几组已知答案）
+    same = [("12000", "壹万贰仟元整"), ("12000", "壹万贰仟圆整"), ("100000", "拾万元整"),
+            ("12000.50", "壹万贰仟元伍角"), ("12000.05", "壹万贰仟元零伍分"),
+            ("10001", "壹万零壹元整"), ("100000000", "壹亿元整")]
+    for small, big in same:
+        if abs(m._parse_small(small) - (m._parse_big(big) or -1)) >= 0.005:
+            err("核验引擎大写金额解析错误：%s 元 与「%s」本应一致，解析为 %s"
+                % (small, big, m._parse_big(big)))
+    for junk in ("见附件", "壹万贰仟元整及利息", ""):
+        if m._parse_big(junk) is not None:
+            err("核验引擎把认不出的金额「%s」硬解析出了数（应当返回 None 不猜）" % junk)
+
+    info("核验引擎：正例通过、5 类负例全部拦下且均带定位（占位符／日期倒置／金额大小写／"
+         "交叉引用悬空／条款总数不符），出口分级与金额解析正确")
+
+
 def check_reproducible_build():
     """可复现构建守卫：出包链不得引入随"生成时刻"变化的字节。
 
@@ -1525,6 +1608,7 @@ def main():
         check_legal_db()
         check_legal_crosscheck()
         check_tpl_engine()
+        check_verify_engine()
         check_reproducible_build()
         check_gitignore()
         check_skill_ext_lowercase()

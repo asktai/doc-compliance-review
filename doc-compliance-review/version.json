@@ -3,22 +3,30 @@
   "product": "文档合规审查助手AI合同",
   "skill_id": "doc-compliance-review",
   "latest": {
-    "version": "v3.18.0",
+    "version": "v3.19.0",
     "date": "2026-10-22",
-    "summary": "补正「三库」两层含义：产品级三库（规则／法规／模板）与规则库内三层（通用／行业／私有）分别成表",
+    "summary": "新增第 11 个引擎「核验引擎」：产物出得去出不去的唯一裁判，四类核验＋三档出口＋必须给定位",
     "changes": [
-      "SKILL／README 各补「规则库的三层」表：通用库（只读 159 条）／行业库（9 个，可改）／私有库（默认空，优先级最高）",
-      "写明三层是叠加适用而非三选一，冲突按 私有>行业>通用 消解",
-      "写明三层都压不过法条：与强制性规定冲突时以法规库原文为准",
-      "加载步骤 1.7 加交叉引用，防止只看一处的人把两层搞混"
+      "新增 scripts/verify.py：法条／模板／口径／格式四类核验，出口只有通过／需人工复核／拦下三档",
+      "「需人工复核」必须带定位（行号／条号／原文片段），无定位即判错",
+      "口径核验六项：占位符残留／条款总数与条号相符／条号断号／交叉引用不悬空／日期区间倒置／金额大小写一致",
+      "金额大小写按「解析成数值再比」而非字形比，合法写法（壹拾万/拾万、圆/元、零的取舍）零误报",
+      "check.py 新增 check_verify_engine() 出包硬闸：正例不误伤、5 类负例必拦下且带定位、分级正确",
+      "能力串加「能核」共十四项，并写明 能检（查风险）vs 能核（做裁决）的区别",
+      "脚本 19 → 20"
     ],
     "download_page": "https://github.com/asktai/doc-compliance-review/releases",
     "files": {
-      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.18.0/文档合规审查助手AI合同_v3.18.0_20261022_(doc-compliance-review).skill",
-      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.18.0/文档合规审查助手AI合同_v3.18.0_20261022_(doc-compliance-review).zip"
+      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.19.0/文档合规审查助手AI合同_v3.19.0_20261022_(doc-compliance-review).skill",
+      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.19.0/文档合规审查助手AI合同_v3.19.0_20261022_(doc-compliance-review).zip"
     }
   },
   "history": [
+    {
+      "version": "v3.18.0",
+      "date": "2026-10-22",
+      "summary": "补正「三库」两层含义：产品级三库（规则／法规／模板）与规则库内三层（通用／行业／私有）分别成表"
+    },
     {
       "version": "v3.17.0",
       "date": "2026-10-22",
@@ -97,5 +105,5 @@
   ],
   "_维护说明": "出包后请同步更新本文件（latest 段与 history）。真源是 SKILL.md 的 version 与 VERSION.md 的沿革；本文件是'对外公布的清单'，须与真源一致，否则使用者会被引向旧版。",
   "schema": 1,
-  "version": "v3.18.0"
+  "version": "v3.19.0"
 }

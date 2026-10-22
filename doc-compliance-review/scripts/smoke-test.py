@@ -849,6 +849,67 @@ def main():
     except Exception as e:
         check("模板引擎自检", False, repr(e))
 
+    # --- 3.47 核验引擎（产物出得去出不去的裁判）---
+    print("\n[3.47] 核验引擎（四类核验／三档出口）")
+    try:
+        vf = os.path.join(HERE, "verify.py")
+        if not os.path.exists(vf):
+            check("核验引擎：脚本存在", False, "缺 scripts/verify.py")
+        else:
+            check("核验引擎：脚本存在", True, "scripts/verify.py")
+
+            # ① 干净文本必须判「通过」（不许误伤）
+            p_ok = os.path.join(work, "vf-ok.md")
+            open(p_ok, "w", encoding="utf-8").write(
+                "第一条 甲方应于2025年3月1日前交货。\n"
+                "第二条 货款人民币12,000元（大写：壹万贰仟元整）。\n"
+                "第三条 未尽事宜依照第一条办理。\n")
+            r1 = run([PY, vf, "--file", p_ok, "--only", "caliber"])
+            check("核验引擎：干净文本判通过（不误伤）",
+                  r1.returncode == 0 and "通过" in (r1.stdout or ""), head_lines(r1.stdout))
+
+            # ② 四类机械错误各拦一次，且必须给定位
+            p_bad = os.path.join(work, "vf-bad.md")
+            open(p_bad, "w", encoding="utf-8").write(
+                "第一条 甲方：{{甲方全称}}。\n"
+                "第二条 自2025年3月1日至2025年1月1日止。\n"
+                "第三条 货款人民币12,000元（大写：壹拾贰万元整）。\n"
+                "第四条 依照第九条办理。\n")
+            r2 = run([PY, vf, "--file", p_bad, "--only", "caliber"])
+            o2 = r2.stdout or ""
+            check("核验引擎：占位符残留／日期倒置／金额大小写不一致 三类拦下（退出 1）",
+                  r2.returncode == 1 and "占位符" in o2 and "日期区间倒置" in o2
+                  and "金额大小写" in o2, head_lines(o2))
+            check("核验引擎：每个问题都给定位（不给定位于使用者无用）",
+                  "第 1 行" in o2 and "第 2 行" in o2 and "第 3 行" in o2,
+                  "定位出现 %d 次" % o2.count("第 "))
+
+            # ③ 机器可读：--json 落盘且结构完整
+            p_json = os.path.join(work, "vf.json")
+            r3 = run([PY, vf, "--file", p_bad, "--only", "caliber", "--json", p_json])
+            ok_json, why = False, "未生成"
+            try:
+                d = json.load(open(p_json, encoding="utf-8"))
+                fs = d.get("findings") or []
+                ok_json = (d.get("level") == "拦下" and fs
+                           and all(f.get("loc") for f in fs if f.get("level") != "通过"))
+                why = "level=%s／%d 项" % (d.get("level"), len(fs))
+            except Exception as e:
+                why = repr(e)
+            check("核验引擎：--json 输出机读结果且复核项均带定位", ok_json, why)
+
+            # ④ 金额大小写按钱数比、不按字形比（合法异写不得误报）
+            p_amt = os.path.join(work, "vf-amt.md")
+            open(p_amt, "w", encoding="utf-8").write(
+                "第一条 货款人民币100,000元（大写：拾万元整）。\n"
+                "第二条 货款人民币12,000元（大写：壹万贰仟圆整）。\n"
+                "第三条 货款人民币12,000.05元（大写：壹万贰仟元零伍分）。\n")
+            r4 = run([PY, vf, "--file", p_amt, "--only", "caliber"])
+            check("核验引擎：大写合法异写不误报（拾万＝壹拾万／圆＝元／零伍分）",
+                  r4.returncode == 0, head_lines(r4.stdout))
+    except Exception as e:
+        check("核验引擎自检", False, repr(e))
+
     # --- 3.5 版本与依赖（分发与落地成本）---
     print("\n[3.5] 版本与依赖")
     try:
