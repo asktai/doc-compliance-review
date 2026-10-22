@@ -122,17 +122,25 @@ def build_spec(path):
             },
         ],
         # 第 10 类「模板版」：转模板 / 撰写模板 两条链路共用（缺字段时退化为条款骨架，故这里给全）
+        # 版本留痕行（ver/date/变更）是模板版出件的硬要求：没有它就无法反查用的是哪版模板。
         "template": {
             "name": "设备采购合同模板（冒烟样例）",
             "placeholders": [
                 {"name": "{{甲方全称}}", "meaning": "采购方主体全称", "example": "某某科技有限公司", "required": True},
+                {"name": "{{设备名称}}", "meaning": "设备规格型号", "example": "XX-2000 型", "required": True},
+                {"name": "{{数量}}", "meaning": "采购数量", "example": "10", "required": True},
                 {"name": "{{合同金额}}", "meaning": "含税总价（大小写一致）", "example": "人民币壹佰万元整（¥1,000,000.00）", "required": True},
                 {"name": "{{交付期限}}", "meaning": "收到订单后的交货天数", "example": "15 个工作日", "required": False},
             ],
-            "body": "第一条 标的：{{甲方全称}}向乙方采购{{设备名称}} {{数量}}台。\n"
+            "values": {"甲方全称": "某某科技有限公司", "设备名称": "XX-2000 型", "数量": "10",
+                       "合同金额": "人民币壹佰万元整（¥1,000,000.00）"},
+            "body": "<!-- tpl: 设备采购合同模板 | ver: 1.0.0 | date: 2026-01-01 | 变更: 冒烟样例初版 -->\n"
+                    "第一条 标的：{{甲方全称}}向乙方采购{{设备名称}} {{数量}}台。\n"
                     "第二条 价款：合同总价{{合同金额}}，含增值税专用发票。\n"
                     "第三条 交付：乙方应于收到订单后{{交付期限}}内交货。\n"
+                    "{{#有第三方担保}}\n第五条 丙方为乙方履约提供连带责任保证。\n{{/有第三方担保}}\n"
                     "第四条 争议解决：协商不成的，向被告所在地有管辖权的人民法院提起诉讼。",
+            "switches": {"有第三方担保": False},
             "optional": [
                 {"name": "竞业限制", "scene": "涉及核心技术或渠道的交易", "advice": "我方强势时可加，弱势时不必争取"},
                 {"name": "审计权", "scene": "对方掌握成本/用量数据的长期合作", "advice": "建议保留，但限定频次与提前通知期"},
@@ -747,6 +755,99 @@ def main():
                   head_lines(r_new.stdout))
     except Exception as e:
         check("法条核验自检", False, repr(e))
+
+    # --- 3.45 模板引擎（占位符必填／条件段／版本留痕）---
+    print("\n[3.45] 模板引擎（模板版出件前的硬闸）")
+    try:
+        te = os.path.join(HERE, "tpl-engine.py")
+        if not os.path.exists(te):
+            check("模板引擎：脚本存在", False, "缺 scripts/tpl-engine.py")
+        else:
+            check("模板引擎：脚本存在", True, "scripts/tpl-engine.py")
+
+            def _tpl(body, values=None, sw=None, meta=None, placeholders=None):
+                t = {"name": "T（模板）", "body": body,
+                     "placeholders": placeholders if placeholders is not None else
+                     [{"name": "{{甲方全称}}", "meaning": "x", "required": True}],
+                     "values": values if values is not None else {"甲方全称": "某公司"}}
+                if sw is not None:
+                    t["switches"] = sw
+                if meta is not None:
+                    t["meta"] = meta
+                return {"name": "T", "template": t}
+
+            HDR = "<!-- tpl: T | ver: 1.0.0 | date: 2026-01-01 | 变更: 初版 -->\n"
+            # ① 体检模式：结构对就过（不看必填填没填）
+            p_ok = os.path.join(work, "tpl-ok.json")
+            json.dump(_tpl(HDR + "甲方：{{甲方全称}}\n{{#有担保}}\n担保。\n{{/有担保}}\n"
+                           "{{^有担保}}\n无担保。\n{{/有担保}}", sw={"有担保": True}),
+                      open(p_ok, "w", encoding="utf-8"), ensure_ascii=False)
+            r1 = run([PY, te, "check", p_ok])
+            check("模板引擎：结构合规的模板体检通过",
+                  r1.returncode == 0 and "版本 1.0.0" in (r1.stdout or ""), head_lines(r1.stdout))
+
+            # ② 出件模式：必填未填要拦
+            p_blank = os.path.join(work, "tpl-blank.json")
+            json.dump(_tpl(HDR + "甲方：{{甲方全称}}", values={}, sw={}),
+                      open(p_blank, "w", encoding="utf-8"), ensure_ascii=False)
+            r2 = run([PY, te, "render", p_blank])
+            check("模板引擎：必填占位符未填实即拦下（退出 1）",
+                  r2.returncode == 1 and "必填占位符未填实" in (r2.stdout or ""),
+                  head_lines(r2.stdout))
+
+            # ③ 条件段按开关取舍：开=留、关=删
+            p_sw = os.path.join(work, "tpl-sw.json")
+            json.dump(_tpl(HDR + "前段。\n{{#有担保}}\n担保条款。\n{{/有担保}}\n后段。"),
+                      open(p_sw, "w", encoding="utf-8"), ensure_ascii=False)
+            o_on = run([PY, te, "render", p_sw, "--switch", "有担保=1"])
+            o_off = run([PY, te, "render", p_sw, "--switch", "有担保=0"])
+            check("模板引擎：条件段按开关取舍（开则留、关则删）",
+                  "担保条款" in (o_on.stdout or "") and "担保条款" not in (o_off.stdout or ""),
+                  "开=%s／关=%s" % ("留" if "担保条款" in (o_on.stdout or "") else "删",
+                                   "留" if "担保条款" in (o_off.stdout or "") else "删"))
+
+            # ④ 开关未给值不得默认保留（默认保留＝偷偷加条款）
+            r4 = run([PY, te, "render", p_sw])
+            check("模板引擎：条件段开关未给值即拦下（不默认保留）",
+                  r4.returncode == 1 and "开关未给值" in (r4.stdout or ""),
+                  head_lines(r4.stdout))
+
+            # ⑤ 版本留痕缺失要拦；版本号写得出
+            p_nover = os.path.join(work, "tpl-nover.json")
+            json.dump(_tpl("甲方：{{甲方全称}}"), open(p_nover, "w", encoding="utf-8"),
+                      ensure_ascii=False)
+            r5 = run([PY, te, "check", p_nover])
+            check("模板引擎：缺版本留痕即拦下（模板改了没法追溯）",
+                  r5.returncode == 1 and "版本留痕" in (r5.stdout or ""), head_lines(r5.stdout))
+
+            # ⑥ make-docx 出模板版：版本号进文档属性与正文
+            p_full = os.path.join(work, "tpl-full.json")
+            json.dump(_tpl(HDR + "甲方：{{甲方全称}}", sw={}), open(p_full, "w", encoding="utf-8"),
+                      ensure_ascii=False)
+            outd = os.path.join(work, "tpl-out")
+            r6 = run([PY, os.path.join(HERE, "make-docx.py"), p_full, "--types", "template",
+                      "--reviewer", "冒烟测试", "--out", outd, "--ts", "20260101-0000"])
+            got = ""
+            try:
+                from docx import Document as _Doc
+                fns = [f for f in os.listdir(outd) if f.endswith(".docx")]
+                if fns:
+                    _d = _Doc(os.path.join(outd, fns[0]))
+                    got = (_d.core_properties.subject or "") + "".join(p.text for p in _d.paragraphs)
+            except Exception:
+                pass
+            check("模板引擎：模板版出件把版本号写进文档属性与正文",
+                  r6.returncode == 0 and "1.0.0" in got, "版本串%s在产出中" % ("" if "1.0.0" in got else "不"))
+
+            # ⑦ 出件闸生效：必填未填时 make-docx 必须拒绝出件
+            r7 = run([PY, os.path.join(HERE, "make-docx.py"), p_blank, "--types", "template",
+                      "--reviewer", "冒烟测试", "--out", os.path.join(work, "tpl-out2"),
+                      "--ts", "20260101-0000"])
+            check("模板引擎：模板不合规时 make-docx 拒绝出件（拦得住）",
+                  r7.returncode != 0 and "校验未通过" in ((r7.stdout or "") + (r7.stderr or "")),
+                  head_lines(r7.stdout))
+    except Exception as e:
+        check("模板引擎自检", False, repr(e))
 
     # --- 3.5 版本与依赖（分发与落地成本）---
     print("\n[3.5] 版本与依赖")

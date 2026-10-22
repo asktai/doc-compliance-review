@@ -1226,17 +1226,101 @@ def doc_masked(spec):
         apply_role(doc.add_paragraph(line), role)
     return doc
 
+_TPL_MOD = None
+
+
+def _tpl_engine():
+    """惰性加载同目录的 tpl-engine.py（文件名带短横，不能直接 import）。失败返回 None。"""
+    global _TPL_MOD
+    if _TPL_MOD is not False and _TPL_MOD is None:
+        try:
+            import importlib.util as _ilu
+            _p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tpl-engine.py")
+            _s = _ilu.spec_from_file_location("_tpl_engine", _p)
+            _m = _ilu.module_from_spec(_s)
+            _s.loader.exec_module(_m)
+            _TPL_MOD = _m
+        except Exception:
+            _TPL_MOD = False
+    return _TPL_MOD or None
+
+
+def _tpl_switches(spec):
+    t = spec.get("template") if isinstance(spec.get("template"), dict) else {}
+    raw = t.get("switches")
+    sw = {}
+    if isinstance(raw, dict):
+        for k, v in raw.items():
+            sw[str(k)] = bool(v)
+    elif isinstance(raw, list):
+        for k in raw:
+            sw[str(k)] = True
+    return sw
+
+
+def tpl_gate(spec):
+    """模板版出件前的硬闸：占位符登记是否齐、必填是否填实、条件段是否定案、版本是否有留痕。
+
+    走 tpl-engine（纯标准库，不联网）。**不过就拦住不出件**——模板缺版本号或必填没填，
+    带病出件的后果是使用者拿着半成品签合同，比不出件坏得多。
+    返回 (ok, info, errors, warnings)。
+    """
+    mod = _tpl_engine()
+    if mod is None:
+        # 引擎自身不可用时不拦出件，但要明说——静默降级等于没有这道闸
+        return True, {}, [], ["模板引擎未加载，本次未做占位符与版本校验"]
+    try:
+        r = mod.check(spec, _tpl_switches(spec), filling=True)
+    except Exception as ex:
+        return False, {}, ["模板校验异常：%s" % ex], []
+    return (not r["errors"]), r.get("info") or {}, r["errors"], r["warnings"]
+
+
+def tpl_body(spec):
+    """渲染后的模板正文：条件段已按开关取舍，占位符保持原样（模板本就该带占位符）。"""
+    mod = _tpl_engine()
+    if mod is None:
+        return template_spec(spec)["body"]
+    try:
+        body, _ = mod.render(spec, _tpl_switches(spec))
+        return body
+    except Exception:
+        return template_spec(spec)["body"]
+
+
 def doc_template(spec):
-    """10 模板版：占位符说明表 ＋ 模板正文 ＋ 可选条款区 ＋ 使用须知。
+    """10 模板版：占位符说明表 ＋ 模板正文（条件段已取舍）＋ 可选条款区 ＋ 使用须知 ＋ 版本留痕。
 
     报告型文书（本技能新写），故标题居中并带报告免责声明；可选条款逐条挂批注（正文不留痕）。
     """
     t = template_spec(spec)
+    _ok, _info, _errs, _warns = tpl_gate(spec)
+    if not _ok:
+        raise SystemExit("[E] 模板版校验未通过，已拦下不出件：\n  - "
+                         + "\n  - ".join(_errs)
+                         + "\n  改好 spec.template 后重跑；只体检不出件可用："
+                           "python scripts/tpl-engine.py check <spec.json>")
+    _meta = (_info.get("meta") or {})
     doc = Document()
     h0 = add_report_title(doc, template_name(spec))
     set_meta(doc, spec, "template")
+    # 模板版本写进文档属性（资源管理器右键即见），报告归档后可反查用的是哪版模板
+    if _meta.get("version"):
+        try:
+            cp = doc.core_properties
+            cp.subject = "模板版本 %s（%s）" % (_meta.get("version"), _meta.get("date") or "日期未记")
+            cp.comments = (cp.comments or "") + "\n模板：%s ｜ 版本 %s ｜ %s ｜ 变更：%s" % (
+                _meta.get("name") or template_name(spec), _meta.get("version"),
+                _meta.get("date") or "—", _meta.get("change") or "—")
+        except Exception:
+            pass
     add_disclaimer(doc, spec)
     doc.add_paragraph("来源：" + title(spec) + "　审查人：" + REVIEWER + "　轮次：r" + ROUND)
+    if _meta.get("version"):
+        r = doc.add_paragraph().add_run(
+            "模板版本：%s（%s）　变更：%s"
+            % (_meta.get("version"), _meta.get("date") or "—", _meta.get("change") or "—"))
+        r.font.size = Pt(9)
     add_delivery_note(doc, h0.runs[:1], "template", spec)
     if t["placeholders"]:
         doc.add_heading("一、占位符说明表", level=2)
@@ -1244,9 +1328,10 @@ def doc_template(spec):
             doc.add_paragraph("%d. %s　含义：%s｜填写示例：%s｜%s"
                               % (i, p.get("name") or "—", p.get("meaning") or "—",
                                  p.get("example") or "—", "必填" if p.get("required") else "选填"))
-    if t["body"]:
+    _body = tpl_body(spec)
+    if _body:
         doc.add_heading("二、模板正文", level=2)
-        for line in t["body"].splitlines():
+        for line in _body.splitlines():
             doc.add_paragraph(line)
     if t["optional"]:
         doc.add_heading("三、可选条款区", level=2)
@@ -1263,6 +1348,14 @@ def doc_template(spec):
         doc.add_heading("四、使用须知", level=2)
         for line in t["notes"].splitlines():
             doc.add_paragraph(line)
+    if _meta.get("version"):
+        doc.add_heading("五、模板版本留痕", level=2)
+        doc.add_paragraph("模板名称：%s" % (_meta.get("name") or template_name(spec)))
+        doc.add_paragraph("版本：%s　定稿日期：%s" % (_meta.get("version"), _meta.get("date") or "—"))
+        doc.add_paragraph("本次变更：%s" % (_meta.get("change") or "—"))
+        doc.add_paragraph("留痕来源：%s"
+                          % ("模板正文首行 <!-- tpl: … --> 注释" if _meta.get("source") == "body"
+                             else "spec.template.meta"))
     return doc
 
 
@@ -1272,7 +1365,6 @@ DOC_GEN = {
     "original": doc_original, "masked": doc_masked, "diff": doc_diff,
     "template": doc_template,
 }
-
 # ---------- excel 生成（openpyxl） ----------
 def _new_sheet(title, headers):
     """返回 (workbook, worksheet)；openpyxl 缺失时返回 (None, None)。"""

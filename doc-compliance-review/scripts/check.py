@@ -1200,6 +1200,63 @@ def check_sample_baseline():
         pass
 
 
+def check_tpl_engine():
+    """模板引擎自洽：引擎在、能加载、正例过、负例拦得住。
+
+    为什么要在 check 里跑一遍：模板引擎是「出件前的硬闸」，闸门坏了不会报错、
+    只会**静默放行**——带病模板照出，使用者拿去签合同。所以每次改动都实跑一次
+    正负例，确认闸门仍然通电。
+    """
+    p = os.path.join(ROOT, "scripts", "tpl-engine.py")
+    if not os.path.exists(p):
+        err("模板引擎缺失：scripts/tpl-engine.py")
+        return
+    try:
+        import importlib.util as _ilu
+        s = _ilu.spec_from_file_location("_ck_tpl", p)
+        m = _ilu.module_from_spec(s)
+        s.loader.exec_module(m)
+    except Exception as e:
+        err("模板引擎无法加载（语法错误或依赖越界）：%s" % e)
+        return
+
+    base = {
+        "name": "T",
+        "template": {
+            "name": "T（模板）",
+            "body": ("<!-- tpl: T | ver: 1.0.0 | date: 2026-01-01 | 变更: 初版 -->\n"
+                     "甲方：{{甲方全称}}\n{{#有担保}}\n担保条款。\n{{/有担保}}\n"
+                     "{{^有担保}}\n无担保。\n{{/有担保}}"),
+            "placeholders": [{"name": "{{甲方全称}}", "meaning": "x", "required": True}],
+            "values": {"甲方全称": "某公司"},
+            "switches": {"有担保": True},
+        },
+    }
+    # 正例：应零错误
+    r = m.check(base, {"有担保": True}, filling=True)
+    if r["errors"]:
+        err("模板引擎正例被判错（不该拦的拦了）：%s" % "；".join(r["errors"]))
+    # 负例四条：载不载得住
+    import copy as _copy
+    cases = [
+        ("必填未填", lambda d: d["template"].update(values={}), "必填占位符未填实"),
+        ("说明表漏登记", lambda d: d["template"].update(
+            body="<!-- tpl: T | ver: 1.0.0 | date: 2026-01-01 | 变更: x -->\n{{未登记项}}"), "没登记"),
+        ("条件段未闭合", lambda d: d["template"].update(
+            body="<!-- tpl: T | ver: 1.0.0 | date: 2026-01-01 | 变更: x -->\n{{#有担保}}\n正文"), "未闭合"),
+        ("无版本留痕", lambda d: d["template"].update(
+            body="甲方：{{甲方全称}}", meta={}), "版本留痕"),
+    ]
+    for label, mut, kw in cases:
+        d = _copy.deepcopy(base)
+        mut(d)
+        rr = m.check(d, {}, filling=True)
+        if not any(kw in e for e in rr["errors"]):
+            err("模板引擎对「%s」没拦住（负例未命中「%s」）：%s"
+                % (label, kw, "；".join(rr["errors"]) or "无错误"))
+    info("模板引擎：正例通过、4 类负例全部拦下（占位符必填／漏登记／条件段未闭合／无版本留痕）")
+
+
 def check_legal_db():
     """法条核验库自洽：结构完整、条文非空、sha256 与正文对得上、文档口径与实收条数一致。
     背景：库是「核验真值源」，一旦混入残缺/错位条文，核验会把错的判成对的——
@@ -1332,6 +1389,7 @@ def main():
         check_platform_limit()
         check_sample_baseline()
         check_legal_db()
+        check_tpl_engine()
         check_reproducible_build()
         check_gitignore()
         check_skill_ext_lowercase()
