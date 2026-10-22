@@ -7,7 +7,7 @@ description_zh: "对合同、协议及授权书、承诺函、告知书、声明
 description_en: "Desensitize, review clause by clause, grade risks in three colors and produce redline revisions, comparison ledgers and opinion reports for contracts, agreements and business documents (authorization letters, commitment letters, notices, policies, NDAs, SLAs, DPAs and more); coverage includes payment and liquidated damages, delivery and acceptance, IP, confidentiality and non-compete, jurisdiction clauses, arbitration, dispute resolution, limitation of action, contract validity, standard terms and personal information protection; accepts background materials (files, images, photos or plain text) to sharpen the review, and adapts the review stance to a strong or weak bargaining position; drafts contracts and reusable templates, and converts existing documents into templates. Nine industry rule sets included; handles Word, PDF, images and scanned files. Advisory only, not legal advice; review by a licensed lawyer is required."
 category: writing
 argument-hint: "<文档路径或文本> [版本/角色/尺度] | 审查 | 起草 | 比对 | 背景资料 | 脱敏 | 精要总结 | 思维导图 | 向导 | 撰写合同 | 撰写模板 | 文档转模板 | 合同转模板 | 技能版本 | 技能更新 | 技能升级 | 立查得 | 小查 | 帮助|help|? | 教程 | 私有库维护/备份/回溯/导入/导出 | 行业库维护/备份/回溯/导入/导出"
-version: 3.17.0
+version: 3.17.1
 license: 个人使用授权 · 商业使用须取得书面授权（见 `LICENSE.md`）
 author: 胡皓
 examples_zh:
@@ -26,7 +26,7 @@ examples_en:
 
 ![文档合规审查助手AI合同 · 合同与商务文档逐条审查 · 风险三色分级](assets/banner-dark.png)
 
-**v3.17.0** ｜ 作者：胡皓 ｜ 许可：个人使用授权 · 商业使用须取得书面授权（详见 `LICENSE.md`）
+**v3.17.1** ｜ 作者：胡皓 ｜ 许可：个人使用授权 · 商业使用须取得书面授权（详见 `LICENSE.md`）
 
 > **免责声明**：本技能仅作辅助法律工作，**不构成法律意见**，输出内容须经**执业律师复核**；**同一对话内首次使用时由技能先输出全文**（同一对话只此一次）——见**步骤 0.0**，全文亦见 `LICENSE.md`。
 
@@ -38,9 +38,21 @@ examples_en:
 
 | 库 | 装什么 | 规模 | 可否改 |
 |---|---|---|---|
-| 规则库 | 通用风险规则（159 条）＋ 9 个行业库 | 159 ＋ 9 | 通用只读／行业可改／私有可增删 |
+| 规则库 | 风险规则；**内部又分三层：通用／行业／私有**（见下） | 159 ＋ 9 ＋ 私有库 | 通用只读／行业可改／私有可增删 |
 | 法规库 | 法条原文（带来源、sha256、所据版本） | 17 部法 704 条 | 不可改（改条文＝造假） |
 | 模板库 | 可复用的合同与文书骨架 | 按需沉淀 | 可改，改则换版本号 |
+
+**规则库的三层（同一个库的三个优先级，不是另外三个库）**：
+
+| 层 | 位置 | 规模 | 可否改 | 优先级 |
+|---|---|---|---|---|
+| 通用库 | `core/01-general-risk-rules.md`、`core/02-legal-verification-checklist.md` | 159 条 | **只读** | 3 |
+| 行业库 | `industries/<slug>-rules.md` | 9 个（内置不可删） | 可改可更新 | 2 |
+| 私有库 | `private/{meta.md,rules.md}` | 默认空库 | 可增删改，带备份／回溯／导入导出 | 1（最高） |
+
+三层**叠加适用**（不是三选一）；冲突按 **私有 > 行业 > 通用** 消解，消解不掉标 ★★★ 交人工。**三层都压不过法条**——与强制性规定冲突时以法规库原文为准，报告里写明冲突点。
+
+> **两层"三库"别混**：产品级三库＝规则库／法规库／模板库；规则库内三库＝通用／行业／私有。说「三库十引擎」指前者。
 
 | # | 引擎 | 实现 | 状态 |
 |---|---|---|---|
@@ -330,7 +342,7 @@ Qn+10 11. 补充（选填，可跳过：截止时间／重点条款／交易背�
 2. **档位必须在报告"总体评估"显著标注**：弱势档写「本次按**弱势方底线口径**审查：仅就法定强制性与不可让步事项提示，商业不对等条款未逐条提示，签署前请自行评估商业可承受度」；强势档写「本次按**强势方增益口径**审查：已纳入可主动争取的苛刻条款，其中涉格式条款与免责条款的，请评估被主张无效的风险」。
 3. **非合同类不适用强弱档**（无对立当事人即无谈判地位）：谈判地位栏写「**不适用（原因：单方/非交易类文件）**」，只按轴一审查尺度走；混合型按组成部分分别标注。
 
-**步骤 1.7 加载规则库（三层）**：读取
+**步骤 1.7 加载规则库（三层）**：读取（三层的定位与规模见「〇、产品骨架」；此处只管加载顺序）
 1. `core/01-general-risk-rules.md`（**通用库·内核**，跨文档、跨行业通用）；
 2. `industries/<行业>-rules.md` 与 `industries/<行业>-meta.md`（**行业库**，平铺文件、可**多选叠加**，`<ID>@<行业>` 覆盖通用库；`<行业>` 取 `-rules.md` 文件名前缀作为 slug）；
 3. `private/{meta.md,rules.md}`（**私有库**，企业自有内控规则，`<ID>@private` 覆盖，优先级最高；**启用方式**：直接在 `private/` 根放置并填写这两个文件，缺失或规则为空则跳过）。

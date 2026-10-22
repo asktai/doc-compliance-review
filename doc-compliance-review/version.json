@@ -3,24 +3,27 @@
   "product": "文档合规审查助手AI合同",
   "skill_id": "doc-compliance-review",
   "latest": {
-    "version": "v3.17.0",
+    "version": "v3.17.1",
     "date": "2026-10-22",
-    "summary": "把「三库十引擎」立成产品骨架：三库管标准、十引擎管执行，十三项能力逐条标明在用或规划中",
+    "summary": "补正「三库」两层含义：产品级三库（规则／法规／模板）与规则库内三层（通用／行业／私有）分别成表",
     "changes": [
-      "SKILL 新增「〇、产品骨架：三库十引擎」，README 同步——每个引擎标实现文件与状态",
-      "三库：规则库 159 条＋9 行业库／法规库 17 部法 704 条／模板库，各自标明可否修改",
-      "十三项能力表：能问·能审·能写·能查·能检·能诊断·能总结·能脱敏·能OCR·能结构化·能比对·能整理·能管理",
-      "划清「能检≠能审」「能诊断≠能审」，避免能力表述含混",
-      "结构化引擎与公文格式引擎如实标为规划中，不作现成能力承诺",
-      "check.py 新增法规库规模常驻校验（N 部法 M 条与真源比对）"
+      "SKILL／README 各补「规则库的三层」表：通用库（只读 159 条）／行业库（9 个，可改）／私有库（默认空，优先级最高）",
+      "写明三层是叠加适用而非三选一，冲突按 私有>行业>通用 消解",
+      "写明三层都压不过法条：与强制性规定冲突时以法规库原文为准",
+      "加载步骤 1.7 加交叉引用，防止只看一处的人把两层搞混"
     ],
     "download_page": "https://github.com/asktai/doc-compliance-review/releases",
     "files": {
-      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.17.0/文档合规审查助手AI合同_v3.17.0_20261022_(doc-compliance-review).skill",
-      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.17.0/文档合规审查助手AI合同_v3.17.0_20261022_(doc-compliance-review).zip"
+      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.17.1/文档合规审查助手AI合同_v3.17.1_20261022_(doc-compliance-review).skill",
+      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.17.1/文档合规审查助手AI合同_v3.17.1_20261022_(doc-compliance-review).zip"
     }
   },
   "history": [
+    {
+      "version": "v3.17.0",
+      "date": "2026-10-22",
+      "summary": "立「三库十引擎」产品骨架与十三项能力表，标明在用／规划中"
+    },
     {
       "version": "v3.16.0",
       "date": "2026-10-22",
