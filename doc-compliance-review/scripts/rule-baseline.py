@@ -139,13 +139,44 @@ def scan_core_meta(path):
 
 
 def scan_meta_md(path):
-    """行业 meta.md 的 YAML 元数据：生效日 / 最近修订 / 沿革末条。"""
+    """行业 meta.md 的 YAML 元数据：生效日 / 最近修订 / 沿革末条。
+
+    **2026-10-22 修正（v3.22.2）**：原来 `sha256` 取**整个 meta 文件**的哈希，于是
+    `display_name` 里改一个产品名（v3.12.1 的全链更名）就会让 9 个行业库全部报
+    `stale（内容已变但未更新「最近修订」）`——**规则一条没动，却要求改修订日期**。
+    这是判据把「文档外观」当成了「审查行为」，根子在指纹取错了范围。
+
+    `last_revised` 的语义是**规则内容的最近修订日**，不是文件被触碰的日期。
+    故指纹只覆盖**会改变审查行为**的部分：触发词、共通角色、审查立场、生效日、
+    行业版本、继承关系、严重度默认值。`display_name`／`industry`／`slug` 是标识符，
+    改名不改行为，**故意排除**（排除项写进 `fingerprint_scope` 便于日后核对）。
+    """
     txt = _read(path)
     kv = {}
     for line in txt.splitlines():
         m = RE_YAML.match(line.strip())
         if m:
             kv[m.group(1)] = m.group(2).strip().strip('"')
+    # 多行值（positions 的 - 列表）单独收集：它们是审查立场，属行为
+    positions = []
+    for i, line in enumerate(txt.splitlines()):
+        if line.strip().startswith("positions:"):
+            for nxt in txt.splitlines()[i + 1:]:
+                if not nxt.strip().startswith("- "):
+                    break
+                positions.append(nxt.strip())
+    # 触发词：单行 YAML 列表或行内列表两种写法都收
+    kw_raw = kv.get("trigger_keywords", "")
+    kws = sorted(w.strip() for w in re.findall(r"[^\[\],]+", kw_raw) if w.strip())
+    behavior = {
+        "trigger_keywords": kws,
+        "positions": positions,
+        "common_roles": kv.get("common_roles", ""),
+        "inherits": kv.get("inherits", ""),
+        "core_version": kv.get("core_version", ""),
+        "severity_defaults": kv.get("severity_defaults", ""),
+        "effective_date": kv.get("effective_date", ""),
+    }
     last = ""
     for line in txt.splitlines():
         if line.strip().startswith("- version:"):
@@ -154,7 +185,10 @@ def scan_meta_md(path):
             "effective_date": kv.get("effective_date", ""),
             "last_revised": kv.get("last_revised", ""),
             "history_rows": len(re.findall(r"^\s*-\s*version:", txt, re.M)),
-            "sha256": hashlib.sha256(txt.encode("utf-8")).hexdigest()[:16]}
+            "fingerprint_scope": "行为字段（触发词/立场/角色/继承/版本/生效日）；不含 display_name 等标识符",
+            "sha256": hashlib.sha256(
+                json.dumps(behavior, ensure_ascii=False, sort_keys=True).encode("utf-8")
+            ).hexdigest()[:16]}
 
 
 def baseline_stamp(cr, cf, cm):

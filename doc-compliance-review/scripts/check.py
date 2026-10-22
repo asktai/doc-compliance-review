@@ -30,6 +30,8 @@ import os
 import re
 import json
 import glob
+import subprocess
+import sys
 import hashlib
 import argparse
 
@@ -1579,7 +1581,10 @@ def check_legal_crosscheck():
         err("法规库口径失准：_交叉验证 记「多源一致 %d」，实测 %d" % (claimed, verified))
 
     # 水位线：写在本文件里，改它需要过 code review，避免「悄悄调低标准」
-    FLOOR = 0.36
+    # 2026-10-22 由 0.36 上调至 0.95：当日补完最后一批独立源后实测 712/712＝100%，
+    # 原 0.36 是「450 条单源」时期留下的低位线，继续用它等于对回退睁一眼闭一眼。
+    # 留 5 个百分点余量，容许新增某法时短暂未配第二源，但不容许大面积退化。
+    FLOOR = 0.95
     if rate < FLOOR:
         err("法规库交叉验证覆盖率回退：多源一致 %d/%d＝%.1f%%，低于水位线 %.0f%%。"
             "通常是某个独立来源失效了——补源或查明原因后再出包，别调低水位线。"
@@ -1591,6 +1596,52 @@ def check_legal_crosscheck():
             "（明细见 report/legal-crosscheck.json）" % n_conf)
     info("法规库交叉验证：%d/%d 条多源一致（%.1f%%），单源 %d 条，冲突 %d 条"
          % (verified, total, rate * 100, total - verified - n_conf, n_conf))
+
+
+def check_cite_alignment():
+    """规则库条号引用与法条库对位（出包硬闸）。
+
+    **为什么单列一道关**：交叉验证管的是「库里条文本身可不可信」，管**不**了
+    「规则里引的条号是不是那一条」。2026-10-22 实测就栽在这上面——《反不正当竞争法》
+    2025-06-27 第二次修订、2025-10-15 施行后条号整体后移，而规则库仍在引「第 7 条商业贿赂」
+    （新法第 7 条已是混淆行为）。此时交叉验证可以 100% 全绿：库是对的，规则是错的，
+    没有任何一道关在看两者的**对位关系**。
+
+    判据见 legal-verify.py --audit-rules：按「文件＋法名」归组比条号集合与条文 sha256，
+    条号位移或条文变动即判错。此处只做调用与结果转述，不重复实现。
+    """
+    modp = os.path.join(HERE, "legal-verify.py")
+    if not os.path.exists(modp):
+        err("法条核验模块缺失：scripts/legal-verify.py（规则库条号对位无从校验）")
+        return
+    basep = os.path.join(ROOT, "core", "_cite-baseline.json")
+    if not os.path.exists(basep):
+        err("条号引用基线缺失：core/_cite-baseline.json（跑 "
+            "python scripts/legal-verify.py --audit-rules --update 生成）")
+        return
+    try:
+        r = subprocess.run([sys.executable, modp, "--audit-rules"],
+                           capture_output=True, text=True, timeout=120)
+    except Exception as e:
+        err("条号对位自检跑不起来：%s" % e)
+        return
+    out = (r.stdout or "") + (r.stderr or "")
+    m = re.search(r"引用 (\d+) 条｜基线 (\d+) 条｜条号位移 (\d+) 处｜条文变动 (\d+) 条",
+                  out)
+    if not m:
+        err("条号对位自检输出无法解析（脚本可能崩了）：%s" % out.strip()[:200])
+        return
+    n_cur, n_base, n_shift, n_chg = (int(x) for x in m.groups())
+    if r.returncode != 0 or n_shift or n_chg:
+        # 把脚本给的明细原样带出来，别让读的人再去翻日志
+        detail = "\n".join(l for l in out.splitlines()
+                           if l.startswith("- `") or l.startswith("    "))
+        err("规则库条号引用与法条库对不上：条号位移 %d 处、条文变动 %d 条。"
+            "改了条号须确认对应的是同一规范内容；库换了版本须复核规则里对该条的描述。"
+            "确认无误后跑 --audit-rules --update 刷基线。\n%s"
+            % (n_shift, n_chg, detail[:1200]))
+        return
+    info("规则库条号对位：%d 条引用与基线逐条一致（对照 %d 条基线）" % (n_cur, n_base))
 
 
 def check_legal_db():
@@ -1726,6 +1777,7 @@ def main():
         check_sample_baseline()
         check_legal_db()
         check_legal_crosscheck()
+        check_cite_alignment()
         check_tpl_engine()
         check_verify_engine()
         check_imbalance_engine()

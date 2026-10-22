@@ -7,7 +7,7 @@ description_zh: "对合同、协议及授权书、承诺函、告知书、声明
 description_en: "Desensitize, review clause by clause, grade risks in three colors and produce redline revisions, comparison ledgers and opinion reports for contracts, agreements and business documents (authorization letters, commitment letters, notices, policies, NDAs, SLAs, DPAs and more); coverage includes payment and liquidated damages, delivery and acceptance, IP, confidentiality and non-compete, jurisdiction clauses, arbitration, dispute resolution, limitation of action, contract validity, standard terms and personal information protection; accepts background materials (files, images, photos or plain text) to sharpen the review, and adapts the review stance to a strong or weak bargaining position; drafts contracts and reusable templates, and converts existing documents into templates. Nine industry rule sets included; handles Word, PDF, images and scanned files. Advisory only, not legal advice; review by a licensed lawyer is required."
 category: writing
 argument-hint: "<文档路径或文本> [版本/角色/尺度] | 审查 | 起草 | 比对 | 背景资料 | 脱敏 | 精要总结 | 思维导图 | 向导 | 撰写合同 | 撰写模板 | 文档转模板 | 合同转模板 | 技能版本 | 技能更新 | 技能升级 | 立查得 | 小查 | 帮助|help|? | 教程 | 私有库维护/备份/回溯/导入/导出 | 行业库维护/备份/回溯/导入/导出"
-version: 3.22.1
+version: 3.22.2
 license: 个人使用授权 · 商业使用须取得书面授权（见 `LICENSE.md`）
 author: 胡皓
 examples_zh:
@@ -26,7 +26,7 @@ examples_en:
 
 ![文档合规审查助手AI合同 · 合同与商务文档逐条审查 · 风险三色分级](assets/banner-dark.png)
 
-**v3.22.1** ｜ 作者：胡皓 ｜ 许可：个人使用授权 · 商业使用须取得书面授权（详见 `LICENSE.md`）
+**v3.22.2** ｜ 作者：胡皓 ｜ 许可：个人使用授权 · 商业使用须取得书面授权（详见 `LICENSE.md`）
 
 > **免责声明**：本技能仅作辅助法律工作，**不构成法律意见**，输出内容须经**执业律师复核**；**同一对话内首次使用时由技能先输出全文**（同一对话只此一次）——见**步骤 0.0**，全文亦见 `LICENSE.md`。
 
@@ -41,7 +41,7 @@ examples_en:
 | 库 | 装什么 | 规模 | 可否改 |
 |---|---|---|---|
 | 规则库 | 风险规则；**内部又分三层**：通用层／行业层／私有层（见下） | 159 ＋ 9 ＋ 私有 | 通用只读／行业可改／私有可增删 |
-| 法规库 | 法条原文（带来源、sha256、所据版本、**交叉验证状态**） | 17 部法 708 条（其中 258 条多源一致） | 不可改（改条文＝造假） |
+| 法规库 | 法条原文（带来源、sha256、所据版本、**交叉验证状态**） | 17 部法 712 条（全部经 ≥2 个独立来源交叉验证一致） | 不可改（改条文＝造假） |
 | 模板库 | 可复用的合同与文书骨架 | 按需沉淀 | 可改，改则换版本号 |
 
 **规则库的三层**——同一个库，由内向外三个范围，按优先级叠加（**不是三个并列的库，也不是三选一**）：
@@ -107,7 +107,7 @@ examples_en:
 
 **三条对外口径（不得违反）**：
 1. **「规划中」必须说成规划中**。结构化引擎、公文格式引擎尚未实现，**不得作为现成能力介绍**，也不得据以承诺。把没做的说成做了，与编造法条同性质。
-2. **数字只报实测值**：159 条、内置 9 个行业库（可自建）、17 部法 708 条（258 条已多源交叉验证）、10 类 × 5 格式、136 项冒烟。改完代码忘了同步文档，`check.py` 会直接报错——**别靠记忆报数**。
+2. **数字只报实测值**：159 条、内置 9 个行业库（可自建）、17 部法 712 条（712 条均已多源交叉验证）、10 类 × 5 格式、136 项冒烟。改完代码忘了同步文档，`check.py` 会直接报错——**别靠记忆报数**。
 3. **"能"都有边界**：能审不等于审对（须执业律师复核）、能查不等于查全（库里没有的标待核验）、能写不等于能签（占位符填实后即为具体合同）、能检只能兜住机械错误（格式/占位符/条文原文），**兜不住判断错误**。
 
 ### 核验引擎（第 11 引擎）：产物出得去出不去的唯一裁判
@@ -721,7 +721,7 @@ python scripts/legal-verify.py --list 民法典        # 查库里收了哪些�
 判定只有四档，**不发明第五档**：`通过`（引述能落到本条）｜`条号成立`（仅核到条号存在，没给引述正文）｜`表述存疑`（能落到本条但用词偏差大）｜`待核验`（条号不在库，或引述在本条找不到）。退出码 1 表示有后两档。
 
 三条口径，必须说清：
-- **库是"核验器"，不是"法条大全"**：现收录 17 部法（含 1 件司法解释）、708 条，其中 258 条已由 ≥2 个独立来源交叉验证一致，覆盖规则库真在引的高频条号，另把四条主线（合同／劳动／数据合规／消费与平台）常用条号一并收齐。**库里没有 ≠ 条号错**，一律标"待核验"交人工，**不得据此删引，更不得凭记忆补条文**。
+- **库是"核验器"，不是"法条大全"**：现收录 17 部法（含 1 件司法解释）、712 条，全部已由 ≥2 个独立来源交叉验证一致，覆盖规则库真在引的高频条号，另把四条主线（合同／劳动／数据合规／消费与平台）常用条号一并收齐。**库里没有 ≠ 条号错**，一律标"待核验"交人工，**不得据此删引，更不得凭记忆补条文**。
 - **"通过"只证明与本库一致，不证明现行有效**：库记录所抓版本与施行日；条文以国家法律法规数据库（flk.npc.gov.cn）与官方公报为准。
 
 **交叉验证（库自身的可信度）**——两个"置信"是不同的东西，回答问题时**不许混**：
@@ -731,7 +731,7 @@ python scripts/legal-verify.py --list 民法典        # 查库里收了哪些�
 | **判定**（引述准不准） | 你引的那段话 vs 库中该条原文 | 通过／条号成立／表述存疑／待核验 | `legal-verify.py` 自动 |
 | **库内置信**（原文本身可不可信） | 该条原文的**源 vs 源** | 多源一致／单源未核／多源冲突 | `legal-crosscheck.py` 建库时做 |
 
-机制：同一部法从 **≥2 个彼此独立的来源**抓同一批条号，逐条比对正文（只比中文字与数字，剔标点空白；4 字片段双向覆盖取小值；阈值 0.985）。一致记 `verified: true`；不一致**保留两版差异、不猜谁对**，记 `status: conflict` 交人工；只有一源记 `single`，**绝不伪装成已核**。当前 708 条中 258 条多源一致、450 条单源、0 条冲突。
+机制：同一部法从 **≥2 个彼此独立的来源**抓同一批条号，逐条比对正文（只比中文字与数字，剔标点空白；4 字片段双向覆盖取小值；阈值 0.985）。一致记 `verified: true`；不一致**保留两版差异、不猜谁对**，记 `status: conflict` 交人工；只有一源记 `single`，**绝不伪装成已核**。当前 712 条**全部**多源一致、0 条单源、0 条冲突。
 
 三条红线：
 1. **单源条不得说成"已核"**。正确说法是"库中有此条，单源收录，未做交叉验证"。

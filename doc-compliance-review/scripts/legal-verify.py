@@ -319,16 +319,189 @@ def render_md(rows, src=""):
     return "\n".join(L)
 
 
+def _audit_rules(db, root, update=False):
+    """规则库条号引用自检：**防「换版后条号错位」这类事故再次静默通过。**
+
+    ## 为什么要有这个模式
+    2026-10-22 实测发现：`core/01-general-risk-rules.md`、`industries/*.md` 里写着
+    「《反不正当竞争法》第 7 条商业贿赂」，而该法已于 2025-06-27 第二次修订、2025-10-15 施行，
+    新法第七条是**混淆行为**，商业贿赂移到了第八条。也就是说，规则库引的条号指向了另一个行为。
+    `--file/--text` 那条核验路径抓不到这种错：它核的是「报告里引述的那句话在不在条文里」，
+    而规则库里只写了「第 7 条」，没有引述正文可比。
+
+    ## 判据：不猜语义，只锁「引用 → 条文」的对应关系
+    语义比对（拿「商业贿赂」四字去条文里找）在本例中会失灵——「商业秘密」对第 9 条也能命中
+    0.50（因为条文里有「商业宣传」），判不出对错。故这里不比语义，只做**指纹锚定**：
+    每条「《法》N 条」的引用，记下它当时对应的条文 sha256。日后以下两种情形任一发生，即报警：
+      ① 规则改了条号（引用指纹变）     → 该引用须人工复核是否还对应当年那条
+      ② 库换了版本（条文 sha256 变）   → 该条内容已变，规则里对该条的描述可能失效
+    两者都不发生时跳过，不制造噪声。
+
+    ## 用法
+      python scripts/legal-verify.py --audit-rules            # 比对，有差异退出码 1
+      python scripts/legal-verify.py --audit-rules --update    # 人工确认后刷新基线
+    """
+    base_path = os.path.join(root, "core", "_cite-baseline.json")
+    laws = db.get("laws") or {}
+    meta = db.get("meta") or {}
+
+    # 「《中华人民共和国XX法》」与「《XX法》」都要认；法名以库内 key 为准
+    names = sorted(laws, key=len, reverse=True)
+    alt = "|".join(re.escape(n) for n in names)
+    pat = re.compile(r"《(?:中华人民共和国)?(" + alt + r")》\s*第?\s*(\d+)\s*条")
+
+    cur, missing = {}, []
+    for rel in ("core/01-general-risk-rules.md", "core/02-legal-verification-checklist.md"):
+        p = os.path.join(root, rel)
+        if not os.path.exists(p):
+            continue
+        _scan_file(p, rel, pat, laws, meta, cur, missing)
+    ind = os.path.join(root, "industries")
+    if os.path.isdir(ind):
+        for fn in sorted(os.listdir(ind)):
+            if fn.endswith(".md"):
+                rel = "industries/" + fn
+                _scan_file(os.path.join(ind, fn), rel, pat, laws, meta, cur, missing)
+
+    if update:
+        out = {
+            "_说明": "规则库条号引用基线（legal-verify.py --audit-rules 生成）。"
+                     "键＝「文件::法名::条号」，值＝该引用所对应条文的 sha256 与当时版本。"
+                     "换版或改条号后须人工确认每条引用仍对得上，再 --update 刷新。",
+            "generated": __import__("datetime").datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "total": len(cur),
+            "cites": dict(sorted(cur.items())),
+        }
+        with io.open(base_path, "w", encoding="utf-8") as f:
+            json.dump(out, f, ensure_ascii=False, indent=1)
+        print("已刷新条号引用基线：%d 条 → %s" % (len(cur), os.path.relpath(base_path, root)))
+        return 0
+
+    if not os.path.exists(base_path):
+        print("没有基线文件，先跑 --audit-rules --update 生成。")
+        return 2
+    with io.open(base_path, encoding="utf-8") as f:
+        base = json.load(f)
+    old = base.get("cites") or {}
+
+    # ---- 判据（2026-10-22 修正）：不能以「文件::法名::条号」为键去比对 ----
+    # 首版就是那样写的，结果**反向注入验不出来**：把规则里的「第 8 条」改回「第 7 条」后，
+    # 键从 `...::8` 变成 `...::7`，旧的进「引用消失」、新的进「新增」，而这两类当时的退出码
+    # 都是 0——**改了条号，门禁竟然全绿**。而「改了条号」恰恰是本门禁唯一要拦的事。
+    # 改为按「文件 + 法名」归组，逐组比对条号集合：集合变了就是条号位移动，直接判错。
+    def group(cites):
+        g = {}
+        for key, ent in cites.items():
+            rel, law, no = key.split("::")
+            g.setdefault((rel, law), {})[int(no)] = ent
+        return g
+
+    og, ng = group(old), group(cur)
+    shifted, changed, gone, added = [], [], [], []
+    for (rel, law), omap in sorted(og.items()):
+        nmap = ng.get((rel, law), {})
+        if not nmap:
+            gone.append((rel, law, sorted(omap)))
+            continue
+        os_, ns_ = set(omap), set(nmap)
+        if os_ != ns_:
+            # 条号集合变了：可能是条号位移（换版后整体后移），也可能是增删引用
+            keep = os_ & ns_
+            shifted.append((rel, law, sorted(os_ - ns_), sorted(ns_ - os_),
+                            bool(keep), sorted(keep)))
+        for no in sorted(os_ & ns_):
+            if omap[no]["sha256"] != nmap[no]["sha256"]:
+                changed.append((rel, law, no, omap[no], nmap[no]))
+    for (rel, law) in sorted(set(ng) - set(og)):
+        added.append((rel, law, sorted(ng[(rel, law)])))
+
+    bad = bool(shifted or changed)
+    print("## 规则库条号引用自检")
+    print()
+    print("> 引用 %d 条｜基线 %d 条｜条号位移 %d 处｜条文变动 %d 条｜整组消失 %d｜整组新增 %d｜库未收录 %d"
+          % (len(cur), len(old), len(shifted), len(changed), len(gone), len(added),
+             len(missing)))
+
+    if changed:
+        print()
+        print("**条文内容已变**（库换了版本或该条被修正）——规则里对它的描述须逐条复核：")
+        for rel, law, no, o, n in changed:
+            print("- `%s` 《%s》第%d条：%s 版 → %s 版（sha256 %s → %s）"
+                  % (rel, law, no, o.get("version", "?"), n.get("version", "?"),
+                     o["sha256"][:8], n["sha256"][:8]))
+
+    if shifted:
+        print()
+        print("**条号位移动了**——规则里引的条号与基线对不上。"
+              "换版导致条号整体后移时最常见，须逐条确认规则描述的是否仍是该内容：")
+        for rel, law, lost, new, overlap, keep in shifted:
+            print("- `%s` 《%s》" % (rel, law))
+            if lost or new:
+                print("    少了：%s ｜多了：%s" % (
+                    "、".join("第%d条" % n for n in lost) or "—",
+                    "、".join("第%d条" % n for n in new) or "—"))
+            if overlap and keep:
+                print("    同组内另有 %s 未变，说明是**个别条号改动**，不是整组重排"
+                      % "、".join("第%d条" % n for n in keep))
+
+    if missing:
+        print()
+        print("**库内未收录**（无从核对，须人工核现行原文）：")
+        for rel, law, no in missing:
+            print("- `%s` 《%s》第%s条" % (rel, law, no))
+
+    if gone:
+        print()
+        print("**整组引用消失**（该文件不再引用这部法；确认是有意删除后 --update）：")
+        for rel, law, nos in gone:
+            print("- `%s` 《%s》原引 %s" % (rel, law, "、".join("第%d条" % n for n in nos)))
+
+    if added:
+        print()
+        print("**整组新增**（该文件开始引用这部法，无基线可比；确认无误后 --update）：")
+        for rel, law, nos in added:
+            print("- `%s` 《%s》新引 %s" % (rel, law, "、".join("第%d条" % n for n in nos)))
+
+    if not bad and not gone and not added and not missing:
+        print()
+        print("无差异：规则库每条「《法》N 条」引用，都与基线记录的条文对得上。")
+    return 1 if bad else 0
+
+
+def _scan_file(path, rel, pat, laws, meta, cur, missing):
+    with io.open(path, encoding="utf-8", errors="ignore") as f:
+        text = f.read()
+    for m in pat.finditer(text):
+        law, no = m.group(1), int(m.group(2))
+        ent = (laws.get(law) or {}).get(str(no))
+        if ent is None:
+            missing.append((rel, law, no))
+            continue
+        cur["%s::%s::%d" % (rel, law, no)] = {
+            "no": no, "sha256": ent.get("sha256", ""),
+            "version": (meta.get(law) or {}).get("version", ""),
+        }
+
+
 def main():
     ap = argparse.ArgumentParser(description="法条核验（离线，比对本地原文库）")
     ap.add_argument("--file", help="待核验的文本文件（md/txt）")
     ap.add_argument("--text", help="直接给一段文本")
     ap.add_argument("--json", help="把机读结果写到该路径")
+    ap.add_argument("--audit-rules", action="store_true",
+                    help="自检模式：扫 core/ 与 industries/ 规则里的「《法》N 条」引用，"
+                         "核对库中该条是否真是所描述的那条（防换版后条号错位）")
+    ap.add_argument("--update", action="store_true",
+                    help="配合 --audit-rules：人工确认全部差异后刷新基线")
     ap.add_argument("--list", metavar="LAW", help="列出库里某部法收录的条号")
     ap.add_argument("--strict", type=float, default=0.72, help="「表述存疑」下限，默认 0.72")
     a = ap.parse_args()
 
     db = load_db()
+
+    if a.audit_rules:
+        root = os.path.abspath(os.path.join(HERE, ".."))
+        return _audit_rules(db, root, update=a.update)
 
     if a.list:
         law = pick_law(a.list)
