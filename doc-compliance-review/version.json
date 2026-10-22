@@ -3,25 +3,29 @@
   "product": "文档合规审查助手AI合同",
   "skill_id": "doc-compliance-review",
   "latest": {
-    "version": "v3.16.0",
+    "version": "v3.17.0",
     "date": "2026-10-22",
-    "summary": "模板引擎加固：模板版出件前强制校验占位符必填／条件段定案／版本留痕，不支持带病出件",
+    "summary": "把「三库十引擎」立成产品骨架：三库管标准、十引擎管执行，十三项能力逐条标明在用或规划中",
     "changes": [
-      "新增 scripts/tpl-engine.py：占位符双向对齐、必填填实校验、条件条款段渲染、模板版本留痕",
-      "make-docx.py 出模板版前过硬闸：不过即拒绝出件（不是警告）",
-      "条件条款段 {{#开关}}…{{/开关}}／{{^开关}}…{{/开关}}，按有无第三方担保等情形自动取舍",
-      "开关没给值一律拦下，不默认保留也不默认删除——不替使用者决定条款存废",
-      "模板版本号写进 docx 文档属性与正文「模板版本留痕」一节，可反查用的是哪版模板",
-      "check.py 新增模板引擎自检（正例过、4 类负例拦得住）；冒烟新增 7 项，共 114 项",
-      "SKILL.md／template-guide.md 补「出件前的硬校验」口径"
+      "SKILL 新增「〇、产品骨架：三库十引擎」，README 同步——每个引擎标实现文件与状态",
+      "三库：规则库 159 条＋9 行业库／法规库 17 部法 704 条／模板库，各自标明可否修改",
+      "十三项能力表：能问·能审·能写·能查·能检·能诊断·能总结·能脱敏·能OCR·能结构化·能比对·能整理·能管理",
+      "划清「能检≠能审」「能诊断≠能审」，避免能力表述含混",
+      "结构化引擎与公文格式引擎如实标为规划中，不作现成能力承诺",
+      "check.py 新增法规库规模常驻校验（N 部法 M 条与真源比对）"
     ],
     "download_page": "https://github.com/asktai/doc-compliance-review/releases",
     "files": {
-      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.16.0/文档合规审查助手AI合同_v3.16.0_20261022_(doc-compliance-review).skill",
-      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.16.0/文档合规审查助手AI合同_v3.16.0_20261022_(doc-compliance-review).zip"
+      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.17.0/文档合规审查助手AI合同_v3.17.0_20261022_(doc-compliance-review).skill",
+      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.17.0/文档合规审查助手AI合同_v3.17.0_20261022_(doc-compliance-review).zip"
     }
   },
   "history": [
+    {
+      "version": "v3.16.0",
+      "date": "2026-10-22",
+      "summary": "模板引擎加固：模板版出件前强制校验占位符必填／条件段定案／版本留痕"
+    },
     {
       "version": "v3.15.0",
       "date": "2026-10-22",

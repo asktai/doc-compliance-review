@@ -7,7 +7,7 @@ description_zh: "对合同、协议及授权书、承诺函、告知书、声明
 description_en: "Desensitize, review clause by clause, grade risks in three colors and produce redline revisions, comparison ledgers and opinion reports for contracts, agreements and business documents (authorization letters, commitment letters, notices, policies, NDAs, SLAs, DPAs and more); coverage includes payment and liquidated damages, delivery and acceptance, IP, confidentiality and non-compete, jurisdiction clauses, arbitration, dispute resolution, limitation of action, contract validity, standard terms and personal information protection; accepts background materials (files, images, photos or plain text) to sharpen the review, and adapts the review stance to a strong or weak bargaining position; drafts contracts and reusable templates, and converts existing documents into templates. Nine industry rule sets included; handles Word, PDF, images and scanned files. Advisory only, not legal advice; review by a licensed lawyer is required."
 category: writing
 argument-hint: "<文档路径或文本> [版本/角色/尺度] | 审查 | 起草 | 比对 | 背景资料 | 脱敏 | 精要总结 | 思维导图 | 向导 | 撰写合同 | 撰写模板 | 文档转模板 | 合同转模板 | 技能版本 | 技能更新 | 技能升级 | 立查得 | 小查 | 帮助|help|? | 教程 | 私有库维护/备份/回溯/导入/导出 | 行业库维护/备份/回溯/导入/导出"
-version: 3.16.0
+version: 3.17.0
 license: 个人使用授权 · 商业使用须取得书面授权（见 `LICENSE.md`）
 author: 胡皓
 examples_zh:
@@ -26,11 +26,42 @@ examples_en:
 
 ![文档合规审查助手AI合同 · 合同与商务文档逐条审查 · 风险三色分级](assets/banner-dark.png)
 
-**v3.16.0** ｜ 作者：胡皓 ｜ 许可：个人使用授权 · 商业使用须取得书面授权（详见 `LICENSE.md`）
+**v3.17.0** ｜ 作者：胡皓 ｜ 许可：个人使用授权 · 商业使用须取得书面授权（详见 `LICENSE.md`）
 
 > **免责声明**：本技能仅作辅助法律工作，**不构成法律意见**，输出内容须经**执业律师复核**；**同一对话内首次使用时由技能先输出全文**（同一对话只此一次）——见**步骤 0.0**，全文亦见 `LICENSE.md`。
 
 本技能适用于合同，以及授权书、承诺函、告知书、声明、委托书、备忘录、制度、政策、通知、SLA、NDA、DPA、采购文件等非合同文档，统一适配。
+
+## 〇、产品骨架：三库十引擎（说清"有什么"和"没什么"）
+
+**三库管标准，十引擎管执行。** 遇到使用者问「你都能干什么」，照下表答，**不夸大、不遗漏**：
+
+| 库 | 装什么 | 规模 | 可否改 |
+|---|---|---|---|
+| 规则库 | 通用风险规则（159 条）＋ 9 个行业库 | 159 ＋ 9 | 通用只读／行业可改／私有可增删 |
+| 法规库 | 法条原文（带来源、sha256、所据版本） | 17 部法 704 条 | 不可改（改条文＝造假） |
+| 模板库 | 可复用的合同与文书骨架 | 按需沉淀 | 可改，改则换版本号 |
+
+| # | 引擎 | 实现 | 状态 |
+|---|---|---|---|
+| 1 | 脱敏 | `desensitize.py`／`local-only.py` | ✅ |
+| 2 | OCR | `preprocess.py` | ✅ |
+| 3 | 结构化 | — | 🔜 规划中 |
+| 4 | 原稿级修订 | `make-docx.py`（tracked/redline） | ✅ |
+| 5 | 规则库 | `core/01-general-risk-rules.md`＋`industries/` | ✅ |
+| 6 | 模板库 | `tpl-engine.py` | ✅ |
+| 7 | 法规库 | `legal-verify.py` | ✅ |
+| 8 | 文档撰写 | `make-docx.py`＋`drafting-guide.md` | ✅ |
+| 9 | 比对 | `make-docx.py`（diff/compare） | ✅ |
+| 10 | 公文格式 | — | 🔜 规划中 |
+
+**十三项能力**：能问／能审／能写／能查／能检／能诊断／能总结／能脱敏／能 OCR／能结构化🔜／能比对／能整理／能管理。
+（十二项已可用；**能结构化**与**公文格式引擎**为规划中。）
+
+**三条对外口径（不得违反）**：
+1. **「规划中」必须说成规划中**。结构化引擎、公文格式引擎尚未实现，**不得作为现成能力介绍**，也不得据以承诺。把没做的说成做了，与编造法条同性质。
+2. **数字只报实测值**：159 条、9 个行业库、17 部法 704 条、10 类 × 5 格式、114 项冒烟。改完代码忘了同步文档，`check.py` 会直接报错——**别靠记忆报数**。
+3. **"能"都有边界**：能审不等于审对（须执业律师复核）、能查不等于查全（库里没有的标待核验）、能写不等于能签（占位符填实后即为具体合同）、能检只能兜住机械错误（格式/占位符/条文原文），**兜不住判断错误**。
 
 ## 一、启动流程（每次使用先做；其中步骤 0.0 的《免责声明》**同一对话内只输出一次**）
 

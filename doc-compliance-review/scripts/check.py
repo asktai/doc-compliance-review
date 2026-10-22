@@ -813,8 +813,34 @@ def check_doc_number_caliber():
     if seed_bad:
         err("内置行业库数失准（真源 `SEED_INDUSTRIES` 共 %d 个）：%s"
             % (real_seed, "；".join(seed_bad)))
-    if not (fmt_bad or menu_bad or seed_bad):
-        info("数字口径：格式／菜单项数／内置库数三处与真源一致（%s）" % "、".join(src_note))
+
+    # ---- 真源 4：法规库规模（「17 部法 704 条」这类表述）----
+    # 背景（v3.15.0/v3.16.0）：法条库从 85 条扩到 704 条，文档里「N 部法 M 条」出现在
+    # SKILL／README 多处，扩一次要同步 5 处以上。凡写死数字迟早失真，故纳入常驻校验。
+    real_laws = real_arts = None
+    lp = os.path.join(ROOT, "core", "legal-articles.json")
+    if os.path.exists(lp):
+        try:
+            _db = json.loads(_read(lp))
+            _laws = _db.get("laws") or {}
+            real_laws = len(_laws)
+            real_arts = sum(len(v) for v in _laws.values())
+        except Exception:
+            pass
+    law_bad = []
+    if real_laws and real_arts:
+        for rel in DOCS:
+            for ln, line in enumerate(_doc_lines(rel), 1):
+                for m in re.finditer(r"(\d+)\s*部法[^0-9]{0,10}?(\d+)\s*条", line):
+                    if int(m.group(1)) != real_laws or int(m.group(2)) != real_arts:
+                        law_bad.append("%s:%d 写 %s 部 %s 条" % (rel, ln, m.group(1), m.group(2)))
+        if law_bad:
+            err("法规库规模失准（真源 core/legal-articles.json 实为 %d 部法 %d 条）：%s"
+                % (real_laws, real_arts, "；".join(law_bad)))
+
+    if not (fmt_bad or menu_bad or seed_bad or law_bad):
+        note = src_note + (["法条 %d 部 %d 条" % (real_laws, real_arts)] if real_laws else [])
+        info("数字口径：格式／菜单项数／内置库数／法规库规模与真源一致（%s）" % "、".join(note))
 
 
 def check_package_fields():
