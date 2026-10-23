@@ -1192,7 +1192,8 @@ def check_smoke_count():
     kw = ("smoke-test", "冒烟", "自检")
     other_scripts = ("check.py", "pack.py", "sample-baseline", "guard.py", "rule-baseline")
     bad, seen = [], 0
-    for rel in ("README.md", "安装使用教程.md"):
+    for rel in ("README.md", "安装使用教程.md", "SKILL.md",
+                "文档合规审查助手AI合同提示词版.md"):
         p = os.path.join(ROOT, rel)
         if not os.path.exists(p):
             continue
@@ -1464,6 +1465,90 @@ def check_version_consistency():
         err("版本号 %s 未同步：%s" % (v, "、".join(bad)))
     else:
         info("版本一致性: %s（frontmatter / 正文 / README / SECURITY / 提示词版）一致；脚本数 %d 口径同步" % (v, n_py))
+
+
+def check_net_tier_consistency():
+    """联网档位一致性（安全声明同型病灶第三次复发）。
+
+    背景（v3.23.4 质检）：README 的「处理文档脚本全离线、仅检查更新会联网」两档旧口径，
+    在 v3.23.2 做四档后就没跟上，到 v3.23.4 才被质检发现——README 仍写「20 个脚本全部
+    纯本地不联网」「仅检查更新会联网」、联网边界表缺「法规时效巡检」一行。同一事实散在四份
+    文档各写一遍，改一处漏三处。**故强制**：SECURITY.md 为唯一真源，其余文档不得再出现
+    两档旧口径，且「N 个脚本」必须与真实脚本数一致（check_version_consistency 也看，这里
+    顺带覆盖 SKILL/提示词版）。
+    """
+    sec_p = os.path.join(ROOT, "SECURITY.md")
+    if not os.path.exists(sec_p):
+        return
+    sec = _read(sec_p)
+    n_py = len([f for f in os.listdir(os.path.join(ROOT, "scripts"))
+                if f.endswith(".py")])
+    # 真源档位计数（从 T1 结构化行抽：L0 ... 18 个脚本 ... L1 ... 1 个 ... L2 ... 2 个 ... L3 ... 2 个）
+    tier = {}
+    mt = re.search(r"L0[^\n]*?(\d+)\s*个脚本[^\n]*?L1[^\n]*?(\d+)\s*个[^\n]*?"
+                   r"L2[^\n]*?(\d+)\s*个[^\n]*?L3[^\n]*?(\d+)\s*个", sec, re.S)
+    if mt:
+        tier = {"L0": int(mt.group(1)), "L1": int(mt.group(2)),
+                "L2": int(mt.group(3)), "L3": int(mt.group(4))}
+    stale, wrong = [], []
+    for rel in ("README.md", "SKILL.md", "安装使用教程.md",
+                "文档合规审查助手AI合同提示词版.md"):
+        p = os.path.join(ROOT, rel)
+        if not os.path.exists(p):
+            continue
+        t = _read(p)
+        # 旧两档口径：只说「仅检查更新会联网」且整篇未提 L2（四档）→ 必然漏了失效巡检
+        if re.search(r"仅[「\"']?检查更新[」\"']?(这一个动作)?会联网", t) and "L2" not in t:
+            stale.append("%s 仍是两档旧口径（只提检查更新会联网，未提 L2 失效巡检）" % rel)
+        # 出现「N 个脚本」但不等于真实数
+        for m in re.finditer(r"(\d+)\s*个脚本", t):
+            if int(m.group(1)) != n_py:
+                wrong.append("%s 写 %s 个脚本（真实 %d）" % (rel, m.group(1), n_py))
+        # 若文档声称四档（含 L2），则四档计数须与真源一致（防止手填数字漂）
+        if tier and "L2" in t:
+            for code, val in tier.items():
+                for mm in re.finditer(r"%s[^\n]{0,20}?(\d+)\s*个" % code, t):
+                    if int(mm.group(1)) != val:
+                        wrong.append("%s 的 %s 档计数 %s ≠ 真源 %d"
+                                     % (rel, code, mm.group(1), val))
+    msgs = stale + wrong
+    if msgs:
+        err("联网档位与 SECURITY.md 不一致：%s" % "；".join(msgs))
+    else:
+        info("联网档位：README/SKILL/教程/提示词版 均与 SECURITY.md 四档一致（共 %d 脚本）" % n_py)
+
+
+def check_engine_implementations():
+    """引擎表「对应实现」反查（骨架表滞后，登记化）。
+
+    背景（v3.23.4 质检）：README/SKILL 的引擎表曾只列 11 个，漏了安全引擎、法规库失效巡检、
+    法规库交叉验证、失衡画像 4 个实际在跑的引擎；且「对应实现」列写的文件名，没人保证它真存在。
+    故：扫两张引擎表，凡「对应实现」里点名的 .py/.md/.json 文件，必须能在技能目录里找着——
+    文档声称的实现落点不存在，等于又一句「写了没验」（第 25 条形态）。规划中（—）不查。
+    """
+    missing = []
+    for rel in ("README.md", "SKILL.md"):
+        p = os.path.join(ROOT, rel)
+        if not os.path.exists(p):
+            continue
+        for ln in _read(p).splitlines():
+            if not re.match(r"^\|\s*\d+\s*\|", ln):   # 只盯「| N |」开头的引擎表行
+                continue
+            for tok in re.findall(r"`([^`]+)`", ln):
+                tok = tok.strip()
+                # 只认「纯文件名型」落点：`make-docx.py`／`core/x.md`；
+                # 跳过命令型（`python scripts/check.py`，带空格）与非文件标记（`net-tier`）。
+                if " " in tok or not re.match(r"^[\w./+-]+\.(py|md|json)$", tok):
+                    continue
+                cand = [os.path.join(ROOT, tok),
+                        os.path.join(ROOT, "scripts", tok),
+                        os.path.join(ROOT, "core", tok)]
+                if not any(os.path.exists(c) for c in cand):
+                    missing.append("%s 引擎表声称的实现 `%s` 在技能目录里找不到" % (rel, tok))
+    if missing:
+        err("引擎实现落点失联：%s" % "；".join(missing))
+    else:
+        info("引擎表：README/SKILL 两张表点名的实现文件全部存在（落点可核验）")
 
 
 def check_manifest_version():
@@ -2194,10 +2279,12 @@ def main():
         check_cite_alignment()
         check_freshness_engine()
         check_net_tiers()
+        check_net_tier_consistency()
         check_security_matrix()
         check_tpl_engine()
         check_verify_engine()
         check_imbalance_engine()
+        check_engine_implementations()
         check_reproducible_build()
         check_gitignore()
         check_skill_ext_lowercase()

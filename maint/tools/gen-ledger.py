@@ -30,7 +30,7 @@ WS_ROOT = ROOT
 # (文件名 glob, 台账标签, 状态文字)
 EXTRA_ARTS = [
     ("技能开发规范（通用铁律）-v*.md", "技能开发规范（通用铁律）", "**发布**（对外分发）"),
-    ("开发工程规范（铁律）-v*.md", "开发工程规范（铁律）· 对外发布版", "**发布**（对外分发）"),
+    ("开发规范（铁律）-v*.md", "开发规范（铁律）· 对外发布版", "**发布**（对外分发）"),
 ]
 
 CST = timezone(timedelta(hours=8))
@@ -175,7 +175,7 @@ def build(no_files=False):
         f1 = f"`dist/{sk[0]['file']}`" if sk else "—"
         f2 = f"`dist/{zp[0]['file']}`" if zp else "—"
         A(f"| 文档合规审查技能（分发包） | {latest} | **在役** | {f1}（.skill）<br>{f2}（.zip） |")
-    A(f"| 开发工程规范（铁律）· 开发侧维护版 | {dev_ver or '—'} | **在役**（开发侧，不外流） | `dev/DEV-RULES.md` |")
+    A(f"| 开发规范（铁律）· 开发侧维护版 | {dev_ver or '—'} | **在役**（开发侧，不外流） | `dev/DEV-RULES.md` |")
     if skill_ver and latest and skill_ver != latest:
         A(f"| 技能本体（工作副本） | {skill_ver} | 注意：与最新包 {latest} 不一致 | `dev/doc-compliance-review/` |")
     elif skill_ver:
@@ -241,7 +241,7 @@ def build(no_files=False):
     A("|---|---|---|---|")
     A("| 产出物台账（本文档的在线版） | 腾讯文档 | "
       "https://docs.qq.com/markdown/DRFdLZ1ZZVGdsUEZ6 | **以最新一次导入为准**，勿作长期引用目标 |")
-    A("| 开发工程规范（铁律 v1.43.3，开发侧） | 腾讯文档 | "
+    A("| 开发规范（铁律 v1.43.3，开发侧） | 腾讯文档 | "
       "https://docs.qq.com/markdown/DRGdTUnpOWUdKTm9N | **开发侧资产**，仅供查阅与留档；不入包、不对外分发 |")
     A("| 开发日志（DEVLOG，开发侧） | 腾讯文档 | "
       "https://docs.qq.com/markdown/DRGJrUHJ2T2pwdHNZ | **开发侧资产**，仅供查阅与留档；不入包、不对外分发 |")
@@ -282,7 +282,7 @@ def build(no_files=False):
     A("| 文件 | 说明 | 大小 | SHA256（前 16 位） |")
     A("|---|---|---|---|")
     dev_files = [
-        ("dev/DEV-RULES.md", "开发工程规范（铁律）——AI 开发行为红线与流程"),
+        ("dev/DEV-RULES.md", "开发规范（铁律）——AI 开发行为红线与流程"),
         ("dev/CHANGELOG.md", "技能版本沿革（面向交付）"),
         ("dev/maint/DEVLOG.md", "开发日志（开发侧，含事故复盘）"),
         ("dev/publish.py", "发布链脚本（sync → 分离守卫 → 校验 → 打包）"),

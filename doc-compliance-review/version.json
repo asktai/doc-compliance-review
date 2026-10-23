@@ -3,26 +3,44 @@
   "product": "文档合规审查助手AI合同",
   "skill_id": "doc-compliance-review",
   "latest": {
-    "version": "v3.23.4",
+    "version": "v3.23.5",
     "date": "2026-10-23",
-    "summary": "给安全机制登记表自己过一遍质检：补上锚点/咬合/完备性三处洞，并补登两条漏网机制",
+    "summary": "质检修复：安全口径收敛到 SECURITY.md 真源、门禁数字一致性守卫扩到 SKILL.md 并加联网档位一致性断言、引擎表登记化（十一→十五引擎＋实现落点反查）",
     "changes": [
-      "上版立了登记表 12 条，做完立刻复盘并实测三刀全中：删光锚点函数的实际检查内容、门禁仍报「逐条落实」；把文档承诺弱化，门禁全绿；逐条核对后发现漏登两条机制",
-      "最值得记的一条：为消灭「写了没验」而立的第 27 条，它自己那句汇总成了新的「写了没验」——元机制同样要过质检",
-      "锚点加固：锚点必须钉到判据行 (函数名, 判据行特征)，判据行丢了即报错；只给函数名视同违规",
-      "咬合加固：判据改为词组且须落在同一行，不再用「关键词 in 全文」；并如实写明边界——防的是「文档没说」，防不了「文档说弱了」（后者归人工核）",
-      "新增完备性反查：文档自己给出承诺编号（七条 C／八不 B／九项措施 T），认领表逐条认领机制或明示「人工」；多一条承诺无人认领、多一条机制无人认领都报错",
-      "强度必须公布：自检输出写成「机械 10／行为 1／弱 3＝M7, M8, M12」，不许把弱判据混进机械里报数",
-      "补登两条漏网机制：M13 脱敏口径默认值（对外出域 10 类全脱，纯本地链路取该口径）、M14 无执行策略绕过；共 14 条",
-      "新增五类注入全部拦下、对照组零误报；冒烟 147 → 155 项"
+      "质检发现对外文档三处失准且安全声明联网面比实际少（同型病灶第三次复发）：README 仍写「20 个脚本全部不联网」「仅检查更新会联网」两档旧口径、联网边界表缺「法规时效巡检」一行；SKILL 写「147 项冒烟」（实为 155）且门禁数字守卫不校验 SKILL 自己；骨架「十一引擎」表漏登 4 个实际在跑的引擎",
+      "安全口径收敛到 SECURITY.md 一处真源：README 2.1 联网边界改为四档表（L0/L1/L2/L3＋下载），档位计数不再写死在 README，改引用 SECURITY.md 第五章；删掉「20 个脚本」「仅检查更新会联网」旧表述",
+      "门禁数字一致性守卫从 README/教程扩到 SKILL.md（155 项冒烟等数字现在 SKILL 也受常驻校验）；新增 check_net_tier_consistency()：README/SKILL/教程/提示词版不得再出现两档旧口径、且「N 个脚本」须与真实数一致",
+      "引擎表登记化：补登安全引擎(check.py)、法规库失效巡检(freshness-patrol.py)、法规库交叉验证(legal-crosscheck.py)、失衡画像(imbalance.py) 共 4 行，十一→十五引擎；新增 check_engine_implementations() 反查文档点名的实现文件是否真实存在",
+      "三个新守卫均做负向验证：注入「20 个脚本」「仅检查更新会联网」「imbalance_NOTEXIST.py」三类错误全部当场拦下，确认守卫真在拦而不是永远绿",
+      "SKILL「数字只报实测值」条修正：147→155，并说明这些数字由门禁常驻校验而非靠记忆"
     ],
     "download_page": "https://github.com/asktai/doc-compliance-review/releases",
     "files": {
-      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.23.4/文档合规审查助手AI合同_v3.23.4_20261023_(doc-compliance-review).skill",
-      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.23.4/文档合规审查助手AI合同_v3.23.4_20261023_(doc-compliance-review).zip"
+      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.23.5/文档合规审查助手AI合同_v3.23.5_20261023_(doc-compliance-review).skill",
+      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.23.5/文档合规审查助手AI合同_v3.23.5_20261023_(doc-compliance-review).zip"
     }
   },
   "history": [
+    {
+      "version": "v3.23.4",
+      "date": "2026-10-23",
+      "summary": "给安全机制登记表自己过一遍质检：补上锚点/咬合/完备性三处洞，并补登两条漏网机制",
+      "changes": [
+        "上版立了登记表 12 条，做完立刻复盘并实测三刀全中：删光锚点函数的实际检查内容、门禁仍报「逐条落实」；把文档承诺弱化，门禁全绿；逐条核对后发现漏登两条机制",
+        "最值得记的一条：为消灭「写了没验」而立的第 27 条，它自己那句汇总成了新的「写了没验」——元机制同样要过质检",
+        "锚点加固：锚点必须钉到判据行 (函数名, 判据行特征)，判据行丢了即报错；只给函数名视同违规",
+        "咬合加固：判据改为词组且须落在同一行，不再用「关键词 in 全文」；并如实写明边界——防的是「文档没说」，防不了「文档说弱了」（后者归人工核）",
+        "新增完备性反查：文档自己给出承诺编号（七条 C／八不 B／九项措施 T），认领表逐条认领机制或明示「人工」；多一条承诺无人认领、多一条机制无人认领都报错",
+        "强度必须公布：自检输出写成「机械 10／行为 1／弱 3＝M7, M8, M12」，不许把弱判据混进机械里报数",
+        "补登两条漏网机制：M13 脱敏口径默认值（对外出域 10 类全脱，纯本地链路取该口径）、M14 无执行策略绕过；共 14 条",
+        "新增五类注入全部拦下、对照组零误报；冒烟 147 → 155 项"
+      ],
+      "download_page": "https://github.com/asktai/doc-compliance-review/releases",
+      "files": {
+        "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.23.4/文档合规审查助手AI合同_v3.23.4_20261023_(doc-compliance-review).skill",
+        "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.23.4/文档合规审查助手AI合同_v3.23.4_20261023_(doc-compliance-review).zip"
+      }
+    },
     {
       "version": "v3.23.3",
       "date": "2026-10-23",
