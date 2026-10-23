@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# net-tier: L3  门禁自检类：文件内出现网络关键字，但自身不发起联网
 """
 文档合规审查助手AI合同 · 结构校验与环境自检（Python 版）
 ==================================================================
@@ -338,45 +339,137 @@ def check_config():
     _check_online_gate(data)
 
 
-# 允许出现网络调用的脚本（v3.23.0 由 1 个增至 3 个）。
-# 三者共同点：**都接触不到使用者的文档**——没有读文档的参数，也不回传任何内容。
-#   · version.py           查更新（默认关闭，须显式 --check-online）
-#   · freshness-patrol.py  法规库失效巡检（须显式调用）
-#   · legal-parse.py       抓取+解析核心，只抓公开法规页（被上面那个调用）
-# 增至 3 个不是放宽口径，而是把「承诺能碰什么」写清楚：处理文档的脚本仍然零联网。
-_NET_OK = {"version.py", "freshness-patrol.py", "legal-parse.py"}
+# ── 安全引擎：联网分四档（DEV-RULES.md 第 26 条）──────────────────────────
+# 口径：**按「数据出域」分档，不按「有没有 urllib」一刀切**。
+# 真源是**每个脚本文件头那行 `# net-tier: Ln`**——不在本文件另立登记表。
+# 同一事实两处写必漂（第 12 条）：中央登记表一定与代码分家，写在代码里则改档必须动那个文件。
+# 本检查器只做三件事：**读标记 → 与实测比对 → 与 SECURITY.md 双向咬合**。
+NET_TIER_RE = re.compile(r"^#[ \t]*net-tier:[ \t]*(L[0-3])\b", re.M)
+# 行首匹配真正的 import 语句；检查器自己持有的"关键字清单"是行中间的字符串，不会自指命中。
+NET_IMPORT_RE = re.compile(
+    r"^[ \t]*(?:import|from)[ \t]+(?:urllib|requests|socket|http\.client|aiohttp|httpx"
+    r"|smtplib|ftplib|xmlrpc)\b", re.M)
+# 联网动作（含间接）：自己不 import 网络库、但调用在线档模块的网络函数，同样算联网路径。
+NET_CALL_RE = re.compile(
+    r"urlopen\(|requests\.(?:get|post|put)\(|socket\.(?:socket|create_connection)\("
+    r"|(?:PARSE|_PARSE|parse)\.fetch\(", re.M)
+TIER_MEANING = {
+    "L0": "接触文档内容 → 绝对离线（零网络库）",
+    "L1": "在线只读公开信息 → 须可关、离线静默降级",
+    "L2": "不联网就用不成 → 须显式调用、离线明示降级",
+    "L3": "门禁自检类 → 自身不发起联网",
+}
+
+
+def _net_tiers():
+    """读全部脚本的档位自标 → {文件名: 档位}（缺失为 None）。
+
+    **这里必须扫全目录，不能用 `_script_files()`**——后者为算指纹而把 `check.py` 自身排除在外，
+    结果守门人自己成了唯一没定档的脚本（v3.23.2 首次跑门禁即被本函数当场抓出）。
+    **检查器最容易被自己漏掉**，故凡"全量清点"类检查，一律直接列举目录，不复用带豁免的辅助函数。
+    """
+    out = {}
+    for p in sorted(glob.glob(os.path.join(HERE, "*.py"))):
+        m = NET_TIER_RE.search(_read(p))
+        out[os.path.basename(p)] = m.group(1) if m else None
+    return out
+
+
+def _doc_net_tiers():
+    """读 SECURITY.md 里**可见的**档位名单 → {档位: [文件名]}；缺行返回 None。
+
+    为什么用"可见代码块"而不藏进 HTML 注释：给客户看的名单必须看得见，
+    而藏起来的机读块一旦与可见文字分家就无人发现（第 12 条的典型形态）。
+    故**一处写、两边用**——代码块既给人看，也给本函数解析。
+    """
+    p = os.path.join(os.path.dirname(HERE), "SECURITY.md")
+    if not os.path.exists(p):
+        return None
+    out = {}
+    for line in _read(p).splitlines():
+        mm = re.match(r"[ \t]*(L[0-3])[ \t]*:[ \t]*([A-Za-z0-9_.\- ]+)$", line)
+        if mm and all(x.endswith(".py") for x in mm.group(2).split()):
+            out[mm.group(1)] = mm.group(2).split()
+    return out or None
+
+
+def check_net_tiers():
+    """安全引擎门禁：联网按档，档位在代码里、机读、与文档咬合。
+
+    为什么不再写「脚本全部不联网」（这是 v3.23.2 修正的一刀切）：
+    那句话把**手段当成了目的**。红线是「使用者的文档不出域」，不是「有没有 urllib」——
+    一刀切禁联网会连「法规库失效巡检」一起废掉，而它不联网根本做不成，
+    恰是产品最值钱的部分。故分四档，并且：
+      · **L0 仍然一刀切**，但切在「**接触文档**」上，不切在「联网」上——这是唯一该切的地方；
+      · **L2 承认「不联网就用不成」**，代价换到别处补：须显式调用、离线须明示降级；
+      · 分档若只写在文档里就成了漂亮话，故**档位写在代码里**，且文档名单与代码**双向比对**——
+        任一侧偷改当场报错（25.2 的事故形态：文档写一套、代码做一套，无人比对）。
+    """
+    tiers = _net_tiers()
+    if not tiers:
+        err("未读到任何脚本——安全引擎无从定档")
+        return
+    no_tag = sorted(n for n, t in tiers.items() if t is None)
+    if no_tag:
+        err("以下脚本缺 `# net-tier:` 档位自标：%s；新增脚本须**先定档再入库**（第 26 条）"
+            % "、".join(no_tag))
+        tiers = {n: t for n, t in tiers.items() if t}
+    bad = sorted("%s=%s" % (n, t) for n, t in tiers.items() if t not in TIER_MEANING)
+    if bad:
+        err("档位取值非法（只许 L0—L3）：%s" % "、".join(bad))
+        return
+
+    imp_hit, call_hit = set(), set()
+    for n in tiers:
+        txt = _read(os.path.join(HERE, n))
+        if NET_IMPORT_RE.search(txt):
+            imp_hit.add(n)
+        if NET_CALL_RE.search(txt):
+            call_hit.add(n)
+    by = lambda t: sorted(n for n, v in tiers.items() if v == t)  # noqa: E731
+
+    # ① L0（接触文档）：**唯一保留的一刀切**——零网络库
+    bad_l0 = [n for n in by("L0") if n in imp_hit]
+    if bad_l0:
+        err("L0 档（接触文档内容）脚本含网络库 import：%s。文档一经手就不得有任何出网路径——"
+            "要么删掉，要么先改档并在 SECURITY.md 写明理由（第 26 条）" % "、".join(bad_l0))
+        return
+    # ② L1/L2：标了"会联网"就得真有联网路径——**档位不许是空头标签**
+    online = by("L1") + by("L2")
+    dead = [n for n in online if n not in (imp_hit | call_hit)]
+    if dead:
+        err("标为在线档却找不到任何联网路径：%s——档位不能是空头标签，要么接上实现，要么改回 L0"
+            % "、".join(dead))
+        return
+    # ③ L3：门禁自检类只许持有"网络关键字清单"，不许真 import
+    bad_l3 = [n for n in by("L3") if n in imp_hit]
+    if bad_l3:
+        err("L3 档（门禁自检类）不该真 import 网络库：%s；它只应持有用于检查别人的关键字清单"
+            % "、".join(bad_l3))
+        return
+    # ④ 与 SECURITY.md 双向咬合（文档一套代码一套，正是 25.2 的事故形态）
+    doc = _doc_net_tiers()
+    if doc is None:
+        err("SECURITY.md 缺机读档位块（NET-TIERS）——名单无法与代码比对，改一处就分家（25.2）")
+        return
+    for t in ("L0", "L1", "L2", "L3"):
+        a, b = by(t), sorted(doc.get(t) or [])
+        if a != b:
+            err("SECURITY.md 的 %s 档名单与脚本自标不一致：文档 %s／代码 %s；两处须同步"
+                % (t, b, a))
+            return
+    info("安全引擎：联网分四档——L0 %d 个（接触文档，零网络库）／L1 %d 个（在线只读公开信息，可关）"
+         "／L2 %d 个（不联网就用不成，须显式调用）／L3 %d 个（门禁自检，自身不联网）；"
+         "名单与 SECURITY.md 双向一致" % (len(by("L0")), len(by("L1")), len(by("L2")), len(by("L3"))))
 
 
 def _check_online_gate(data=None):
-    """联网边界守两条：① 联网脚本只有一个 ② 它默认不发请求。
+    """只守一件事：出厂配置**不得默认联网**。
 
-    为什么必须用门禁锁：SECURITY.md 对客户做了「零联网」承诺，而这句话一旦被代码打破，
-    错的性质比任何功能缺陷都重——客户 IT 拿一个 `grep` 就能证伪，整套信任崩塌。
-    实测踩过：SECURITY.md 写「21 个脚本全部不含联网库」、`version.py` 里却实实在在 import
-    了 urllib 并会 urlopen，自检命令跑出来是 1 而文档写「输出 0 即零联网」——文档自己证伪自己。
-    故这里把口径钉死：**联网代码只许出现在 _NET_OK 内的脚本；且随包 config 必须默认关闭**。
+    分档由 `check_net_tiers()` 管（谁可以联网、谁绝不能），这里只管"默认行为"——
+    **可联网 ≠ 会自动联网**。L1 的 `version.py` 允许联网查更新，但出厂必须关着，
+    要人显式开口（`--check-online`）才发请求（19.4.5 与 25.4.3）。
     """
-    hits = []
-    for p in _script_files():
-        if not p.endswith(".py"):
-            continue
-        n = os.path.basename(p)
-        # check.py 与 smoke-test.py 自身要写"网络关键字"清单来查别人，会命中自己——
-        # 故这两个只做白名单豁免（本函数与冒烟里都有同一份清单，改一处须同步另一处）。
-        if n in _NET_OK or n in ("check.py", "smoke-test.py"):
-            continue
-        txt = _read(p)
-        for k in ("import urllib", "import requests", "import socket", "import http.client",
-                  "import aiohttp", "import httpx", "import smtplib", "urlopen("):
-            if k in txt:
-                hits.append("%s(%s)" % (n, k))
-                break
-    if hits:
-        err("联网调用越界：以下脚本不该联网却含网络代码 %s；若确需，须同步改写 SECURITY.md 的"
-            " C1／C7 与 SKILL.md 常驻要点，不能一边承诺零联网一边留调用"
-            % ", ".join(hits))
-        return
-
     if data is None:
         try:
             data = json.loads(_read(os.path.join(HERE, "config.json")))
@@ -386,13 +479,6 @@ def _check_online_gate(data=None):
     if u.get("check_online_by_default") is True:
         warn("config.json 把 update.check_online_by_default 设为 true：查更新会自动联网。"
              "对外分发前请确认这是有意为之（SECURITY.md 声称默认不发请求）")
-    else:
-        url = (u.get("manifest_url") or "").strip()
-        n_all = len([p for p in _script_files() if p.endswith(".py")])
-        info("联网边界: %d 个脚本含网络代码（%s），均**接触不到文档**：version.py 查更新默认关闭；"
-             "freshness-patrol.py 巡检与 legal-parse.py 抓法规页须显式调用。"
-             "其余 %d 个脚本零联网"
-             % (len(_NET_OK), "／".join(sorted(_NET_OK)), n_all - len(_NET_OK)))
 
 
 def check_freshness_engine():
@@ -1816,6 +1902,7 @@ def main():
         check_legal_crosscheck()
         check_cite_alignment()
         check_freshness_engine()
+        check_net_tiers()
         check_tpl_engine()
         check_verify_engine()
         check_imbalance_engine()

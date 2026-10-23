@@ -3,24 +3,43 @@
   "product": "文档合规审查助手AI合同",
   "skill_id": "doc-compliance-review",
   "latest": {
-    "version": "v3.23.1",
+    "version": "v3.23.2",
     "date": "2026-10-23",
-    "summary": "质检修三处：安全自检预期与实测不符、建库链漏绑导致换库会崩、自检预期未纳入门禁",
+    "summary": "建立「安全引擎」：联网按「数据出域」分四档，不再一刀切说「脚本全部不联网」",
     "changes": [
-      "修 SECURITY.md：给客户 IT 的零联网自检命令实测命中四个（version.py、legal-parse.py 真联网＋check.py、smoke-test.py 检查器自指），文档原先写的三个与实测不符——声明自己证伪自己",
-      "修 build-legal-db.py：解析链逐个点名绑定漏了 strip_footer 等，重构后跑建库会 NameError（换库链路实际是坏的）；改为整体注入并在导入时校验必需名字",
-      "新增 maint/tools/smoke-build-chain.py（开发侧离线）：验建库链名字在位、解析链来自随包那份、GROUPS 与 SOURCES 长度一致",
-      "包内冒烟新增一项「实测命中集合 == 白名单＋两个检查器」（136 → 137 项），把文档自检预期钉死在实测上",
-      "build-legal-db.py 补齐文档早有记载却未实现的 --only：只重建一部法并合回已有库，避免为改一部法全量重抓",
-      "巡检正向注入实测：把劳动合同法 60 条改成无关条文 → 正确报「60/94 条不一致，疑似换版」并退 1"
+      "换分类轴：红线是「带着什么出去」，不是「出没出去」。联网不是毒蛇——一刀切禁联网会连法规库失效巡检一起废掉，而它不联网根本做不成",
+      "四档：L0 绝对离线 18 个（接触文档正文／映射表／私有规则，零网络库——唯一保留的一刀切，切在「接触文档」上）；L1 在线只读 1 个（version.py 查更新，默认关）；L2 不联网就用不成 2 个（法规抓取／失效巡检，允许联网，代价换三条补偿：须显式调用、不在审查链路上、离线明示降级）；L3 门禁自检 2 个（自身不联网）",
+      "档位真源落在代码里：每个脚本文件头一行 `# net-tier: Ln`，不设中央登记表（登记表必与代码分家）；新增脚本不定档即报错",
+      "门禁按档五断言（缺标／L0 越界／在线档空头标签／L3 真 import／文档名单与代码自标逐档一致），并与 SECURITY.md 双向比对——文档一套代码一套正是上一版的事故形态",
+      "五类注入全部拦下且对照组无误报：越界、改标洗白、缺标、文档分家、空头标签",
+      "对外口径改为「文档不出域 ＋ 四档名单」；给客户的自检命令不再写死命中数（实测：换一套关键字集，命中数由 4 变 3——写死就会自证伪）",
+      "冒烟 137 → 143 项；同步 SECURITY.md／SKILL.md／安装使用教程的表述与逐档名单"
     ],
     "download_page": "https://github.com/asktai/doc-compliance-review/releases",
     "files": {
-      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.23.1/文档合规审查助手AI合同_v3.23.1_20261023_(doc-compliance-review).skill",
-      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.23.1/文档合规审查助手AI合同_v3.23.1_20261023_(doc-compliance-review).zip"
+      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.23.2/文档合规审查助手AI合同_v3.23.2_20261023_(doc-compliance-review).skill",
+      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.23.2/文档合规审查助手AI合同_v3.23.2_20261023_(doc-compliance-review).zip"
     }
   },
   "history": [
+    {
+      "version": "v3.23.1",
+      "date": "2026-10-23",
+      "summary": "质检修三处：安全自检预期与实测不符、建库链漏绑导致换库会崩、自检预期未纳入门禁",
+      "changes": [
+        "修 SECURITY.md：给客户 IT 的零联网自检命令实测命中四个（version.py、legal-parse.py 真联网＋check.py、smoke-test.py 检查器自指），文档原先写的三个与实测不符——声明自己证伪自己",
+        "修 build-legal-db.py：解析链逐个点名绑定漏了 strip_footer 等，重构后跑建库会 NameError（换库链路实际是坏的）；改为整体注入并在导入时校验必需名字",
+        "新增 maint/tools/smoke-build-chain.py（开发侧离线）：验建库链名字在位、解析链来自随包那份、GROUPS 与 SOURCES 长度一致",
+        "包内冒烟新增一项「实测命中集合 == 白名单＋两个检查器」（136 → 137 项），把文档自检预期钉死在实测上",
+        "build-legal-db.py 补齐文档早有记载却未实现的 --only：只重建一部法并合回已有库，避免为改一部法全量重抓",
+        "巡检正向注入实测：把劳动合同法 60 条改成无关条文 → 正确报「60/94 条不一致，疑似换版」并退 1"
+      ],
+      "download_page": "https://github.com/asktai/doc-compliance-review/releases",
+      "files": {
+        "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.23.1/文档合规审查助手AI合同_v3.23.1_20261023_(doc-compliance-review).skill",
+        "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.23.1/文档合规审查助手AI合同_v3.23.1_20261023_(doc-compliance-review).zip"
+      }
+    },
     {
       "version": "v3.23.0",
       "date": "2026-10-23",

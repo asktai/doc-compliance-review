@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# net-tier: L0  接触文档内容 → 绝对离线，不得引入任何网络库
 """
 样例级人工基线（scripts/sample-baseline.py）
 ============================================

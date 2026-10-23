@@ -216,9 +216,21 @@ def check_structure(s):
     else:
         info("条标题格式统一（条号后均有空格）")
 
-    CN = "一二三四五六七八九十"
+    # 2026-10-23 自检崩溃实录：原式 `CN = "一二三四五六七八九十"` 配 `[CN[i] for i in ...]`，
+    # **把"章数上限"写死进了字符串长度**——规范加到第十一章当天，自检 IndexError 裸崩，
+    # 连 err 都没机会报。故改为按需生成（支持 1—99），不再有隐式上限。
+    def _cn(n):
+        d = "一二三四五六七八九"
+        if n <= 9:
+            return d[n - 1]
+        if n == 10:
+            return "十"
+        if n < 20:
+            return "十" + d[n - 11]
+        return d[n // 10 - 1] + "十" + (d[n % 10 - 1] if n % 10 else "")
+
     chaps = re.findall(r"^## 第(.+?)章", s, re.M)
-    want = [CN[i] for i in range(len(chaps))]
+    want = [_cn(i + 1) for i in range(len(chaps))]
     if not chaps:
         # 2026-10-20 自检发现：原写法 `info("章序号一至%s连续" % want[-1])` 在"无章"时
         # 直接 IndexError 崩溃（裸 traceback，连 err 都没机会报）。而"不分章、只列条"

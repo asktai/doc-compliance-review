@@ -1,6 +1,6 @@
 # 数据安全声明（一页版）｜ Data Security Statement
 
-**文档合规审查助手AI合同· doc-compliance-review** ｜ 版本：v3.23.1 ｜ 作者：胡皓 ｜ 2026-10-23
+**文档合规审查助手AI合同· doc-compliance-review** ｜ 版本：v3.23.2 ｜ 作者：胡皓 ｜ 2026-10-23
 
 > 本文可供**客户 IT / 法务 / 合规部门**审阅留档，是数据安全的**完整版**；`SKILL.md` 第十二节为其常驻摘要（四条要点＋脱敏口径），二者口径一致。
 
@@ -12,7 +12,7 @@
 
 | 编号 | 承诺 |
 |---|---|
-| **C1** | **文档数据不进入任何 AI 模型的训练 / 微调 / 评测语料。** 本技能不收集、不上传、不缓存、不回传任何文档内容。**脚本层按「能不能碰到文档」分两类说清**（v3.23.0 起 `scripts/` 下共 **23 个脚本**）：**处理文档的 20 个脚本零联网**——不含 `requests`/`urllib`/`socket`/`http.client`/`aiohttp`/`httpx` 等联网库，也不调用 `curl`/`wget`/`Invoke-WebRequest`/`smtplib` 等外部网络命令；**另有 3 个脚本含网络代码，但它们接触不到文档**——没有读文档的参数，也不会回传任何内容：① `version.py` 查更新，网络代码只在一个函数里、只 GET 一份公开版本清单，**默认不发任何请求**（须使用者显式打 `--check-online`，或把 `update.check_online_by_default` 显式设为 true）；② `freshness-patrol.py` 法规库失效巡检，**须使用者显式调用**才联网，只抓公开法规页面（它不自带网络库，联网经由 ③ 完成）；③ `legal-parse.py` 抓取与解析核心，被 ② 调用，只抓公开法规页面。三者**都不读取、不上传文档内容**，因为它们在代码里就碰不到文档。逐脚本自检方法见第五节。 |
+| **C1** | **文档数据不进入任何网络请求，也不进入任何 AI 模型的训练 / 微调 / 评测语料。** 本技能不收集、不上传、不缓存、不回传任何文档内容。**联网按「数据出域」分四档，不按"有没有联网"一刀切**（v3.23.2 起 `scripts/` 下共 **23 个脚本**）：**L0 绝对离线 18 个**——凡接触文档正文、脱敏映射表或私有规则的脚本，**零网络库、零出网路径**；这是唯一保留的一刀切，但它切在「**接触文档**」上，不切在「联网」上。**L1 在线只读 1 个**——`version.py` 查更新，只 GET 一份公开版本清单，**默认关闭**（须显式 `--check-online`）。**L2 不联网就用不成 2 个**——`legal-parse.py` 抓公开法规页、`freshness-patrol.py` 调它做法规库失效巡检；**法条是否已修订，不联网无从得知**，故这一档必须能联网，代价换到别处补：**须显式调用**、**不出现在审查链路上**、离线时明示降级而非静默假成功。**L3 门禁自检 2 个**——`check.py`、`smoke-test.py` 持有网络关键字清单用于检查别人，自身不发起联网。**四档同一条红线：任何一档的请求里都不含文档内容、文件名、映射表或私有规则。** 联网本身不是风险，**带着文档出去才是**——所以这里承诺的是"文档不出域"，不是"不联网"。逐档名单与自检命令见第五节。 |
 | **C2** | **不改动原始文件。** 原件只读、永远留存；全部交付物均为新建文件。 |
 | **C3** | **最小必要。** 只读取必要范围；脱敏只脱必要类别；凡数据出域，**先脱敏**。 |
 | **C4** | **脱敏可逆、映射表隔离。** 映射表（含真实值的明文对照表）默认只落**本机隔离目录** `~/.dcr-maps/`，**不随交付物外发**；可 `--irreversible` 选择不生成映射表。 |
@@ -65,7 +65,7 @@
 
 | 措施 | 说明 |
 |---|---|
-| 零联网 / 断网可用 | **处理文档的 20 个脚本全部**不含联网库与外部网络命令；另有 3 个脚本含网络代码但**接触不到文档**：`version.py` 查更新默认关闭、`freshness-patrol.py` 巡检与 `legal-parse.py` 抓法规页须显式调用。依赖仅标准库＋ `python-docx`/`openpyxl`/`Pillow`；除"审查判断"外，其余环节均可离线完成（巡检本身需要联网，但它不是审查环节） |
+| 联网分级（安全引擎） | 不按"有没有 urllib"一刀切，按**数据出域**分四档：`L0` 接触文档的 **18 个脚本零网络库**；`L1` **1 个**（查更新，默认关）；`L2` **2 个**（法规抓取／失效巡检，**不联网做不成**，故允许联网但须显式调用、且不在审查链路上）；`L3` **2 个**（门禁自检，自身不联网）。**任何一档都不携带文档内容出网**。依赖仅标准库＋ `python-docx`/`openpyxl`/`Pillow`；除"审查判断"（模型层，由平台决定）与"法规时效巡检"（L2）外**全部环节可离线完成**，关掉在线项后功能不降级 |
 | 无缓存留痕 | 脚本禁止生成 `__pycache__`；`check.py --clean` 可清残留 |
 | 脚本防篡改 | `check.py --sign` 建指纹基线、`--verify` 校验，被改动即告警 |
 | 无执行策略绕过 | 校验用纯 Python `check.py`，不需要 PowerShell 执行策略绕过参数 |
@@ -75,24 +75,41 @@
 | 私有库默认空 | 根 `rules.md` 为空库、示例移入 `_template/`，避免企业未填写时示例规则误生效 |
 | 输出隔离与限权 | 按文档名分目录；可选关闭权限继承、仅授权本机账户 |
 
-**零联网自检**（在技能目录下执行）。**预期结果：命中四个文件，顺序不定**——
-  `version.py`、`legal-parse.py`（真正 import 网络库的两个）＋ `check.py`、`smoke-test.py`（检查器自指，见下）。
-**注意 `freshness-patrol.py` 不会出现在这个名单里**：它不自己 import 网络库，联网是通过调用 `legal-parse.py` 完成的——
-网络代码因此**集中在唯一一处**，比「每个联网脚本各写一份」更紧，也更利于审计。四个命中的文件里，
-两个真正联网的都只抓公开内容（版本清单／法规页面），**且都默认不联网**（查更新须显式开，巡检须显式跑），均不接触文档。
+**联网档位自检（两问两答）。**
 
-> **另有两个文件会命中，但它们不是联网**：`check.py` 与 `smoke-test.py` 是**查别人的检查器**，里面写着这串关键字本身（`"import urllib"` 这类字符串字面量），用来扫描其他脚本。它们不 import 任何网络库、也不发请求。所以若用 grep 自检，看到 `check.py`／`smoke-test.py` 属正常，**看到这四个之外的任何文件才是问题**。
+**问一：每个脚本属于哪一档？** 下面是**当前全部 23 个脚本的逐一定档**（与脚本源码里的自标一一对应，
+`check.py` 每次自检都会拿它与代码比对，**改一边不动另一边当场报错**）：
+
+```
+L0: _config.py desensitize.py detect-tools.py guard.py harden-dir.py imbalance.py legal-crosscheck.py legal-verify.py local-only.py make-docx.py make-header.py pack.py preprocess.py rule-baseline.py sample-baseline.py set-workdir.py tpl-engine.py verify.py
+L1: version.py
+L2: freshness-patrol.py legal-parse.py
+L3: check.py smoke-test.py
+```
+
+一次命令即可复核（输出应当与上面四行**逐字相同**）：
 
 ```bash
-python -c "import pathlib; ks=('requests','urllib','socket','http.client','aiohttp','httpx','curl','wget','Invoke-WebRequest','smtplib'); print([f.name for f in pathlib.Path('scripts').glob('*.py') if any(k in f.read_text(encoding='utf-8',errors='ignore') for k in ks)])"
-# 预期：version.py、legal-parse.py（真联网）＋ check.py、smoke-test.py（检查器自指），顺序不定
+grep -h "^# net-tier:" scripts/*.py | sed 's/# net-tier: //' | sort   # 看代码里的自标
+python scripts/check.py | grep "安全引擎"                              # 看门禁比对结论
 ```
 
-**不用读代码、只看行为**的核验（更能说服客户 IT）：清空 `config.json` 的 `update` 段后跑 `python scripts/version.py --notice`，**零输出、退出码 0** 即证明默认不发请求。
-```powershell
-# PowerShell 等价写法（预期同样只列出那四个）
-Select-String -Path scripts\*.py -Pattern 'requests|urllib|socket|aiohttp|httpx|curl|wget|Invoke-WebRequest|smtplib' | Select-Object -ExpandProperty Filename -Unique
+**问二：默认会不会自己发请求？** **不看代码、只看行为**的核验（更能说服客户 IT）：
+清空 `config.json` 的 `update` 段后跑 `python scripts/version.py --notice`，**零输出、退出码 0** 即证明默认不发请求。
+
+若改用"搜网络关键字"的办法（更原始，但客户 IT 爱用），**判据不要看总数，要看档位**：
+命中名单里**只要出现任何一个 L0 档脚本，就是问题**；出现在 L1／L2／L3 档则属正常。
+
+```bash
+python -c "import pathlib; ks=('requests','urllib','socket','http.client','aiohttp','httpx','curl','wget','Invoke-WebRequest','smtplib'); print(sorted(f.name for f in pathlib.Path('scripts').glob('*.py') if any(k in f.read_text(encoding='utf-8',errors='ignore') for k in ks)))"
 ```
+> 当前实测命中 `check.py`、`legal-parse.py`、`smoke-test.py`、`version.py` 四个，但**这个名单会随重构变化**
+> （例如 `check.py` 把关键字清单改成正则后就不一定命中），故文档不把它写死成"预期 N 个"——
+> **写死数字就会在某次重构后自证伪**（本项目已因此栽过三次）。看档位，不看总数。
+>
+> `check.py`／`smoke-test.py` 属"**检查器自指**"：里面写着用来扫描别人的关键字或正则，
+> 自身不 import 任何网络库、也不发请求。`freshness-patrol.py` 通常不出现在该名单里——
+> 它不自带网络库，联网经 `legal-parse.py` 完成，网络代码因此**集中在唯一一处**，比"每个联网脚本各写一份"更利于审计。
 
 ## 六、合规对标与边界
 
