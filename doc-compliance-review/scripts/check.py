@@ -35,6 +35,7 @@ import subprocess
 import sys
 import hashlib
 import argparse
+import inspect
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
@@ -465,6 +466,8 @@ def check_net_tiers():
 
 # 真正的"带 shell 的调用"，而非 `shell=True` 这个子串（后者会让检查器自指命中）。
 SHELL_TRUE_RE = re.compile(r"subprocess\.[A-Za-z_]+\([^)]*shell\s*=\s*True")
+# 同理：只认「策略值紧跟 ExecutionPolicy」这一形态，不搜裸关键字（否则检查器自指命中）
+EXEC_BYPASS_RE = re.compile(r"ExecutionPolicy\s+(Bypass|Unrestricted|RemoteSigned|AllSigned)", re.I)
 
 # ── 安全机制登记表（铁律第 27 条）────────────────────────────────────────
 # 为什么要有这张表：安全承诺原先散落在 SECURITY.md 的七条承诺／八不／九项措施里，
@@ -558,6 +561,41 @@ def _sec_no_auto_install():
             if ok else "detect-tools.py 出现了执行调用——「不代装」被打破")
 
 
+def _sec_mask_defaults():
+    """数据层：脱敏口径默认值——对外出域须 10 类全脱，且纯本地链路必须取这个口径。
+
+    为什么要单列：`ALL_TYPES`（10 类）与 `REVIEW_TYPES`（6 类）是两个常量，
+    而"涉密走纯本地链路"这条承诺全靠 `local-only.py` 的默认值取前者撑着。
+    有人把它改成后者，**涉密文档就只脱 6 类就出去了，而门禁此前全绿**
+    （本条是 v3.23.4 复盘「登记表守不住完备性」时补的，此前漏登记）。
+    """
+    d = _read(os.path.join(HERE, "desensitize.py"))
+    m = re.search(r"^ALL_TYPES\s*=\s*\((.*?)\)\s*(?:#.*)?$", d, re.M | re.S)
+    if not m:
+        return (False, "desensitize.py 里找不到 ALL_TYPES（对外出域口径的实现被删）")
+    n = len([x for x in m.group(1).replace("\n", "").split(",") if x.strip()])
+    if n != 10:
+        return (False, "ALL_TYPES 实为 %d 类——对外出域口径被改少（应为 10 类全脱）" % n)
+    lo = _read(os.path.join(HERE, "local-only.py"))
+    if "_d.ALL_TYPES" not in lo:
+        return (False, "local-only.py 的默认口径不再取 desensitize.ALL_TYPES——"
+                       "纯本地链路可能偷偷降成审查用的 6 类")
+    return (True, "对外出域 10 类全脱，纯本地链路默认取该口径")
+
+
+def _sec_no_exec_bypass():
+    """代码层：无执行策略绕过——不得要求使用者以绕过 PowerShell 执行策略的方式运行。
+
+    判据同 27.3.2：只认**策略值跟在 ExecutionPolicy 之后**这一形态，
+    不搜裸关键字（检查器自己要写这些词来扫别人，裸搜必自指命中）。
+    """
+    bad = [os.path.basename(p) for p in glob.glob(os.path.join(HERE, "*.py"))
+           if EXEC_BYPASS_RE.search(_read(p))]
+    bad += [os.path.basename(p) for p in glob.glob(os.path.join(ROOT, "*.ps1")) + glob.glob(os.path.join(ROOT, "*.bat"))
+            if EXEC_BYPASS_RE.search(_read(p))]
+    return (not bad, "无执行策略绕过参数" if not bad else "存在绕过面 %s" % ", ".join(sorted(set(bad))))
+
+
 def _sec_fingerprint():
     """代码层：脚本防篡改——指纹基线须覆盖全部脚本，缺一个即等于该脚本无人看管"""
     p = os.path.join(HERE, ".integrity.json")
@@ -574,56 +612,146 @@ def _sec_fingerprint():
             else "未纳入指纹 %s" % ", ".join(miss))
 
 
-# (编号, 机制, 层, SECURITY.md 里的对应承诺关键词, 判据函数 or None（None＝由既有段落负责，见 anchor）, 锚点)
+# 登记表字段（27.3）：
+#   编号／机制／层／**承诺词组**／判据函数 or None／锚点 or None／强度
+#
+# 两处都是 v3.23.4 复盘后的加固，别再退回旧写法：
+#   · 承诺词组：必须**同一行**里全部出现才算咬合（旧写法是单个关键词 `in` 全文，
+#     实测把「默认关」改成「可关」仍全绿——拿"词在别处"冒充"承诺还在"）。
+#   · 锚点：写成 (函数名, 判据行特征)，**只验名字在是不够的**——
+#     实测删光 `check_security()` 里的私有库整段，登记表照样报"逐条落实"。
 SEC_MATRIX = (
-    ("M1", "文档不出网（接触文档的脚本零出网路径）", "数据层", "不出域", _sec_doc_no_net, None),
-    ("M2", "映射表隔离（默认落本机隔离目录）", "数据层", "映射表", _sec_map_isolated, None),
-    ("M3", "私有库默认不打进发布包", "数据层", "private", _sec_private_not_packed, None),
-    ("M4", "查更新默认不发请求（可联网 ≠ 会自动联网）", "数据层", "默认", _sec_online_off, None),
-    ("M5", "原件不改（产物一律新建）", "产物层", "不改动原始文件", _sec_original_intact, None),
-    ("M6", "输出隔离（按文档名分目录，多客户不混放）", "产物层", "隔离", _sec_output_isolated, None),
-    ("M7", "私有库默认空（不参与审查）", "数据层", "私有库默认空", None, "check_security"),
-    ("M8", "不留缓存（脚本禁止生成 __pycache__）", "代码层", "无缓存留痕", None, "_check_no_bytecode"),
-    ("M9", "脚本防篡改（指纹基线覆盖全部脚本）", "代码层", "脚本防篡改", _sec_fingerprint, None),
-    ("M10", "无 shell 注入面（本机工具按参数列表调用）", "代码层", "shell", _sec_no_shell, None),
-    ("M11", "不代装依赖（只给命令，不替人执行）", "代码层", "不代装", _sec_no_auto_install, None),
-    ("M12", "企业词表外置（脚本内不含任何企业名）", "代码层", "企业词表外置", None, "check_deenterprise"),
+    ("M1", "文档不出网（接触文档的脚本零出网路径）", "数据层",
+     ("数据出域", "L0"), _sec_doc_no_net, None, "机械"),
+    ("M2", "映射表隔离（默认落本机隔离目录）", "数据层",
+     ("映射表", "隔离目录"), _sec_map_isolated, None, "机械"),
+    ("M3", "私有库默认不打进发布包", "数据层",
+     ("private/", "排除"), _sec_private_not_packed, None, "机械"),
+    ("M4", "查更新默认不发请求（可联网 ≠ 会自动联网）", "数据层",
+     ("查更新", "默认关"), _sec_online_off, None, "机械"),
+    ("M5", "原件不改（产物一律新建）", "产物层",
+     ("不改动原始文件", "原件只读"), _sec_original_intact, None, "行为"),
+    ("M6", "输出隔离（按文档名分目录，多客户不混放）", "产物层",
+     ("输出隔离", "限权"), _sec_output_isolated, None, "机械"),
+    ("M7", "私有库默认空（不参与审查）", "数据层",
+     ("私有库默认空", "空库"), None, ("check_security", r"PR-\\d+"), "弱"),
+    ("M8", "不留缓存（脚本禁止生成 __pycache__）", "代码层",
+     ("无缓存留痕", "__pycache__"), None, ("_check_no_bytecode", "dont_write_bytecode"), "弱"),
+    ("M9", "脚本防篡改（指纹基线覆盖全部脚本）", "代码层",
+     ("脚本防篡改", "--verify"), _sec_fingerprint, None, "机械"),
+    ("M10", "无 shell 注入面（本机工具按参数列表调用）", "代码层",
+     ("参数列表", "shell"), _sec_no_shell, None, "机械"),
+    ("M11", "不代装依赖（只给命令，不替人执行）", "代码层",
+     ("不代装依赖", "安装命令"), _sec_no_auto_install, None, "机械"),
+    ("M12", "企业词表外置（脚本内不含任何企业名）", "代码层",
+     ("企业词表外置", "deidentify-words"), None, ("check_deenterprise", "deidentify-words"), "弱"),
+    ("M13", "脱敏口径默认值（对外出域 10 类全脱，纯本地链路取该口径）", "数据层",
+     ("10 类全脱", "对外出域"), _sec_mask_defaults, None, "机械"),
+    ("M14", "无执行策略绕过（纯 Python 校验，不要求绕过 PowerShell）", "代码层",
+     ("无执行策略绕过", "PowerShell"), _sec_no_exec_bypass, None, "机械"),
 )
 
 
+def _sec_claims(sec):
+    """完备性反查：对外文档里**每一条承诺**都必须认领一个机制编号（或明示「人工」）。
+
+    为什么需要这一段：登记表能保证"登记了的都有判据"，**保证不了有没有漏登记**——
+    12 条最初是人工读文档归纳的，而"无执行策略绕过""脱敏口径默认值"两条就漏了
+    （v3.23.4 复盘实测）。故改为**从文档反查**：先数出文档到底承诺了哪些
+    （七条 C／八不 B／九项措施 T，编号由文档自己给出），再看认领表是否逐条认领。
+    **多一条承诺没人认领即报错，多一条机制没人认领也报错**。
+
+    "人工"是合法归属：有些承诺守的是使用者的动作，机器判不了；
+    **写明"人工"不算漏，闷着不写才算漏**。
+    """
+    if not sec:
+        return (False, "读不到 SECURITY.md")
+    # ① 文档实际承诺了哪些（编号由文档给出，门禁不推算，避免"数行数"式隐式编号漂移）
+    cs = re.findall(r"^\|\s*\*\*(C\d+)\*\*", sec, re.M)
+    ts = re.findall(r"^\|\s*\*\*(T\d+)\*\*", sec, re.M)
+    b_sec = re.search(r"## 四、操作红线.*?(?=\n## )", sec, re.S)
+    bs = ["B%d" % i for i in range(1, len(re.findall(r"^\d+\.\s", b_sec.group(0), re.M)) + 1)] if b_sec else []
+    promised = set(cs) | set(bs) | set(ts)
+    if not promised:
+        return (False, "SECURITY.md 里解析不出承诺编号（C／B／T 三族都没了）")
+    # ② 认领表：| C1 文档不出域 | M1 | 机械 |
+    rows = re.findall(r"^\|\s*((?:C|B|T)\d+)\b[^\|]*\|\s*([^\|]+?)\s*\|", sec, re.M)
+    claimed = {}
+    for cid, val in rows:
+        claimed.setdefault(cid, []).extend(
+            [v.strip() for v in re.split(r"[、,]", val) if v.strip()])
+    bad = []
+    miss = sorted(promised - set(claimed))
+    if miss:
+        bad.append("无人认领的承诺 %s（新增承诺必须来认领表登记）" % ", ".join(miss))
+    ghost = sorted(set(claimed) - promised)
+    if ghost:
+        bad.append("认领表里有不存在的承诺 %s（承诺已删，认领未清）" % ", ".join(ghost))
+    mids = {m[0] for m in SEC_MATRIX}
+    illegal = sorted({v for vs in claimed.values() for v in vs if v not in mids and v != "人工"})
+    if illegal:
+        bad.append("认领了不存在的机制 %s" % ", ".join(illegal))
+    orphan = sorted(mids - {v for vs in claimed.values() for v in vs})
+    if orphan:
+        bad.append("无人认领的机制 %s（没有对外承诺认领它——要么补承诺，要么删机制）" % ", ".join(orphan))
+    return (not bad, "；".join(bad)) if bad else (
+        True, "承诺 %d 条全部认领（C%d／B%d／T%d），无孤儿机制" % (len(promised), len(cs), len(bs), len(ts)))
+
+
 def check_security_matrix():
-    """安全机制逐条自检：登记在册的 12 条，逐条跑判据并公布结论。
+    """安全机制逐条自检：登记在册的每条机制，逐条跑判据并**如实公布强度**。
 
     与 `check_net_tiers()` 的分工：那条管"**谁可以联网**"，本条管"**承诺过的安全机制是不是真装上了**"。
     两条都不复制实现，只钉落点——**登记表与实现分家是 25.2 的事故形态，安全承诺尤其经不起**。
+
+    强度必须公布：把"弱（锚点）"混在"机械"里报"逐条落实"，
+    **这句汇总自己就成了新的空头承诺**（第 25 条形态，v3.23.4 复盘实测）。
     """
     sec_p = os.path.join(os.path.dirname(HERE), "SECURITY.md")
     sec = _read(sec_p) if os.path.exists(sec_p) else ""
-    bad_all, layers = [], {}
-    for mid, name, layer, doc_kw, probe, anchor in SEC_MATRIX:
+    lines = sec.splitlines()
+    bad_all, layers, strengths = [], {}, {}
+    for mid, name, layer, doc_words, probe, anchor, strength in SEC_MATRIX:
         layers.setdefault(layer, []).append(mid)
+        strengths.setdefault(strength, []).append(mid)
         if probe is not None:
             try:
                 ok, detail = probe()
             except Exception as e:      # 判据跑不起来＝落点被删，与"判据失败"同罪
                 ok, detail = False, "判据跑不起来：%r（落点可能被删）" % (e,)
         else:
-            # 由既有段落负责：只验锚点还在位（改名不同步当场报错，不重复执行以免重复输出）
-            ok = bool(anchor) and callable(globals().get(anchor))
-            detail = ("由 %s() 负责" % anchor) if ok else "锚点 %s 不存在或不可调用" % anchor
+            # 锚点型（27.3.3）：不仅验函数还在，**还要验判据行还在**——
+            # 只验名字在的话，把函数里的检查内容删光也照样绿（v3.23.4 复盘实测）。
+            fn_name, needle = anchor
+            fn = globals().get(fn_name)
+            if not callable(fn):
+                ok, detail = False, "锚点 %s 不存在或不可调用" % fn_name
+            else:
+                body = inspect.getsource(fn)
+                ok = re.search(needle, body) is not None
+                detail = ("由 %s() 负责，判据行在位（%s）" % (fn_name, needle) if ok
+                          else "%s() 里找不到判据行 %s——那段检查可能被删了" % (fn_name, needle))
         if not ok:
             bad_all.append("%s %s：%s" % (mid, name, detail))
-        if doc_kw and doc_kw not in sec:
-            bad_all.append("%s %s：SECURITY.md 里查不到对应承诺（关键词「%s」）——"
-                           "代码有、文档没说，或文档改了名，两处须对上" % (mid, name, doc_kw))
+        # 咬合：词组须在**同一行**全部出现（单个关键词 `in` 全文会被"词在别处"骗过）
+        if doc_words and not any(all(w in ln for w in doc_words) for ln in lines):
+            bad_all.append("%s %s：SECURITY.md 里找不到同时含 %s 的承诺句——"
+                           "代码有、文档没说，或文档把承诺改弱了"
+                           % (mid, name, "、".join("「%s」" % w for w in doc_words)))
+    ok_claim, claim_detail = _sec_claims(sec)
+    if not ok_claim:
+        bad_all.append("完备性反查未过 —— %s" % claim_detail)
     if bad_all:
         for b in bad_all:
             err("安全机制未落实 —— %s" % b)
         return
-    info("安全机制：12 条在册逐条落实（数据层 %d／产物层 %d／代码层 %d；"
-         "判据均指向已在跑的实现，登记表不复制实现）"
-         % (len(layers.get("数据层", [])), len(layers.get("产物层", [])),
+    weak = strengths.get("弱", [])
+    info("安全机制：%d 条在册逐条落实（数据层 %d／产物层 %d／代码层 %d）"
+         % (len(SEC_MATRIX), len(layers.get("数据层", [])), len(layers.get("产物层", [])),
             len(layers.get("代码层", []))))
+    info("安全机制强度：机械 %d／行为 %d／弱（锚点）%d＝%s；%s"
+         % (len(strengths.get("机械", [])), len(strengths.get("行为", [])), len(weak),
+            ", ".join(weak) if weak else "无", claim_detail))
 
 
 def _check_online_gate(data=None):

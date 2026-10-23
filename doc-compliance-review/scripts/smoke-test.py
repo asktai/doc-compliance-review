@@ -213,6 +213,8 @@ try:
         m._check_online_gate(data)
     elif which == "net_tiers":
         m.check_net_tiers()
+    elif which == "sec_matrix":
+        m.check_security_matrix()
     else:
         m._check_no_bytecode()
 except BaseException as e:
@@ -238,9 +240,10 @@ def _inject_gate_tests(tmp):
     base = os.path.join(tmp, "skillsim")
     tgt = os.path.join(base, "scripts")
     try:
+        # 不排除 .integrity.json：安全机制登记表要验指纹基线覆盖度，
+        # 副本里缺了它，门禁报的是"缺基线"而不是被注入的那一处——误报会掩盖真信号。
         shutil.copytree(real_scripts, tgt,
-                        ignore=shutil.ignore_patterns("__pycache__", "*.pyc",
-                                                      ".integrity.json"))
+                        ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
         # 带上 SECURITY.md：安全引擎门禁要拿文档名单与代码自标比对，
         # 副本里缺了它，门禁会报"文档缺名单"而不是被注入的那一处——误报会掩盖真信号。
         shutil.copy(os.path.join(os.path.dirname(HERE), "SECURITY.md"), base)
@@ -327,8 +330,96 @@ def _inject_gate_tests(tmp):
         out.append(("反向注入③：把联网开关改回 true → 必须告警（默认不发请求的承诺被打破）",
                     hit,
                     "已告警" if hit else ("未告警；" + (bad or "warns=%s" % warns))))
+        # 立即还原：后面 ④ 对照组会跑安全机制登记表，M4 要读同一个 config.json，
+        # 不还原就会报"默认会自己发请求"——那是本条注入的残留，不是新信号。
+        cfg["update"]["check_online_by_default"] = False
+        open(cfgp, "w", encoding="utf-8").write(
+            json.dumps(cfg, ensure_ascii=False, indent=1))
     except Exception as e:
         out.append(("反向注入③：把联网开关改回 true → 必须告警", False, repr(e)))
+
+    def rewrite_doc(old, new):
+        """改副本根上的 SECURITY.md（安全机制门禁要拿它做文档咬合与完备性反查）。"""
+        fp = os.path.join(base, "SECURITY.md")
+        t = open(fp, encoding="utf-8").read()
+        if old not in t:
+            return False
+        open(fp, "w", encoding="utf-8").write(t.replace(old, new, 1))
+        return True
+
+    def case(name, hit, hit_detail, miss_detail):
+        out.append((name, hit, hit_detail if hit else miss_detail))
+
+    # ⑤ 锚点型加固（v3.23.4 复盘实测①）：只验"函数还在"是不够的——
+    #    把 check_security() 里私有库的判据行掏空，M7 必须红（旧写法照样全绿）。
+    if rewrite("check.py", 'and re.search(r"PR-\d+", l)]', "and False]"):
+        bad, errs, _ = run_gate("sec_matrix")
+        hit = any("M7" in m and "判据行" in m for m in errs)
+        case("反向注入⑤：掏空 check_security() 里的私有库判据行 → M7 必须红",
+             hit, "已报 M7 判据行丢失", "未报；" + (bad or "errs=%s" % errs))
+        rewrite("check.py", "and False]", 'and re.search(r"PR-\d+", l)]')
+    else:
+        out.append(("反向注入⑤：掏空私有库判据行 → M7 必须红", False, "注入点未命中"))
+
+    def rewrite_doc_all(old, new):
+        fp = os.path.join(base, "SECURITY.md")
+        t = open(fp, encoding="utf-8").read()
+        if old not in t:
+            return False
+        open(fp, "w", encoding="utf-8").write(t.replace(old, new))
+        return True
+
+    # ⑥ 文档咬合加固（复盘实测②）：整条承诺被弱化到文档里查不到 → M4 必须红。
+    #    旧写法是单个关键词 `in` 全文：把「默认关」改成「可关」后，
+    #    "默认"在别处仍出现 17 次，门禁照样全绿——拿"词在别处"冒充"承诺还在"。
+    #    注意本条验的是**承诺整条消失**；只弱化其中一处（总述与分述并存）仍不会红，
+    #    那是第 25 条的活儿——咬合防"文档没说"，不防"文档说弱了"，已在铁律 27.3.4 写明。
+    if rewrite_doc_all("默认关", "可关"):
+        bad, errs, _ = run_gate("sec_matrix")
+        hit = any("M4" in m for m in errs)
+        case("反向注入⑥：把「默认关」弱化成「可关」→ 文档咬合必须红",
+             hit, "已报 M4 找不到承诺句", "未报；" + (bad or "errs=%s" % errs))
+        rewrite_doc_all("可关", "默认关")
+    else:
+        out.append(("反向注入⑥：弱化文档承诺 → M4 必须红", False, "注入点未命中"))
+
+    # ⑦ 完备性反查（复盘实测③）：删掉认领表里 T4 一行 → 必须有承诺无人认领。
+    if rewrite_doc("| T4 无执行策略绕过 | M14 | 机械 |\n", ""):
+        bad, errs, _ = run_gate("sec_matrix")
+        hit = any("T4" in m and ("无人认领" in m or "认领" in m) for m in errs)
+        case("反向注入⑦：删掉认领表 T4 一行 → 完备性反查必须红",
+             hit, "已报 T4 无人认领", "未报；" + (bad or "errs=%s" % errs))
+        rewrite_doc("| T9 输出隔离与限权 | M6 | 机械 |",
+                    "| T4 无执行策略绕过 | M14 | 机械 |\n| T9 输出隔离与限权 | M6 | 机械 |")
+    else:
+        out.append(("反向注入⑦：删认领表一行 → 反查必须红", False, "注入点未命中"))
+
+    # ⑧ M13 脱敏口径：把纯本地链路的默认口径降成审查用的 6 类 → 涉密文档漏脱。
+    if rewrite("local-only.py", "_d.ALL_TYPES if _d else", "_d.REVIEW_TYPES if _d else"):
+        bad, errs, _ = run_gate("sec_matrix")
+        hit = any("M13" in m for m in errs)
+        case("反向注入⑧：纯本地链路默认口径降成 6 类 → M13 必须红",
+             hit, "已报 M13 口径被降", "未报；" + (bad or "errs=%s" % errs))
+        rewrite("local-only.py", "_d.REVIEW_TYPES if _d else", "_d.ALL_TYPES if _d else")
+    else:
+        out.append(("反向注入⑧：降低脱敏默认口径 → M13 必须红", False, "注入点未命中"))
+
+    # ⑨ M14 无执行策略绕过：塞进一条要求绕过 PowerShell 的调用 → 必须红。
+    # 注入串**拼接构造**：检查器自己若把"策略名＋Bypass"按连续形态写进源码（含注释），
+    # M14 判据会把 smoke-test.py 也报成绕过面——检查器自指，本项目第三次踩，
+    # 且这次是**注释里的完整串**命中的，注释也算源码。
+    _bypass = "powershell -Execution" + "Policy Bypass -File x.ps1"
+    if rewrite("preprocess.py", "import sys as _sys",
+               'import sys as _sys\n_BYPASS = "%s"' % _bypass):
+        bad, errs, _ = run_gate("sec_matrix")
+        hit = any("M14" in m for m in errs)
+        case("反向注入⑨：引入执行策略绕过调用 → M14 必须红",
+             hit, "已报 M14 存在绕过面", "未报；" + (bad or "errs=%s" % errs))
+        rewrite("preprocess.py",
+                'import sys as _sys\n_BYPASS = "%s"' % _bypass,
+                "import sys as _sys")
+    else:
+        out.append(("反向注入⑨：引入执行策略绕过 → M14 必须红", False, "注入点未命中"))
 
     # ④ 对照组：副本**没改坏**时两个门禁都必须零 ERR。
     #    为什么要这一组：只验"改坏了会报"还不够——一个见谁报谁的门禁同样能通过 ①②③。
@@ -336,11 +427,13 @@ def _inject_gate_tests(tmp):
     bad, errs, _ = run_gate("online")
     bad2, errs2, _ = run_gate("bytecode")
     bad3, errs3, _ = run_gate("net_tiers")
-    clean = not (errs or errs2 or errs3)
-    out.append(("反向注入④（对照）：副本未改坏时三个门禁必须零报错",
+    bad4, errs4, _ = run_gate("sec_matrix")
+    clean = not (errs or errs2 or errs3 or errs4)
+    out.append(("反向注入④（对照）：副本未改坏时四个门禁必须零报错",
                 clean,
                 "均零报错" if clean
-                else ("误报：" + (bad or bad2 or bad3 or str(errs + errs2 + errs3)))))
+                else ("误报：" + (bad or bad2 or bad3 or bad4
+                                 or str(errs + errs2 + errs3 + errs4)))))
 
     shutil.rmtree(tmp, ignore_errors=True)
     return out
@@ -1230,6 +1323,18 @@ def main():
             _lay = {r[2] for r in _m.SEC_MATRIX}
             check("安全机制：三层类目齐全（数据层／产物层／代码层）",
                   _lay == {"数据层", "产物层", "代码层"}, "实测 %s" % sorted(_lay))
+            # v3.23.4 复盘加固：锚点只给函数名＝守不住"函数里的检查被删光"
+            _bare = [r[0] for r in _m.SEC_MATRIX
+                     if r[5] and not (isinstance(r[5], tuple) and len(r[5]) == 2 and r[5][1])]
+            check("安全机制：锚点型必须钉到判据行（只给函数名＝内容被删照样绿）",
+                  not _bare, "裸锚点 %s" % _bare)
+            # 咬合用单个关键词会被"词在别处"骗过（实测把「默认关」改成「可关」仍全绿）
+            _solo = [r[0] for r in _m.SEC_MATRIX if not r[3] or len(r[3]) < 2]
+            check("安全机制：文档咬合必须是词组（单个关键词会被「词在别处」骗过）",
+                  not _solo, "单词条 %s" % _solo)
+            _badst = [r[0] for r in _m.SEC_MATRIX if r[6] not in ("机械", "行为", "弱", "人工")]
+            check("安全机制：强度字段须为四态之一（不许把弱的混进机械里报数）",
+                  not _badst, "实测 %s" % _badst)
         except Exception as e:
             check("安全机制：登记表可加载（SEC_MATRIX 在位）", False, repr(e))
         # 每个脚本都在 import 前关掉字节码写入（否则被 import 时在技能目录留 .pyc）
