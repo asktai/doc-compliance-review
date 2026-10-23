@@ -44,6 +44,7 @@ import tempfile
 import datetime
 import time
 import re
+import hashlib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 # 冒烟结果台账（运行侧生成物，不随开发侧留存；供 check.py 校验文档所写项数是否为真）
@@ -401,6 +402,7 @@ def main():
     src = os.path.join(work, "冒烟测试合同.md")
     with open(src, "w", encoding="utf-8") as f:
         f.write(SAMPLE)
+    src_sha = hashlib.sha256(open(src, "rb").read()).hexdigest()
     pp = run([PY, os.path.join(HERE, "preprocess.py"), src, "--base", base, "--out", os.path.join(work, "预处理")])
     check("preprocess.py 执行", pp.returncode == 0, (pp.stderr or "")[-160:] if pp.returncode else "")
     pre_out = os.path.join(work, "预处理", "冒烟测试合同")
@@ -412,6 +414,11 @@ def main():
     check("生成元数据 meta/*.json（含 sha256/异常标记）",
           os.path.exists(os.path.join(pre_out, "meta", "冒烟测试合同.json")))
     check("原始文件留痕 raw/", os.path.exists(os.path.join(pre_out, "raw", "冒烟测试合同.md")))
+    # 安全机制「不改原件」的**行为判据**（25.6：能证明"没做"优于"能证明没写"）。
+    # 只在源码里 grep "有没有写回源文件" 证明不了运行时真的没写——跑完比一次 sha256 才算数。
+    now_sha = hashlib.sha256(open(src, "rb").read()).hexdigest()
+    check("安全机制：处理前后源文档 sha256 不变（产物一律新建，原件零写入）",
+          now_sha == src_sha, "前 %s… 后 %s…" % (src_sha[:12], now_sha[:12]))
 
     # --- 1.5 真实文件链路（随包自检样本：Word 含敏感信息 / 扫描型 PDF / 图片合同）---
     print("\n[1.5] 真实文件链路（samples/ 下自检样本）")
@@ -1206,6 +1213,25 @@ def main():
         diff = [t for t in ("L0", "L1", "L2", "L3") if doc_t.get(t) != by(t)]
         check("安全引擎：SECURITY.md 档位名单与脚本自标逐档一致（文档不得与代码分家）",
               not diff, "不一致档位: %s" % ", ".join(diff))
+        # ── 安全机制登记表（第 27 条）──────────────────────────────────────
+        # 上面那组管"谁可以联网"，这组管"**承诺过的整套安全机制是不是真装上了**"。
+        # 登记表只钉落点、不复制实现，故这里验的是**登记表自身的形状**：
+        # 编号连续（漏登记会当场看出来）、每条都有判据或锚点（不许有空登记）。
+        try:
+            import importlib.util as _ilu
+            _sp = _ilu.spec_from_file_location("_mx_probe", os.path.join(HERE, "check.py"))
+            _m = _ilu.module_from_spec(_sp)
+            _sp.loader.exec_module(_m)          # 只读其登记表，不跑 main（有 __main__ 守卫）
+            _ids = [r[0] for r in _m.SEC_MATRIX]
+            check("安全机制：登记表 %d 条在册、编号 M1—M%d 连续" % (len(_ids), len(_ids)),
+                  _ids == ["M%d" % i for i in range(1, len(_ids) + 1)], "实测 %s" % _ids)
+            _dead = [r[0] for r in _m.SEC_MATRIX if r[4] is None and not r[5]]
+            check("安全机制：每条都有判据或锚点（不许有空登记）", not _dead, "空登记 %s" % _dead)
+            _lay = {r[2] for r in _m.SEC_MATRIX}
+            check("安全机制：三层类目齐全（数据层／产物层／代码层）",
+                  _lay == {"数据层", "产物层", "代码层"}, "实测 %s" % sorted(_lay))
+        except Exception as e:
+            check("安全机制：登记表可加载（SEC_MATRIX 在位）", False, repr(e))
         # 每个脚本都在 import 前关掉字节码写入（否则被 import 时在技能目录留 .pyc）
         leak = []
         for fn in sorted(os.listdir(HERE)):

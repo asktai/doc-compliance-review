@@ -463,6 +463,169 @@ def check_net_tiers():
          "名单与 SECURITY.md 双向一致" % (len(by("L0")), len(by("L1")), len(by("L2")), len(by("L3"))))
 
 
+# 真正的"带 shell 的调用"，而非 `shell=True` 这个子串（后者会让检查器自指命中）。
+SHELL_TRUE_RE = re.compile(r"subprocess\.[A-Za-z_]+\([^)]*shell\s*=\s*True")
+
+# ── 安全机制登记表（铁律第 27 条）────────────────────────────────────────
+# 为什么要有这张表：安全承诺原先散落在 SECURITY.md 的七条承诺／八不／九项措施里，
+# 而 `check_security()` 实际只查了三项（私有库／映射表目录／缓存）——
+# **多数承诺是"写在文档里"，没有一行代码在盯**。文档写一套、代码做一套且无人比对，
+# 正是 25.2 的事故形态；安全承诺尤其经不起这个，因为它是客户据以决定"敢不敢把涉密合同交给你"的依据。
+#
+# 本表的口径只有一条：**登记表不复制实现，只登记"机制 → 判据 → 落点"**（第 12 条）。
+#   · 判据一律**指向已经在跑的那段代码**（同一常量、同一函数），故实现删了判据当场红；
+#   · 已有独立段落盯着的（缓存／防篡改／去企业化）不重复跑，只登记**锚点**并验锚点还在位；
+#   · 行为类判据（如"不改原件"）落在冒烟，本表同样只记落点并验在位——
+#     改名不同步会当场报错，这正是 26.5.5 那条"按字符串匹配的用例视同引用了实现"的用法。
+
+
+def _sec_doc_no_net():
+    """数据层：文档不出网——接触文档的 L0 档零网络库（与 26.5.2 同一判据，不另写一套）"""
+    tiers = _net_tiers()
+    l0 = [n for n, v in tiers.items() if v == "L0"]
+    bad = [n for n in l0 if NET_IMPORT_RE.search(_read(os.path.join(HERE, n)))]
+    return (not bad,
+            "L0 档 %d 个脚本零网络库" % len(l0) if not bad else "越界 %s" % ", ".join(bad))
+
+
+def _sec_map_isolated():
+    """数据层：映射表落**本机隔离目录**，且不落在技能目录里（否则会被整目录打包带走）"""
+    t = _read(os.path.join(HERE, "desensitize.py"))
+    m = re.search(r"^MAP_DIR\s*=.*$", t, re.M)
+    if not m:
+        return (False, "desensitize.py 里找不到 MAP_DIR 常量（隔离目录的实现被删）")
+    expr = m.group(0)
+    ok = ("expanduser" in expr) and ("HERE" not in expr)
+    return (ok, "默认落本机隔离目录 %s" % expr.strip() if ok
+            else "MAP_DIR 未走 expanduser 或落在技能目录内：%s" % expr.strip())
+
+
+def _sec_private_not_packed():
+    """数据层：私有库默认不打进发布包"""
+    t = _read(os.path.join(HERE, "pack.py"))
+    ok = bool(re.search(r"def build\([^)]*include_private\s*=\s*False", t))
+    return (ok, "pack.py 的 build() 默认 include_private=False"
+            if ok else "build() 的默认参数变了——私有库可能被默认打包")
+
+
+def _sec_online_off():
+    """数据层：查更新默认不发请求（可联网 ≠ 会自动联网）"""
+    try:
+        u = (json.loads(_read(os.path.join(HERE, "config.json"))).get("update") or {})
+    except Exception as e:
+        return (False, "config.json 读不出来：%r" % (e,))
+    ok = u.get("check_online_by_default") is False
+    return (ok, "出厂 check_online_by_default=false" if ok
+            else "实为 %r——默认会自己发请求" % u.get("check_online_by_default"))
+
+
+def _sec_original_intact():
+    """产物层：原件不改——行为判据落在冒烟（跑完比 sha256），本表只验落点还在位"""
+    t = _read(os.path.join(HERE, "smoke-test.py"))
+    ok = ("处理前后源文档 sha256 不变" in t) and ("hashlib.sha256" in t)
+    return (ok, "冒烟行为判据在位（跑完比一次 sha256）"
+            if ok else "冒烟里的原件判据被删或改名——「不改原件」退回成一句无人验的话")
+
+
+def _sec_output_isolated():
+    """产物层：交付物按文档名分目录（多客户不平铺混放）"""
+    try:
+        o = (json.loads(_read(os.path.join(HERE, "config.json"))).get("output") or {})
+    except Exception as e:
+        return (False, "config.json 读不出来：%r" % (e,))
+    ok = o.get("per_source_subdir") is True
+    return (ok, "出厂 per_source_subdir=true" if ok
+            else "实为 %r——多客户文档会平铺混放" % o.get("per_source_subdir"))
+
+
+def _sec_no_shell():
+    """代码层：调用本机工具无 shell 拼接（注入面）。
+
+    判据**必须正则到 `subprocess.…(…shell=True` 这一整段**，不能只搜 `shell=True` 子串：
+    检查器自己就要写这个字符串来搜别人，子串判据会让 `check.py` 自指命中
+    （与 26.5.3 的"行首正则"同一教训：判据要落到**调用形态**，不是关键字）。
+    """
+    bad = [os.path.basename(p) for p in glob.glob(os.path.join(HERE, "*.py"))
+           if SHELL_TRUE_RE.search(_read(p))]
+    return (not bad, "全部脚本零 shell=True 调用" if not bad else "存在注入面 %s" % ", ".join(bad))
+
+
+def _sec_no_auto_install():
+    """代码层：不代装依赖——只给命令，不替使用者执行"""
+    t = _read(os.path.join(HERE, "detect-tools.py"))
+    ok = ("subprocess" not in t) and ("os.system" not in t)
+    return (ok, "detect-tools.py 只打印命令、无执行调用"
+            if ok else "detect-tools.py 出现了执行调用——「不代装」被打破")
+
+
+def _sec_fingerprint():
+    """代码层：脚本防篡改——指纹基线须覆盖全部脚本，缺一个即等于该脚本无人看管"""
+    p = os.path.join(HERE, ".integrity.json")
+    if not os.path.exists(p):
+        return (False, "缺 .integrity.json（指纹基线）")
+    try:
+        d = json.loads(_read(p))
+    except Exception as e:
+        return (False, ".integrity.json 解析失败：%r" % (e,))
+    signed = set((d.get("sha256") or {}).keys())   # 实测结构：{note, root, count, sha256{文件名: 指纹}}
+    have = {os.path.basename(f) for f in glob.glob(os.path.join(HERE, "*.py"))}
+    miss = sorted(have - signed - {"check.py"})   # check.py 自己不算自己的指纹
+    return (not miss, "指纹基线覆盖 %d 个脚本" % len(signed) if not miss
+            else "未纳入指纹 %s" % ", ".join(miss))
+
+
+# (编号, 机制, 层, SECURITY.md 里的对应承诺关键词, 判据函数 or None（None＝由既有段落负责，见 anchor）, 锚点)
+SEC_MATRIX = (
+    ("M1", "文档不出网（接触文档的脚本零出网路径）", "数据层", "不出域", _sec_doc_no_net, None),
+    ("M2", "映射表隔离（默认落本机隔离目录）", "数据层", "映射表", _sec_map_isolated, None),
+    ("M3", "私有库默认不打进发布包", "数据层", "private", _sec_private_not_packed, None),
+    ("M4", "查更新默认不发请求（可联网 ≠ 会自动联网）", "数据层", "默认", _sec_online_off, None),
+    ("M5", "原件不改（产物一律新建）", "产物层", "不改动原始文件", _sec_original_intact, None),
+    ("M6", "输出隔离（按文档名分目录，多客户不混放）", "产物层", "隔离", _sec_output_isolated, None),
+    ("M7", "私有库默认空（不参与审查）", "数据层", "私有库默认空", None, "check_security"),
+    ("M8", "不留缓存（脚本禁止生成 __pycache__）", "代码层", "无缓存留痕", None, "_check_no_bytecode"),
+    ("M9", "脚本防篡改（指纹基线覆盖全部脚本）", "代码层", "脚本防篡改", _sec_fingerprint, None),
+    ("M10", "无 shell 注入面（本机工具按参数列表调用）", "代码层", "shell", _sec_no_shell, None),
+    ("M11", "不代装依赖（只给命令，不替人执行）", "代码层", "不代装", _sec_no_auto_install, None),
+    ("M12", "企业词表外置（脚本内不含任何企业名）", "代码层", "企业词表外置", None, "check_deenterprise"),
+)
+
+
+def check_security_matrix():
+    """安全机制逐条自检：登记在册的 12 条，逐条跑判据并公布结论。
+
+    与 `check_net_tiers()` 的分工：那条管"**谁可以联网**"，本条管"**承诺过的安全机制是不是真装上了**"。
+    两条都不复制实现，只钉落点——**登记表与实现分家是 25.2 的事故形态，安全承诺尤其经不起**。
+    """
+    sec_p = os.path.join(os.path.dirname(HERE), "SECURITY.md")
+    sec = _read(sec_p) if os.path.exists(sec_p) else ""
+    bad_all, layers = [], {}
+    for mid, name, layer, doc_kw, probe, anchor in SEC_MATRIX:
+        layers.setdefault(layer, []).append(mid)
+        if probe is not None:
+            try:
+                ok, detail = probe()
+            except Exception as e:      # 判据跑不起来＝落点被删，与"判据失败"同罪
+                ok, detail = False, "判据跑不起来：%r（落点可能被删）" % (e,)
+        else:
+            # 由既有段落负责：只验锚点还在位（改名不同步当场报错，不重复执行以免重复输出）
+            ok = bool(anchor) and callable(globals().get(anchor))
+            detail = ("由 %s() 负责" % anchor) if ok else "锚点 %s 不存在或不可调用" % anchor
+        if not ok:
+            bad_all.append("%s %s：%s" % (mid, name, detail))
+        if doc_kw and doc_kw not in sec:
+            bad_all.append("%s %s：SECURITY.md 里查不到对应承诺（关键词「%s」）——"
+                           "代码有、文档没说，或文档改了名，两处须对上" % (mid, name, doc_kw))
+    if bad_all:
+        for b in bad_all:
+            err("安全机制未落实 —— %s" % b)
+        return
+    info("安全机制：12 条在册逐条落实（数据层 %d／产物层 %d／代码层 %d；"
+         "判据均指向已在跑的实现，登记表不复制实现）"
+         % (len(layers.get("数据层", [])), len(layers.get("产物层", [])),
+            len(layers.get("代码层", []))))
+
+
 def _check_online_gate(data=None):
     """只守一件事：出厂配置**不得默认联网**。
 
@@ -1903,6 +2066,7 @@ def main():
         check_cite_alignment()
         check_freshness_engine()
         check_net_tiers()
+        check_security_matrix()
         check_tpl_engine()
         check_verify_engine()
         check_imbalance_engine()
