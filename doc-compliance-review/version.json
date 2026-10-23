@@ -3,24 +3,42 @@
   "product": "文档合规审查助手AI合同",
   "skill_id": "doc-compliance-review",
   "latest": {
-    "version": "v3.23.0",
+    "version": "v3.23.1",
     "date": "2026-10-23",
-    "summary": "法规库失效巡检随包（巡检 + 解析链共 2 个新脚本），安全声明按「能不能碰到文档」重写分区",
+    "summary": "质检修三处：安全自检预期与实测不符、建库链漏绑导致换库会崩、自检预期未纳入门禁",
     "changes": [
-      "新增 scripts/freshness-patrol.py（随包）：重抓库内已登记源页面与库内条文逐条比对，大面积不一致（≥50%）判疑似换版报警退出 1，不猜谁对",
-      "新增 scripts/legal-parse.py（随包）：抓取+解析核心，从开发侧 build-legal-db.py 整段抽出——建库与巡检共用同一条解析链，避免两套判据漂移",
-      "库内 sources 增发 grp/enc 字段，使包内巡检不依赖开发侧配置即可定位源",
-      "巡检含离线自检 --self-test（6 项判据），已纳入 check.py 出包门禁；反向注入实测：判据调松即被拦下",
-      "SECURITY.md C1/C7/第五节重写：23 个脚本按「处理文档的 20 个零联网」+「3 个含网络代码但接触不到文档且须显式调用」分区；零联网自检预期命中由 1 个改为 3 个",
-      "check.py 联网门禁白名单 version.py → version.py/freshness-patrol.py/legal-parse.py"
+      "修 SECURITY.md：给客户 IT 的零联网自检命令实测命中四个（version.py、legal-parse.py 真联网＋check.py、smoke-test.py 检查器自指），文档原先写的三个与实测不符——声明自己证伪自己",
+      "修 build-legal-db.py：解析链逐个点名绑定漏了 strip_footer 等，重构后跑建库会 NameError（换库链路实际是坏的）；改为整体注入并在导入时校验必需名字",
+      "新增 maint/tools/smoke-build-chain.py（开发侧离线）：验建库链名字在位、解析链来自随包那份、GROUPS 与 SOURCES 长度一致",
+      "包内冒烟新增一项「实测命中集合 == 白名单＋两个检查器」（136 → 137 项），把文档自检预期钉死在实测上",
+      "build-legal-db.py 补齐文档早有记载却未实现的 --only：只重建一部法并合回已有库，避免为改一部法全量重抓",
+      "巡检正向注入实测：把劳动合同法 60 条改成无关条文 → 正确报「60/94 条不一致，疑似换版」并退 1"
     ],
     "download_page": "https://github.com/asktai/doc-compliance-review/releases",
     "files": {
-      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.23.0/文档合规审查助手AI合同_v3.23.0_20261023_(doc-compliance-review).skill",
-      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.23.0/文档合规审查助手AI合同_v3.23.0_20261023_(doc-compliance-review).zip"
+      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.23.1/文档合规审查助手AI合同_v3.23.1_20261023_(doc-compliance-review).skill",
+      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.23.1/文档合规审查助手AI合同_v3.23.1_20261023_(doc-compliance-review).zip"
     }
   },
   "history": [
+    {
+      "version": "v3.23.0",
+      "date": "2026-10-23",
+      "summary": "法规库失效巡检随包（巡检 + 解析链共 2 个新脚本），安全声明按「能不能碰到文档」重写分区",
+      "changes": [
+        "新增 scripts/freshness-patrol.py（随包）：重抓库内已登记源页面与库内条文逐条比对，大面积不一致（≥50%）判疑似换版报警退出 1，不猜谁对",
+        "新增 scripts/legal-parse.py（随包）：抓取+解析核心，从开发侧 build-legal-db.py 整段抽出——建库与巡检共用同一条解析链，避免两套判据漂移",
+        "库内 sources 增发 grp/enc 字段，使包内巡检不依赖开发侧配置即可定位源",
+        "巡检含离线自检 --self-test（6 项判据），已纳入 check.py 出包门禁；反向注入实测：判据调松即被拦下",
+        "SECURITY.md C1/C7/第五节重写：23 个脚本按「处理文档的 20 个零联网」+「3 个含网络代码但接触不到文档且须显式调用」分区；零联网自检预期命中由 1 个改为 3 个",
+        "check.py 联网门禁白名单 version.py → version.py/freshness-patrol.py/legal-parse.py"
+      ],
+      "download_page": "https://github.com/asktai/doc-compliance-review/releases",
+      "files": {
+        "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.23.0/文档合规审查助手AI合同_v3.23.0_20261023_(doc-compliance-review).skill",
+        "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.23.0/文档合规审查助手AI合同_v3.23.0_20261023_(doc-compliance-review).zip"
+      }
+    },
     {
       "version": "v3.22.3",
       "date": "2026-10-22",

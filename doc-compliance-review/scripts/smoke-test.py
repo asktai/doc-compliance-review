@@ -1149,17 +1149,39 @@ def main():
         # 本清单与 check.py 的 _NET_OK 是同一份口径，改一处须同步另一处。
         net_ks = ("import urllib", "import requests", "import socket",
                   "import http.client", "import aiohttp", "import httpx", "urlopen(")
-        net_ok = ("version.py", "freshness-patrol.py", "legal-parse.py")
+        # 两组白名单，语义不同，**不许合并**：
+        #   net_kw_ok  ＝**真的写有网络库**的文件（grep 会命中）
+        #   net_call   ＝**会发起联网动作**的脚本（freshness-patrol.py 不自带网络库，
+        #                 联网经 legal-parse.py 完成，故只在 net_call 里）
+        # 合并成一组会让「实测命中集合」这条断言永远对不上——2026-10-23 实测即如此。
+        net_kw_ok = ("version.py", "legal-parse.py")
+        net_call = ("version.py", "freshness-patrol.py", "legal-parse.py")
         bad = []
         for fn in sorted(os.listdir(HERE)):
-            if not fn.endswith(".py") or fn in net_ok or fn in ("check.py", "smoke-test.py"):
+            if not fn.endswith(".py") or fn in net_kw_ok or fn in ("check.py", "smoke-test.py"):
                 continue
             src = open(os.path.join(HERE, fn), encoding="utf-8").read()
             if any(k in src for k in net_ks):
                 bad.append(fn)
-        check("联网边界：处理文档的脚本零网络库（仅 %s 例外，均接触不到文档）"
-              % "／".join(net_ok),
+        check("联网边界：处理文档的脚本零网络库（会联网的仅 %s，均接触不到文档）"
+              % "／".join(net_call),
               not bad, "越界: %s" % ", ".join(bad))
+        # **文档自检预期必须与实测一致**（2026-10-23 质检发现的同型错，第三次）：
+        # SECURITY.md 给客户 IT 的核验命令写「预期命中 X 个」，而实测是另一组，
+        # 客户照着敲一次就能证明文档在说谎——这正是 v3.22.0 修过的病灶。
+        # 这里不解析文档文字（脆弱），而是断言**实测集合**恰为「白名单 ∪ 两个检查器」：
+        # 只要有人新增联网脚本却没进白名单、或白名单多列了不相干的，都会当场红。
+        actual = set()
+        for fn in sorted(os.listdir(HERE)):
+            if not fn.endswith(".py"):
+                continue
+            if any(k in open(os.path.join(HERE, fn), encoding="utf-8").read()
+                   for k in net_ks):
+                actual.add(fn)
+        expect = set(net_kw_ok) | {"check.py", "smoke-test.py"}
+        check("联网边界：实测命中集合 == 白名单＋两个检查器（文档自检预期才站得住）",
+              actual == expect,
+              "实测 %s ≠ 预期 %s" % (sorted(actual), sorted(expect)))
         # 每个脚本都在 import 前关掉字节码写入（否则被 import 时在技能目录留 .pyc）
         leak = []
         for fn in sorted(os.listdir(HERE)):

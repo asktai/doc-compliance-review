@@ -398,6 +398,9 @@ WANTED = {
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=None, help="输出路径（默认 core/legal-articles.json）")
+    ap.add_argument("--only", metavar="LAW",
+                    help="只重建某部法（其余沿用已有库），用于**换版后单法更新**——"
+                         "避免为改一部法而全量重抓（某源临时不可达会连累其余法）")
     ap.add_argument("--dump-raw", default=None,
                     help="把每个 URL 的原始抽条结果落盘（调试/复核用）")
     a = ap.parse_args()
@@ -407,20 +410,20 @@ def main():
 
     _load_crosscheck(here)
     _load_parse(here)
-    global fetch, to_text, parse_articles, strip_line_title, src_name, is_garbage_text, \
-        looks_garbage, short_anchor, UA
-    fetch, to_text = PARSE.fetch, PARSE.to_text
-    parse_articles, strip_line_title = PARSE.parse_articles, PARSE.strip_line_title
-    src_name, is_garbage_text = PARSE.src_name, PARSE.is_garbage_text
-    looks_garbage, short_anchor = PARSE.looks_garbage, PARSE.short_anchor
-    UA = PARSE.UA
+    _bind_parse()
 
     result, missing, srcs = {}, {}, []
     stats = {}          # 法名 → {"multi-ok": n, "single": n, "conflict": n, "missing": n}
     conflicts = []      # 冲突明细（写进 report/legal-conflicts.json）
     raw_dump = {}
 
-    for law, urls in SOURCES.items():
+    todo = SOURCES
+    if a.only:
+        if a.only not in SOURCES:
+            print("[E] 配置里没有这部法：%s" % a.only)
+            return 2
+        todo = {a.only: SOURCES[a.only]}
+    for law, urls in todo.items():
         groups = GROUPS.get(law) or list(range(len(urls)))
         if len(groups) != len(urls):
             print("[!] %s 的 GROUPS 长度(%d) 与 SOURCES(%d) 不符，按「每 URL 独立」处理"
@@ -512,6 +515,36 @@ def main():
         result[law] = arts
         stats[law] = stat
 
+    # --only：把这一部合回已有库，其余法原样保留（不重抓、不重算）
+    meta_out = META
+    if a.only and os.path.exists(out):
+        with open(out, encoding="utf-8") as f:
+            old = json.load(f)
+        old_laws = dict(old.get("laws") or {})
+        old_laws.update(result)
+        result = old_laws
+        srcs = [s for s in (old.get("sources") or []) if s.get("law") != a.only] + srcs
+        meta_out = dict(old.get("meta") or {})
+        meta_out.update({k: v for k, v in META.items() if k == a.only})
+        old_miss = dict(old.get("missing") or {})
+        old_miss.update(missing)
+        missing = old_miss
+        print("[i] 已合回已有库（仅重建 %s，其余 %d 部法沿用）"
+              % (a.only, len(result) - 1))
+
+    def _stat(arts):
+        st = {"multi-ok": 0, "single": 0, "conflict": 0}
+        for e in arts.values():
+            if e.get("verified"):
+                st["multi-ok"] += 1
+            elif e.get("status") == "conflict":
+                st["conflict"] += 1
+            else:
+                st["single"] += 1
+        return st
+
+    stats = {law: _stat(v) for law, v in result.items()}
+
     # 全局统计
     all_ents = [e for v in result.values() for e in v.values()]
     n_all = len(all_ents)
@@ -541,7 +574,7 @@ def main():
         "generated": datetime.date.today().isoformat(),
         "sources": srcs,
         "laws": result,
-        "meta": META,
+        "meta": meta_out,
         "missing": missing,
         "_校验": "每条含 sha256 前 16 位，供人工复核原文未被篡改。",
     }
@@ -552,7 +585,9 @@ def main():
     print("\n落盘：%s（%d 部法 / %d 条）" % (out, len(result), total))
 
     # 交叉验证报告
-    rep = os.path.join(root, "report", "legal-crosscheck.json")
+    # --only 时统计只覆盖这一部法，若照写进 report/ 会把全库报告污染成单法报告
+    rep = (os.path.join(os.path.dirname(os.path.abspath(out)), "legal-crosscheck.json")
+           if a.only else os.path.join(root, "report", "legal-crosscheck.json"))
     os.makedirs(os.path.dirname(rep), exist_ok=True)
     with open(rep, "w", encoding="utf-8") as f:
         json.dump({"generated": db["generated"], "stats": stats,
@@ -598,6 +633,25 @@ def _load_crosscheck(here):
     raise SystemExit("[E] 找不到 legal-crosscheck.py（比对模块），无法做交叉验证")
 
 
+# 建库对这些名字有硬依赖，缺一个就会在跑到一半时 NameError——导入时先查清
+_PARSE_REQUIRED = ["fetch", "to_text", "parse_articles", "strip_line_title", "src_name",
+                   "strip_footer", "strip_tail_noise", "looks_garbage", "is_garbage_text",
+                   "short_anchor", "cn2int", "UA", "SRC_NAMES", "LINE_TITLES"]
+
+
+def _bind_parse():
+    """把解析链注入本模块命名空间（**整体注入，不逐个点名**）。
+
+    逐个绑定必漏：2026-10-23 质检发现只绑了 9 个名字，而 main() 里还直接用到
+    `strip_footer` 等，重构后一跑建库就 NameError——换库这条链路当时是坏的，
+    而 check.py 与冒烟都覆盖不到开发侧脚本。逐个绑定的写法每加一个函数就要记得
+    同步一次，这种「靠人记」的口子必须用机制堵上（由 smoke-build-chain.py 验）。
+    """
+    for _n in dir(PARSE):
+        if not _n.startswith("_"):
+            globals()[_n] = getattr(PARSE, _n)
+
+
 def _load_parse(here):
     """加载「抓取＋解析」共享模块（**只认随包那份** scripts/legal-parse.py）。
 
@@ -613,6 +667,10 @@ def _load_parse(here):
             spec = importlib.util.spec_from_file_location("legal_parse", p)
             m = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(m)
+            missing = [n for n in _PARSE_REQUIRED if not hasattr(m, n)]
+            if missing:
+                raise SystemExit("[E] 解析链 legal-parse.py 缺这些名字：%s——"
+                                 "抽取不完整，建库会在中途 NameError" % "、".join(missing))
             PARSE = m
             return
     raise SystemExit("[E] 找不到随包的 scripts/legal-parse.py（解析链），无法建库")
