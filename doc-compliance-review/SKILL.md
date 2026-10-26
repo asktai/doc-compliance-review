@@ -7,7 +7,7 @@ description_zh: "对合同、协议及授权书、承诺函、告知书、声明
 description_en: "Desensitize, review clause by clause, grade risks in three colors and produce redline revisions, comparison ledgers and opinion reports for contracts, agreements and business documents (authorization letters, commitment letters, notices, policies, NDAs, SLAs, DPAs and more); coverage includes payment and liquidated damages, delivery and acceptance, IP, confidentiality and non-compete, jurisdiction clauses, arbitration, dispute resolution, limitation of action, contract validity, standard terms and personal information protection; accepts background materials (files, images, photos or plain text) to sharpen the review, and adapts the review stance to a strong or weak bargaining position; drafts contracts and reusable templates, and converts existing documents into templates. Nine industry rule sets included; handles Word, PDF, images and scanned files. Advisory only, not legal advice; review by a licensed lawyer is required."
 category: writing
 argument-hint: "<文档路径或文本> [版本/角色/尺度] | 审查 | 起草 | 比对 | 背景资料 | 脱敏 | 精要总结 | 思维导图 | 向导 | 撰写合同 | 撰写模板 | 文档转模板 | 合同转模板 | 技能版本 | 技能更新 | 技能升级 | 立查得 | 小查 | 帮助|help|? | 教程 | 私有库维护/备份/回溯/导入/导出 | 行业库维护/备份/回溯/导入/导出"
-version: 3.25.1
+version: 3.25.2
 license: 个人使用授权 · 商业使用须取得书面授权（见 `LICENSE.md`）
 author: 胡皓
 examples_zh:
@@ -26,7 +26,7 @@ examples_en:
 
 ![文档合规审查助手AI合同 · 合同与商务文档逐条审查 · 风险三色分级](assets/banner-dark.png)
 
-**v3.25.1** ｜ 作者：胡皓 ｜ 许可：个人使用授权 · 商业使用须取得书面授权（详见 `LICENSE.md`）
+**v3.25.2** ｜ 作者：胡皓 ｜ 许可：个人使用授权 · 商业使用须取得书面授权（详见 `LICENSE.md`）
 
 > **免责声明**：本技能仅作辅助法律工作，**不构成法律意见**，输出内容须经**执业律师复核**；**同一对话内首次使用时由技能先输出全文**（同一对话只此一次）——见**步骤 0.0**，全文亦见 `LICENSE.md`。
 
@@ -87,8 +87,8 @@ examples_en:
 | | *—— 六、维护 ——* | | |
 | 17 | 失衡画像 | `imbalance.py` | ✅ |
 
-**十九项能力**：能问／**能理解**／**能分析**／能审／能写／能查／能检／能核／能诊断／能总结／**能归纳**／能脱敏／能 OCR／能结构化／能比对／能整理／能管理／能检索／能体检／**能汇编**。
-（**十九项全部可用**，无规划中项。）
+**二十项能力**：能问／**能理解**／**能分析**／能审／能写／能查／能检／能核／能诊断／能总结／**能归纳**／能脱敏／能 OCR／能结构化／能比对／能整理／能管理／能检索／能体检／**能汇编**。
+（**二十项全部可用**，无规划中项。）
 
 **四个「看起来都在读文档」的能力，界限必须划清**（客户最容易问「这不都一样吗」）：
 
@@ -118,7 +118,7 @@ examples_en:
 
 **三条对外口径（不得违反）**：
 1. **「规划中」必须说成规划中；做完了也须及时改口**。v3.23.6 及以前结构化引擎、公文格式引擎确未实现，如实标规划中；**v3.24.0 起两者已实现**（`structure.py`／`gb9704.py`），对外可按在用能力介绍。**两个方向都是编造**：把没做的说成做了，与编造法条同性质；做完了仍写"规划中"，同样是说假话。
-2. **数字只报实测值**：159 条、内置 9 个行业库（可自建）、17 部法 712 条（712 条均已多源交叉验证）、10 类 × 5 格式、190 项冒烟、十七个引擎、十九项能力、27 个脚本；这些数字不是手填的，改完代码忘了同步文档，门禁会当场报错——**别靠记忆报数**。
+2. **数字只报实测值**：159 条、内置 9 个行业库（可自建）、17 部法 712 条（712 条均已多源交叉验证）、10 类 × 5 格式、190 项冒烟、十七个引擎、二十项能力、27 个脚本；这些数字不是手填的，改完代码忘了同步文档，门禁会当场报错——**别靠记忆报数**。
 3. **"能"都有边界**：能审不等于审对（须执业律师复核）、能查不等于查全（库里没有的标待核验）、能写不等于能签（占位符填实后即为具体合同）、**能检索不等于给法律意见**（只讲要件不下结论，具体适用须律师认定）、能检只能兜住机械错误（格式/占位符/条文原文），**兜不住判断错误**。
 
 ### 核验引擎（第 15 引擎）：产物出得去出不去的唯一裁判

@@ -1650,6 +1650,129 @@ def _check_engine_count():
     elif counts:
         info("引擎表：%d 个引擎，两张表一致、编号连续，正文数量表述相符"
              % list(counts.values())[0])
+    _check_engine_ordinal_in_scripts()
+    _check_capability_count()
+
+
+def _check_capability_count():
+    """能力项数须与能力表实际行数相符。
+
+    为什么补这条（v3.25.1 质检当场抓出）：v3.25.0 加了第 20 项能力「能汇编」，
+    **表里加了行、正文却写「十九项」**——同样的病灶在引擎数上刚犯过一次，
+    这次犯在能力数上。两次都是「加了东西但忘了改数字」，说明光靠人记不行。
+
+    口径：以 README「#### N 项能力」小节的表格数据行数为准（那是给用户看的
+    权威清单），比对 README 与 SKILL 两处的「N 项能力／N 个能力」表述。
+    """
+    readme = os.path.join(ROOT, "README.md")
+    if not os.path.exists(readme):
+        return
+    src = _read(readme)
+    # 抓能力表：从「| 能力 | 一句话 |」表头起，到非表格行为止
+    rows = 0
+    in_tbl = False
+    for ln in src.splitlines():
+        if ln.lstrip().startswith("|") and re.search(r"\|\s*能力\s*\|.*\|", ln):
+            in_tbl = True
+            continue
+        if in_tbl and not ln.lstrip().startswith("|"):
+            break
+        if in_tbl and ln.lstrip().startswith("| **能"):
+            rows += 1
+    if not rows:
+        return
+
+    def _cn2int(t):
+        if t.isdigit():
+            return int(t)
+        D = "零一二三四五六七八九"
+        unit = {"十": 10, "百": 100}
+        total, cur = 0, 0
+        for ch in t:
+            if ch in D:
+                cur = D.index(ch)
+            elif ch in unit:
+                total += (cur or 1) * unit[ch]
+                cur = 0
+            else:
+                return None
+        return total + cur
+
+    bad = []
+    for rel in ("README.md", "SKILL.md"):
+        p = os.path.join(ROOT, rel)
+        if not os.path.exists(p):
+            continue
+        s = _read(p)
+        for mm in re.finditer(r"([一二三四五六七八九十百]+|\d+)\s*(?:项|个)\s*能力", s):
+            val = _cn2int(mm.group(1))
+            if val is not None and val != rows:
+                seg = s[max(0, mm.start() - 10):mm.end() + 4].replace("\n", " ")
+                bad.append("%s：「%s」=%d（表内实为 %d 项）…%s"
+                           % (rel, mm.group(1), val, rows, seg))
+    if bad:
+        err("能力项数表述与能力表行数（%d）不符：%s" % (rows, "；".join(bad[:4])))
+    else:
+        info("能力表：%d 项，正文数量表述相符" % rows)
+
+
+def _check_engine_ordinal_in_scripts():
+    """脚本 docstring 里的「第 N 个引擎」须与引擎表真实编号相符。
+
+    为什么补这一条（v3.25.1 质检当场抓出）：重排把核验引擎从 #11 挪到 #15，
+    SKILL 的序号改了、`verify.py` 开头那行「第 11 个引擎」却留着——**代码里的
+    序号没有任何人查**。前一条守卫只扫 README/SKILL 正文，脚本自述完全在射程外，
+    而脚本 docstring 正是维护者读代码时第一眼看到的东西。
+
+    判据怎么定：**不硬编码映射表**（那又会变成「改一处漏一处」）。改为按引擎表
+    里的「实现」列反查——某个脚本名出现在哪一行的实现落点里，那一行的 # 就是它的
+    编号；脚本 docstring 若自称「第 N 个引擎」，N 必须与之相等。一个脚本被多行
+    点名时（如 make-docx.py 同时是 11/12/13）不判，因为「它是第几个」本身无唯一答案。
+    """
+    readme = os.path.join(ROOT, "README.md")
+    if not os.path.exists(readme):
+        return
+    # 从引擎表抓 (编号 -> 该行实现列文本)
+    owners = {}
+    in_tbl = False
+    for ln in _read(readme).splitlines():
+        if ln.lstrip().startswith("|") and re.search(r"\|\s*#\s*\|.*引擎.*\|", ln):
+            in_tbl = True
+            continue
+        if in_tbl and not ln.lstrip().startswith("|"):
+            break
+        if not in_tbl:
+            continue
+        m = re.match(r"^\|\s*(\d+)\s*\|", ln)
+        if not m:
+            continue
+        cols = [c.strip() for c in ln.strip().strip("|").split("|")]
+        impl = cols[-2] if len(cols) >= 2 else ""
+        owners[int(m.group(1))] = impl
+    if not owners:
+        return
+    # 脚本 -> 被哪些编号点名
+    named = {}
+    for num, impl in owners.items():
+        for fn in re.findall(r"([A-Za-z0-9_\-]+\.py)", impl):
+            named.setdefault(fn, set()).add(num)
+    bad = []
+    for fn, nums in sorted(named.items()):
+        if len(nums) > 1:
+            continue          # 一线多职，序号无唯一答案
+        path = os.path.join(ROOT, "scripts", fn)
+        if not os.path.exists(path):
+            continue
+        m = re.search(r"第\s*(\d+)\s*个引擎", _read(path)[:2000])
+        if not m:
+            continue
+        claim = int(m.group(1))
+        real = list(nums)[0]
+        if claim != real:
+            bad.append("%s 自称「第 %d 个引擎」，引擎表中实为 #%d"
+                       % (fn, claim, real))
+    if bad:
+        err("脚本 docstring 的引擎序号与引擎表不符：%s" % "；".join(bad))
 
 
 def check_manifest_version():
