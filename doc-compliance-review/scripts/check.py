@@ -1652,6 +1652,64 @@ def _check_engine_count():
              % list(counts.values())[0])
     _check_engine_ordinal_in_scripts()
     _check_capability_count()
+    _check_trigger_words()
+
+
+def _check_trigger_words():
+    """description 的触发词不得在改写/精简中丢失。
+
+    为什么单立一条（v3.25.4 精简时当场抓到）：「触发词」是 description 的唯一
+    职能——用户在对话里说「帮我看看这份合同有没有坑」，模型靠它认出该触发。
+    **丢一个词，那一类需求就再也不触发，而且没有任何报错**——技能安静地不工作。
+    本轮把 description 从 833 精简到 687 字符时，就漏掉了「强势方／弱势方」
+    （写成「与强弱两轴」只留了型、丢了值），说明靠人眼核不可靠。
+
+    判据：给一份必含词清单（文种 / 动作 / 风险维度 / 用户口语 / 立场），
+    逐个断言出现在 description 里。清单只增不减——新增能力就补词，
+    精简文案时由它兜底，不许为了省字数把词删掉。
+    """
+    p = os.path.join(ROOT, "SKILL.md")
+    if not os.path.exists(p):
+        return
+    m = re.search(r"(?m)^description:\s*(.+)$", _read(p))
+    if not m:
+        return
+    d = m.group(1)
+    MUST = [
+        # 文种（用户会直接说这些）
+        "合同", "协议", "授权书", "承诺函", "告知书", "声明", "委托书", "制度", "通知",
+        "NDA", "SLA", "DPA",
+        # 动作（用户会直接说这些）
+        "审查", "起草", "修订", "比对", "脱敏", "模板", "法条", "汇编", "体检",
+        "精要总结", "思维导图",
+        # 风险维度（用户会拿这些词问）
+        "违约金", "交付验收", "知识产权", "保密", "竞业", "管辖", "仲裁", "争议解决",
+        "诉讼时效", "合同效力", "格式条款", "个人信息", "主体适格", "签章",
+        # 立场与口语（立场决定审查口径；口语决定能否被日常说话触发）
+        "强势", "弱势", "红线", "风险", "有坑", "回稿",
+    ]
+    # 判据用「词不被更长同类词吞掉」而不是裸子串包含：
+    # 实测教训（连续踩两次）——「强弱势」这个词本身含「强势」「弱势」四字。
+    # 裸子串判据下删掉「（强势方/均衡/弱势方）」后，「弱势」仍被判定为在（**漏报**）；
+    # 补了「后接势不算」之后仍报不出「弱势」，因为还剩**前一字符是强**这一侧。
+    # 故改为双向判断：前后任一方向构成「强弱势」合写，即视为该词未独立出现。
+    def _has(word):
+        for mm in re.finditer(re.escape(word), d):
+            before = d[mm.start() - 1] if mm.start() > 0 else " "
+            after = d[mm.end()] if mm.end() < len(d) else " "
+            if word in ("强势", "弱势") and (before == "强" or after == "势"):
+                # 组成「强弱势」合写：只说强弱、没说立场，不算该词命中
+                continue
+            return True
+        return False
+
+    lost = [w for w in MUST if not _has(w)]
+    if lost:
+        err("SKILL.md 的 description 丢了触发词：%s"
+            "（丢一个词，该类需求就不再触发且无任何报错）" % "、".join(lost))
+    else:
+        info("description：%d 字符，%d 个必含触发词齐备"
+             % (len(d), len(MUST)))
 
 
 def _check_capability_count():

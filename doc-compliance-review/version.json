@@ -3,24 +3,44 @@
   "product": "文档合规审查助手AI合同",
   "skill_id": "doc-compliance-review",
   "latest": {
-    "version": "v3.25.3",
+    "version": "v3.25.4",
     "date": "2026-10-26",
-    "summary": "description 改用推介文写法：四条护城河（法条不靠记忆／库会自我更新／数据不出域／数字都可自验）前置，补齐法规检索、法规汇编、公文格式体检三项；触发词 39 个零丢失",
+    "summary": "description 精简 833→687 字符（删掉列了两遍的文种清单与无用修饰，触发词 43 个零丢失），并新增「触发词不许丢」守卫",
     "changes": [
-      "description 整段重写为推介文风格：可信＝与其他「AI 审合同」的分界线，四条护城河前置（法条逐条比对本地原文／云端双源巡检／文档不出域、涉密件不出本机／数字由门禁实扫可自验），末尾「给的是辅助，不是意见——判断权留给你」收束",
-      "补齐原 description 缺失的三项能力：法规检索（原文＋出处＋适用要件，只讲要件不下结论）、法规汇编（编成册带目录索引与版本施行日，只搬运不撰写）、公文格式体检（GB/T 9704 逐项核，不符合给偏差值）",
-      "触发词零丢失：39 个必含词逐条核验，含 11 类文种、10 类动作、全部风险维度，以及「帮我看看这份合同有没有坑」这类用户口语",
-      "description_zh 按同一风格重写（338→577 字符）；description_en 补齐原缺失的 search／compile／GB-T 9704 三项",
-      "修两处：① 推介文的 ** 加粗不能搬进 description（纯文本字段不渲染 Markdown，16 处裸露星号已清）；② pack.py 读版本号原为「读前 4000 字符」，description 变长会把 version 行挤出窗口且失败静默（打出 v0.0.0 包），改为读到 frontmatter 结束为止",
-      "实测 description 塞到 8000 字符仍能正确读出 v3.25.2；YAML 三字段解析正常；门禁 0 错 0 警、冒烟 190 项全绿"
+      "删掉最大的一处浪费：11 个文种（合同/协议/授权书/承诺函/告知书/声明/委托书/制度/通知/NDA/SLA/DPA）在能力段与触发段各列一遍，共 22 处；触发段改为「上述法律文书」",
+      "删掉对触发无用的内容：修辞（模型不参与回忆、编造没有入口）、解释性括号（一页看懂）、（连着样本量说、不外推）、压缩冗长连接词",
+      "严格保留全部检索锚点：11 类文种、13 个动作词（含红线/比对/脱敏等短词）、14 个风险维度、3 条用户口语例句、强弱势立场词",
+      "description 833→687 字符；description_zh 577→501；description_en 1561→1861（此前缺的四项能力补齐，非冗余而是内容缺失），并修掉上轮遗留的语法错（句号后接小写 drafts）",
+      "新增守卫 _check_trigger_words()：43 个必含触发词逐个断言，丢一个即报错并提示「该类需求将不再触发且无任何报错」",
+      "守卫自身踩两次坑：裸子串判据下「强弱势」含「强势」「弱势」四字致漏报；补后接判断仍漏（前一字符是「强」这一侧）。终版改双向判断",
+      "三组注入实测：删立场词→同时报出强势与弱势；删「回稿」→准点报出；删「脱敏」→不报（「脱敏映射表」中仍在，合理子串命中）",
+      "门禁 0 错 0 警，冒烟 190 项全绿（183＋跳过 7）"
     ],
     "download_page": "https://github.com/asktai/doc-compliance-review/releases",
     "files": {
-      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.25.3/文档合规审查助手AI合同_v3.25.3_20261026_(doc-compliance-review).skill",
-      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.25.3/文档合规审查助手AI合同_v3.25.3_20261026_(doc-compliance-review).zip"
+      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.25.4/文档合规审查助手AI合同_v3.25.4_20261026_(doc-compliance-review).skill",
+      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.25.4/文档合规审查助手AI合同_v3.25.4_20261026_(doc-compliance-review).zip"
     }
   },
   "history": [
+    {
+      "version": "v3.25.3",
+      "date": "2026-10-26",
+      "summary": "description 改用推介文写法：四条护城河（法条不靠记忆／库会自我更新／数据不出域／数字都可自验）前置，补齐法规检索、法规汇编、公文格式体检三项；触发词 39 个零丢失",
+      "changes": [
+        "description 整段重写为推介文风格：可信＝与其他「AI 审合同」的分界线，四条护城河前置（法条逐条比对本地原文／云端双源巡检／文档不出域、涉密件不出本机／数字由门禁实扫可自验），末尾「给的是辅助，不是意见——判断权留给你」收束",
+        "补齐原 description 缺失的三项能力：法规检索（原文＋出处＋适用要件，只讲要件不下结论）、法规汇编（编成册带目录索引与版本施行日，只搬运不撰写）、公文格式体检（GB/T 9704 逐项核，不符合给偏差值）",
+        "触发词零丢失：39 个必含词逐条核验，含 11 类文种、10 类动作、全部风险维度，以及「帮我看看这份合同有没有坑」这类用户口语",
+        "description_zh 按同一风格重写（338→577 字符）；description_en 补齐原缺失的 search／compile／GB-T 9704 三项",
+        "修两处：① 推介文的 ** 加粗不能搬进 description（纯文本字段不渲染 Markdown，16 处裸露星号已清）；② pack.py 读版本号原为「读前 4000 字符」，description 变长会把 version 行挤出窗口且失败静默（打出 v0.0.0 包），改为读到 frontmatter 结束为止",
+        "实测 description 塞到 8000 字符仍能正确读出 v3.25.2；YAML 三字段解析正常；门禁 0 错 0 警、冒烟 190 项全绿"
+      ],
+      "download_page": "https://github.com/asktai/doc-compliance-review/releases",
+      "files": {
+        "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.25.3/文档合规审查助手AI合同_v3.25.3_20261026_(doc-compliance-review).skill",
+        "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.25.3/文档合规审查助手AI合同_v3.25.3_20261026_(doc-compliance-review).zip"
+      }
+    },
     {
       "version": "v3.25.2",
       "date": "2026-10-26",
