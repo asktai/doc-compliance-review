@@ -1471,7 +1471,7 @@ def export_pdf(docx_paths, outdir):
     import subprocess
     try:
         r = subprocess.run([SOFFICE, "--headless", "--convert-to", "pdf", "--outdir", outdir] + docx_paths,
-                           capture_output=True, text=True, encoding="utf-8", errors="ignore",
+                           capture_output=True, text=True, encoding="utf-8", errors="replace",
                            timeout=PDF_TIMEOUT)
         if r.returncode != 0:
             print("[make-docx] PDF 导出返回码非 0：", (r.stderr or r.stdout or "")[:200])

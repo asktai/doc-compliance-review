@@ -3,26 +3,44 @@
   "product": "文档合规审查助手AI合同",
   "skill_id": "doc-compliance-review",
   "latest": {
-    "version": "v3.25.4",
+    "version": "v3.25.5",
     "date": "2026-10-26",
-    "summary": "description 精简 833→687 字符（删掉列了两遍的文种清单与无用修饰，触发词 43 个零丢失），并新增「触发词不许丢」守卫",
+    "summary": "修 Windows 装机冒烟 8 项全灭的编码缺陷：subprocess text=True 六处锁定 UTF-8＋run_gate 假绿洞＋新增 subprocess 编码守卫（千问办公实测报告驱动）",
     "changes": [
-      "删掉最大的一处浪费：11 个文种（合同/协议/授权书/承诺函/告知书/声明/委托书/制度/通知/NDA/SLA/DPA）在能力段与触发段各列一遍，共 22 处；触发段改为「上述法律文书」",
-      "删掉对触发无用的内容：修辞（模型不参与回忆、编造没有入口）、解释性括号（一页看懂）、（连着样本量说、不外推）、压缩冗长连接词",
-      "严格保留全部检索锚点：11 类文种、13 个动作词（含红线/比对/脱敏等短词）、14 个风险维度、3 条用户口语例句、强弱势立场词",
-      "description 833→687 字符；description_zh 577→501；description_en 1561→1861（此前缺的四项能力补齐，非冗余而是内容缺失），并修掉上轮遗留的语法错（句号后接小写 drafts）",
-      "新增守卫 _check_trigger_words()：43 个必含触发词逐个断言，丢一个即报错并提示「该类需求将不再触发且无任何报错」",
-      "守卫自身踩两次坑：裸子串判据下「强弱势」含「强势」「弱势」四字致漏报；补后接判断仍漏（前一字符是「强」这一侧）。终版改双向判断",
-      "三组注入实测：删立场词→同时报出强势与弱势；删「回稿」→准点报出；删「脱敏」→不报（「脱敏映射表」中仍在，合理子串命中）",
-      "门禁 0 错 0 警，冒烟 190 项全绿（183＋跳过 7）"
+      "根因：check.py 两处门禁自检子进程 text=True 未指定 encoding，Windows 下按 GBK 解码 UTF-8 输出致中文乱码、JSON 解析失败、报「门禁无输出」；开发侧 Linux 全 UTF-8 从不暴露",
+      "修复：六处 subprocess.run（check.py×2／smoke-test.py×1／make-docx.py×1／preprocess.py×2）统一 encoding=utf-8＋errors=replace，run_gate 的 env 加 PYTHONIOENCODING=utf-8 两端锁死",
+      "假绿洞：run_gate 门禁无输出时原返回 errs=[]，正向用例会把「门禁没跑成」当「通过」；改为 errs 带说明，正负用例两端都失败",
+      "新增守卫 _check_subprocess_encoding：text=True 须伴随恰好一个 encoding，按括号配平抓完整参数区判（按行 grep 会被多行调用骗）",
+      "守卫立起过程中自己炸一次：make-docx 续行已有 encoding 被按行 grep 误判为缺、又塞一个，keyword argument repeated 把冒烟炸成 33 失败，冒烟当场抓住；判据因此定为「恰好一次」",
+      "冒烟恢复 183/0/7，门禁 0 错 0 警"
     ],
     "download_page": "https://github.com/asktai/doc-compliance-review/releases",
     "files": {
-      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.25.4/文档合规审查助手AI合同_v3.25.4_20261026_(doc-compliance-review).skill",
-      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.25.4/文档合规审查助手AI合同_v3.25.4_20261026_(doc-compliance-review).zip"
+      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.25.5/文档合规审查助手AI合同_v3.25.5_20261026_(doc-compliance-review).skill",
+      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.25.5/文档合规审查助手AI合同_v3.25.5_20261026_(doc-compliance-review).zip"
     }
   },
   "history": [
+    {
+      "version": "v3.25.4",
+      "date": "2026-10-26",
+      "summary": "description 精简 833→687 字符（删掉列了两遍的文种清单与无用修饰，触发词 43 个零丢失），并新增「触发词不许丢」守卫",
+      "changes": [
+        "删掉最大的一处浪费：11 个文种（合同/协议/授权书/承诺函/告知书/声明/委托书/制度/通知/NDA/SLA/DPA）在能力段与触发段各列一遍，共 22 处；触发段改为「上述法律文书」",
+        "删掉对触发无用的内容：修辞（模型不参与回忆、编造没有入口）、解释性括号（一页看懂）、（连着样本量说、不外推）、压缩冗长连接词",
+        "严格保留全部检索锚点：11 类文种、13 个动作词（含红线/比对/脱敏等短词）、14 个风险维度、3 条用户口语例句、强弱势立场词",
+        "description 833→687 字符；description_zh 577→501；description_en 1561→1861（此前缺的四项能力补齐，非冗余而是内容缺失），并修掉上轮遗留的语法错（句号后接小写 drafts）",
+        "新增守卫 _check_trigger_words()：43 个必含触发词逐个断言，丢一个即报错并提示「该类需求将不再触发且无任何报错」",
+        "守卫自身踩两次坑：裸子串判据下「强弱势」含「强势」「弱势」四字致漏报；补后接判断仍漏（前一字符是「强」这一侧）。终版改双向判断",
+        "三组注入实测：删立场词→同时报出强势与弱势；删「回稿」→准点报出；删「脱敏」→不报（「脱敏映射表」中仍在，合理子串命中）",
+        "门禁 0 错 0 警，冒烟 190 项全绿（183＋跳过 7）"
+      ],
+      "download_page": "https://github.com/asktai/doc-compliance-review/releases",
+      "files": {
+        "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.25.4/文档合规审查助手AI合同_v3.25.4_20261026_(doc-compliance-review).skill",
+        "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.25.4/文档合规审查助手AI合同_v3.25.4_20261026_(doc-compliance-review).zip"
+      }
+    },
     {
       "version": "v3.25.3",
       "date": "2026-10-26",

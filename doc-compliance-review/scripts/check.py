@@ -786,7 +786,7 @@ def check_freshness_engine():
         return
     try:
         r = subprocess.run([sys.executable, p, "--self-test"],
-                           capture_output=True, text=True, timeout=120)
+                           capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120)
     except Exception as e:
         err("巡检自检跑不起来：%s" % e)
         return
@@ -1653,6 +1653,54 @@ def _check_engine_count():
     _check_engine_ordinal_in_scripts()
     _check_capability_count()
     _check_trigger_words()
+    _check_subprocess_encoding()
+
+
+def _check_subprocess_encoding():
+    """subprocess.run 的 text=True 必须伴随 encoding="utf-8"。
+
+    为什么立这条（v3.25.5，千问办公装机实测抓出）：Windows 下 text=True 默认按
+    locale（简中即 GBK）解码子进程输出，而本技能所有脚本输出都是 UTF-8——
+    中文报告一进管道就乱码，门禁自检报「门禁无输出」、装机冒烟 8 项全灭。
+    **开发侧（Linux 全 UTF-8）一个错都不会报**，问题只在用户机器上炸——
+    这正是「在我机器上是好的」的教科书形态。
+
+    判据实现要点：不能按行 grep「subprocess.run 那行有没有 encoding」——
+    多行调用的 encoding 写在续行，会误报。按括号配平抓出**完整参数区**再判。
+    errors 一并建议（replace 优于 ignore：ignore 静默吞字节，replace 至少留痕）。
+    """
+    bad = []
+    scripts_dir = os.path.join(ROOT, "scripts")
+    if not os.path.isdir(scripts_dir):
+        return
+    for fn in sorted(os.listdir(scripts_dir)):
+        if not fn.endswith(".py"):
+            continue
+        src = _read(os.path.join(scripts_dir, fn))
+        for m in re.finditer(r"subprocess\.run\(", src):
+            i = m.end()
+            depth = 1
+            while i < len(src) and depth:
+                if src[i] == "(":
+                    depth += 1
+                elif src[i] == ")":
+                    depth -= 1
+                i += 1
+            args = src[m.end():i - 1]
+            enc = args.count("encoding=")
+            ln = src[:m.start()].count("\n") + 1
+            # 判据是「恰好一次」而不是「至少一次」：v3.25.5 修复时自己踩过——
+            # 多行调用续行里已有 encoding，按行 grep 误判为缺、又塞一个，
+            # keyword argument repeated 直接把 make-docx 整条链路炸成 33 项失败。
+            if enc > 1:
+                bad.append("%s:%d（encoding 重复 %d 次）" % (fn, ln, enc))
+            elif enc == 0 and "text=True" in args:
+                bad.append("%s:%d" % (fn, ln))
+    if bad:
+        err("subprocess.run 用了 text=True 却未指定 encoding（Windows 下按 GBK "
+            "解码 UTF-8 输出会乱码，装机冒烟会全灭）：%s" % "、".join(bad))
+    else:
+        info("subprocess 编码：所有 text=True 调用均已锁定 UTF-8（Windows 装机不再乱码）")
 
 
 def _check_trigger_words():
@@ -2402,7 +2450,7 @@ def check_cite_alignment():
         return
     try:
         r = subprocess.run([sys.executable, modp, "--audit-rules"],
-                           capture_output=True, text=True, timeout=120)
+                           capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120)
     except Exception as e:
         err("条号对位自检跑不起来：%s" % e)
         return

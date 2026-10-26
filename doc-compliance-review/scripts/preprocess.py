@@ -178,6 +178,7 @@ def extract_pdf(path, outdir, allow_ocr=True):
         img = os.path.join(outdir, p)
         outp = os.path.join(outdir, p + ".ocr")
         r = subprocess.run([TESSERACT, img, outp, "-l", "chi_sim"],
+                           encoding="utf-8", errors="replace",
                            capture_output=True, text=True, env=env)
         if os.path.exists(outp + ".txt"):
             parts.append(open(outp + ".txt", encoding="utf-8", errors="ignore").read())
@@ -187,7 +188,8 @@ def extract_image(path, outdir):
     base = os.path.splitext(os.path.basename(path))[0]
     outp = os.path.join(outdir, base + ".ocr")
     env = dict(os.environ); env["TESSDATA_PREFIX"] = TESSDATA
-    subprocess.run([TESSERACT, path, outp, "-l", "chi_sim"], capture_output=True, text=True, env=env)
+    subprocess.run([TESSERACT, path, outp, "-l", "chi_sim"], capture_output=True, text=True,
+                       encoding="utf-8", errors="replace", env=env)
     t = outp + ".txt"
     return open(t, encoding="utf-8", errors="ignore").read() if os.path.exists(t) else "", "ocr"
 

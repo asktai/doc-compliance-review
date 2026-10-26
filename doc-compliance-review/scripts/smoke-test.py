@@ -261,7 +261,12 @@ def _inject_gate_tests(tmp):
             cmd.append(cfgp)
         env = dict(os.environ)
         env["PYTHONDONTWRITEBYTECODE"] = "1"   # 别让探针自己往副本里扔 .pyc
-        r = subprocess.run(cmd, capture_output=True, text=True, timeout=300, env=env)
+        # Windows 下 text=True 默认按 locale（GBK）解码子进程的 UTF-8 输出，
+        # JSON 最后一行直接乱码 → 「门禁无输出」，且 8 项用例全灭。
+        # 两端锁死 UTF-8：这里按 UTF-8 解码，子进程端用 PYTHONIOENCODING 强制。
+        env["PYTHONIOENCODING"] = "utf-8"
+        r = subprocess.run(cmd, capture_output=True, text=True,
+                           encoding="utf-8", errors="replace", timeout=300, env=env)
         txt = (r.stdout or "").strip()
         try:
             d = json.loads(txt.splitlines()[-1]) if txt else {}
@@ -272,8 +277,10 @@ def _inject_gate_tests(tmp):
             tb = [l for l in (d.get("tb") or "").splitlines() if l.strip()]
             return "门禁执行崩溃（%s）｜%s" % (d["crash"], tb[-1] if tb else ""), [], []
         if not d:
-            return ("门禁无输出（退出码 %s）：%s"
-                    % (r.returncode, tail_line(r.stderr or r.stdout))), [], []
+            # errs 必须带上说明：正向用例（断言 errs 为空）若看到 [] 会把
+            # 「门禁没跑成」误判为「通过」——假绿比失败更糟。
+            msg = "门禁无输出（退出码 %s）：%s" % (r.returncode, tail_line(r.stderr or r.stdout))
+            return msg, [msg], []
         return "", d.get("errs") or [], d.get("warns") or []
 
     def rewrite(fn, old, new):
