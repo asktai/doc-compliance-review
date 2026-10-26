@@ -7,7 +7,7 @@ description_zh: "对合同、协议及授权书、承诺函、告知书、声明
 description_en: "Desensitize, review clause by clause, grade risks in three colors and produce redline revisions, comparison ledgers and opinion reports for contracts, agreements and business documents (authorization letters, commitment letters, notices, policies, NDAs, SLAs, DPAs and more); coverage includes payment and liquidated damages, delivery and acceptance, IP, confidentiality and non-compete, jurisdiction clauses, arbitration, dispute resolution, limitation of action, contract validity, standard terms and personal information protection; accepts background materials (files, images, photos or plain text) to sharpen the review, and adapts the review stance to a strong or weak bargaining position; drafts contracts and reusable templates, and converts existing documents into templates. Nine industry rule sets included; handles Word, PDF, images and scanned files. Advisory only, not legal advice; review by a licensed lawyer is required."
 category: writing
 argument-hint: "<文档路径或文本> [版本/角色/尺度] | 审查 | 起草 | 比对 | 背景资料 | 脱敏 | 精要总结 | 思维导图 | 向导 | 撰写合同 | 撰写模板 | 文档转模板 | 合同转模板 | 技能版本 | 技能更新 | 技能升级 | 立查得 | 小查 | 帮助|help|? | 教程 | 私有库维护/备份/回溯/导入/导出 | 行业库维护/备份/回溯/导入/导出"
-version: 3.25.0
+version: 3.25.1
 license: 个人使用授权 · 商业使用须取得书面授权（见 `LICENSE.md`）
 author: 胡皓
 examples_zh:
@@ -26,15 +26,15 @@ examples_en:
 
 ![文档合规审查助手AI合同 · 合同与商务文档逐条审查 · 风险三色分级](assets/banner-dark.png)
 
-**v3.25.0** ｜ 作者：胡皓 ｜ 许可：个人使用授权 · 商业使用须取得书面授权（详见 `LICENSE.md`）
+**v3.25.1** ｜ 作者：胡皓 ｜ 许可：个人使用授权 · 商业使用须取得书面授权（详见 `LICENSE.md`）
 
 > **免责声明**：本技能仅作辅助法律工作，**不构成法律意见**，输出内容须经**执业律师复核**；**同一对话内首次使用时由技能先输出全文**（同一对话只此一次）——见**步骤 0.0**，全文亦见 `LICENSE.md`。
 
 本技能适用于合同，以及授权书、承诺函、告知书、声明、委托书、备忘录、制度、政策、通知、SLA、NDA、DPA、采购文件等非合同文档，统一适配。
 
-## 〇、产品骨架：三库十五引擎（说清"有什么"和"没什么"）
+## 〇、产品骨架：三库十七引擎（说清"有什么"和"没什么"）
 
-**三库管标准，十五引擎管执行。** 遇到使用者问「你都能干什么」，照下表答，**不夸大、不遗漏**：
+**三库管标准，十七引擎管执行。** 遇到使用者问「你都能干什么」，照下表答，**不夸大、不遗漏**：
 
 > **先说清一个命名**：本产品只有**一个「三库」**——规则库／法规库／模板库，三个**并列**的容器，装三种不同性质的东西。**规则库内部另有三个层**（通用层／行业层／私有层），那是**同一个库**由内向外扩的三个范围，**不是另外三个库**。以前把内层也叫「三库」，造成两处同名不同义，现已统一改称「层」。**记住一个是并列、一个是包含，就不会混。**
 
@@ -56,7 +56,7 @@ examples_en:
 
 冲突按 **私有 > 行业 > 通用** 消解，消解不掉标 ★★★ 交人工。**三层都压不过法条**——与强制性规定冲突时以法规库原文为准，报告里写明冲突点。
 
-**一句话记住**：三个库是**并列的三兄弟**（规则／法规／模板），三层是规则库**自己套的三层皮**（通用／行业／私有）。说「三库十五引擎」，指的是三个库。
+**一句话记住**：三个库是**并列的三兄弟**（规则／法规／模板），三层是规则库**自己套的三层皮**（通用／行业／私有）。说「三库十七引擎」，指的是三个库。
 
 > **文档里的两种叫法，指的是同一件事**：讲解层级与优先级时写「通用层／行业层／私有层」（强调是同一个库的三层）；**操作界面与文件路径**处仍写「通用版／私有库／行业库」（因为菜单、勾选项、目录就叫这个名，改了使用者找不到）。**看到「私有库」出现在勾选项、菜单、路径里，就把它读成「私有层」**——是同一件东西，只是站在哪一边说话。
 
@@ -67,20 +67,25 @@ examples_en:
 | 1 | 脱敏 | `desensitize.py`／`local-only.py` | ✅ |
 | 2 | OCR | `preprocess.py` | ✅ |
 | 3 | 结构化 | `structure.py` | ✅ |
-| 4 | 原稿级修订 | `make-docx.py`（tracked/redline） | ✅ |
-| 5 | 规则库 | `core/01-general-risk-rules.md`＋`industries/`＋`rule-baseline.py` | ✅ |
-| 6 | 模板库 | `tpl-engine.py` | ✅ |
-| 7 | 法规库 | `legal-verify.py` | ✅ |
-| 8 | 文档撰写 | `make-docx.py`＋`drafting-guide.md` | ✅ |
-| 9 | 比对 | `make-docx.py`（diff/compare） | ✅ |
-| 10 | 公文格式 | `gb9704.py` | ✅ |
-| 11 | **核验** | `verify.py` | ✅ |
-| 12 | 安全 | `check.py`（联网四档 `net-tier` 自标 ＋ `SEC_MATRIX` 安全机制登记表） | ✅ |
-| 13 | 法规库失效巡检 | `freshness-patrol.py` 调 `legal-parse.py` | ✅ |
-| 14 | 法规库交叉验证 | `legal-crosscheck.py`＋`core/legal-articles.json` | ✅ |
-| 15 | 失衡画像 | `imbalance.py` | ✅ |
-| 16 | 法规检索 | `legal-search.py` | ✅ |
-| 17 | 法规汇编 | `legal-compile.py` | ✅ |
+| | *—— 二、判定依据（三库） ——* | | |
+| 4 | 规则库 | `core/01-general-risk-rules.md`＋`industries/`＋`rule-baseline.py` | ✅ |
+| 5 | 模板库 | `tpl-engine.py` | ✅ |
+| | *—— 三、法规簇：读用（6–8）· 守库（9–10） ——* | | |
+| 6 | 法规库 | `legal-verify.py` | ✅ |
+| 7 | 法规检索 | `legal-search.py` | ✅ |
+| 8 | 法规汇编 | `legal-compile.py` | ✅ |
+| 9 | 法规库交叉验证 | `legal-crosscheck.py`＋`core/legal-articles.json` | ✅ |
+| 10 | 法规库失效巡检 | `freshness-patrol.py` 调 `legal-parse.py` | ✅ |
+| | *—— 四、产出 ——* | | |
+| 11 | 原稿级修订 | `make-docx.py`（tracked/redline） | ✅ |
+| 12 | 文档撰写 | `make-docx.py`＋`drafting-guide.md` | ✅ |
+| 13 | 比对 | `make-docx.py`（diff/compare） | ✅ |
+| 14 | 公文格式 | `gb9704.py` | ✅ |
+| | *—— 五、把关 ——* | | |
+| 15 | **核验** | `verify.py` | ✅ |
+| 16 | 安全 | `check.py`（联网四档 `net-tier` 自标 ＋ `SEC_MATRIX` 安全机制登记表） | ✅ |
+| | *—— 六、维护 ——* | | |
+| 17 | 失衡画像 | `imbalance.py` | ✅ |
 
 **十九项能力**：能问／**能理解**／**能分析**／能审／能写／能查／能检／能核／能诊断／能总结／**能归纳**／能脱敏／能 OCR／能结构化／能比对／能整理／能管理／能检索／能体检／**能汇编**。
 （**十九项全部可用**，无规划中项。）
@@ -116,7 +121,7 @@ examples_en:
 2. **数字只报实测值**：159 条、内置 9 个行业库（可自建）、17 部法 712 条（712 条均已多源交叉验证）、10 类 × 5 格式、190 项冒烟、十七个引擎、十九项能力、27 个脚本；这些数字不是手填的，改完代码忘了同步文档，门禁会当场报错——**别靠记忆报数**。
 3. **"能"都有边界**：能审不等于审对（须执业律师复核）、能查不等于查全（库里没有的标待核验）、能写不等于能签（占位符填实后即为具体合同）、**能检索不等于给法律意见**（只讲要件不下结论，具体适用须律师认定）、能检只能兜住机械错误（格式/占位符/条文原文），**兜不住判断错误**。
 
-### 核验引擎（第 11 引擎）：产物出得去出不去的唯一裁判
+### 核验引擎（第 15 引擎）：产物出得去出不去的唯一裁判
 
 `scripts/verify.py`。**只管一件事：这份东西能不能交出去。**
 

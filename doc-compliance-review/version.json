@@ -3,24 +3,44 @@
   "product": "文档合规审查助手AI合同",
   "skill_id": "doc-compliance-review",
   "latest": {
-    "version": "v3.25.0",
+    "version": "v3.25.1",
     "date": "2026-10-26",
-    "summary": "新增法规汇编引擎：把条文编成册（封面要素＋编制说明＋目录＋正文＋条号索引＋覆盖面附录），条文照录、只搬运不撰写；十七引擎、十九项能力全部可用",
+    "summary": "引擎表按六阶段重排（读入→判定依据→法规簇→产出→把关→维护），守库与把关分列并说明理由；新增引擎数量守卫：正文数量、两张表行数、编号连续性三类错配当场拦下",
     "changes": [
-      "法规汇编引擎（legal-compile.py）：按主题检索／限定法名／逐条指定三种方式收集条文，编成带目录与索引的汇编册；每部法带版本、施行日、修订注记，每条带条旨、原文、校验状态与来源数",
-      "三条硬约束：只搬运不撰写（条旨取库内 anchor 字段，目录与索引由条文词面机械生成，不摘要点、不作评析、不下结论）；时效必须报（single／conflict 逐条标出且明说「不作为定论」）；未收录逐条列名（不补不替，全未收录时不产空册、退出码 1）",
-      "输出 Markdown 与 Word 两式：Word 版套公文风（标题二号居中、正文三号仿宋），由 python-docx 直出不经转换器，段落文字与 md 一致、不漏 Markdown 标记",
-      "法规汇编与 10 类审查交付物分立：一次审查的交付物针对「这份文档」，汇编针对「一个领域」，来源不同、用途不同，故不并入 5 格式矩阵",
-      "冒烟 181 → 190 项：新增汇编引擎 9 项独立用例（体例五段齐备／时效标注／覆盖面自报／跨法升序／库外不产空册／部分未收录列名／红线无结论性用语／Word 不漏标记）",
-      "联网分档同步：legal-compile.py 为 L0 绝对离线（接触文档内容、零网络库），L0 21 → 22 个，脚本总数 26 → 27"
+      "引擎表由「先有的先排」的堆叠序改为按实际处理顺序分六段：一读入（脱敏·OCR·结构化）／二判定依据（规则库·模板库）／三法规簇（法规库·检索·汇编·交叉验证·失效巡检）／四产出（原稿级修订·文档撰写·比对·公文格式）／五把关（核验·安全）／六维护（失衡画像），表内加分节线",
+      "原稿级修订由「读入」移入「产出」：它读原稿但目的是出件，属产出动作，不是预处理",
+      "法规簇组内再分两职并写进分节线：6–8 读用（读库、查库、编成册），9–10 守库（交叉验证管入库资格、失效巡检管库存活性）",
+      "说明「守库为何不并入把关」：把关判交付物本身（产物出不出得去、代码可不可信），守库判库的资格与新鲜度（条文真假、是否现行版）——前者拦成品、后者拦材料，混在一起会让人误以为「库核过了报告就不用核了」",
+      "原「三个防守型引擎」一句改写为「三道关卡拦在不同位置」，原文把两个守库引擎与一个守产物引擎并称，与分组逻辑自相矛盾",
+      "新增引擎数量守卫（check.py）：正文「N 引擎」须与表格行数相符（中文数字真解析、不靠查表）、README 与 SKILL 两张表行数须一致、编号须连续不重复；识别表头形态使 SKILL 简表同样受查，并排除「第 N 引擎」这类指代用法",
+      "守卫负向验证：改小数量→拦下并算出应为 17；编号重复→三重报错（不连续／数量不符／两表不一致）；还原后零误报",
+      "门禁通过（警告 0 项），冒烟 190 项全绿（快速档 183＋跳过 7＝全量档）"
     ],
     "download_page": "https://github.com/asktai/doc-compliance-review/releases",
     "files": {
-      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.25.0/文档合规审查助手AI合同_v3.25.0_20261026_(doc-compliance-review).skill",
-      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.25.0/文档合规审查助手AI合同_v3.25.0_20261026_(doc-compliance-review).zip"
+      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.25.1/文档合规审查助手AI合同_v3.25.1_20261026_(doc-compliance-review).skill",
+      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.25.1/文档合规审查助手AI合同_v3.25.1_20261026_(doc-compliance-review).zip"
     }
   },
   "history": [
+    {
+      "version": "v3.25.0",
+      "date": "2026-10-26",
+      "summary": "新增法规汇编引擎：把条文编成册（封面要素＋编制说明＋目录＋正文＋条号索引＋覆盖面附录），条文照录、只搬运不撰写；十七引擎、十九项能力全部可用",
+      "changes": [
+        "法规汇编引擎（legal-compile.py）：按主题检索／限定法名／逐条指定三种方式收集条文，编成带目录与索引的汇编册；每部法带版本、施行日、修订注记，每条带条旨、原文、校验状态与来源数",
+        "三条硬约束：只搬运不撰写（条旨取库内 anchor 字段，目录与索引由条文词面机械生成，不摘要点、不作评析、不下结论）；时效必须报（single／conflict 逐条标出且明说「不作为定论」）；未收录逐条列名（不补不替，全未收录时不产空册、退出码 1）",
+        "输出 Markdown 与 Word 两式：Word 版套公文风（标题二号居中、正文三号仿宋），由 python-docx 直出不经转换器，段落文字与 md 一致、不漏 Markdown 标记",
+        "法规汇编与 10 类审查交付物分立：一次审查的交付物针对「这份文档」，汇编针对「一个领域」，来源不同、用途不同，故不并入 5 格式矩阵",
+        "冒烟 181 → 190 项：新增汇编引擎 9 项独立用例（体例五段齐备／时效标注／覆盖面自报／跨法升序／库外不产空册／部分未收录列名／红线无结论性用语／Word 不漏标记）",
+        "联网分档同步：legal-compile.py 为 L0 绝对离线（接触文档内容、零网络库），L0 21 → 22 个，脚本总数 26 → 27"
+      ],
+      "download_page": "https://github.com/asktai/doc-compliance-review/releases",
+      "files": {
+        "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.25.0/文档合规审查助手AI合同_v3.25.0_20261026_(doc-compliance-review).skill",
+        "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.25.0/文档合规审查助手AI合同_v3.25.0_20261026_(doc-compliance-review).zip"
+      }
+    },
     {
       "version": "v3.23.6",
       "date": "2026-10-26",

@@ -1572,6 +1572,84 @@ def check_engine_implementations():
         err("引擎实现落点失联：%s" % "；".join(missing))
     else:
         info("引擎表：README/SKILL 两张表点名的实现文件全部存在（落点可核验）")
+    _check_engine_count()
+
+
+def _check_engine_count():
+    """引擎数量与编号自洽：表里有多少行编号、正文就该写多少个引擎。
+
+    为什么要单查一条：v3.24/v3.25 两次加引擎（16→17）时，**表格加了行、正文的
+    「十五引擎」却一直没改**，门禁全绿放过——这正是「写了没验」的老病灶：
+    落点检查只管「点名的文件在不在」，不管「说的数量对不对」。数字错了比文件
+    缺失更隐蔽，因为文档读起来毫无异样。
+    查三件事：① 编号连续（1..N 不缺不重）；② 正文「N 个引擎／N 引擎」＝N；
+    ③ 两张表 N 一致。
+    """
+    counts = {}
+    for rel in ("README.md", "SKILL.md"):
+        p = os.path.join(ROOT, rel)
+        if not os.path.exists(p):
+            continue
+        src = _read(p)
+        nums, in_tbl = [], False
+        for ln in src.splitlines():
+            # 表头识别要兼容两种写法：README 写「对应实现」，SKILL 写「实现」。
+            # 只认「对应实现」会漏掉 SKILL 表——那张表的编号就没人查了。
+            if ln.lstrip().startswith("|") and re.search(
+                    r"\|\s*#\s*\|.*引擎.*\|", ln):
+                in_tbl = True
+                continue
+            if in_tbl and not ln.lstrip().startswith("|"):
+                in_tbl = False
+            if in_tbl:
+                m = re.match(r"^\|\s*(\d+)\s*\|", ln)
+                if m:
+                    nums.append(int(m.group(1)))
+        if not nums:
+            continue
+        n = len(nums)
+        counts[rel] = n
+        # ① 编号连续、不重复
+        if sorted(nums) != list(range(1, n + 1)):
+            err("%s 引擎表编号不连续或有重复：%s（应为 1..%d）"
+                % (rel, nums, n))
+        # ② 正文里的引擎数量表述必须等于实数（含「十七引擎」这类中文数字写法）
+        #    中文数字必须真解析，不能只查一张对照表——表里漏了某个数字，
+        #    那个数字就趁机溜过去（本轮实测：「十五」不在表内，注入后门禁照样全绿）。
+        def _cn2int(t):
+            if t.isdigit():
+                return int(t)
+            D = "零一二三四五六七八九"
+            unit = {"十": 10, "百": 100}
+            total, cur = 0, 0
+            for ch in t:
+                if ch in D:
+                    cur = D.index(ch)
+                elif ch in unit:
+                    total += (cur or 1) * unit[ch]
+                    cur = 0
+                else:
+                    return None
+            return total + cur
+        wrong = []
+        for mm in re.finditer(r"([一二三四五六七八九十百]+|\d+)\s*(?:个)?引擎", src):
+            raw = mm.group(1)
+            # 「第 N 引擎」是**序号**（点名某一个引擎），不是总数，须排除，
+            # 否则重排一次编号就会误报一次。
+            if src[max(0, mm.start() - 2):mm.start()].strip().endswith("第"):
+                continue
+            val = _cn2int(raw)
+            if val is not None and val != n:
+                seg = src[max(0, mm.start() - 12):mm.end() + 6].replace("\n", " ")
+                wrong.append("「%s」=%d（应为 %d）…%s" % (raw, val, n, seg))
+        if wrong:
+            err("%s 里引擎数量表述与表格行数（%d）不符：%s"
+                % (rel, n, "；".join(wrong[:4])))
+    if len(set(counts.values())) > 1:
+        err("README 与 SKILL 的引擎表行数不一致：%s" % counts)
+    elif counts:
+        info("引擎表：%d 个引擎，两张表一致、编号连续，正文数量表述相符"
+             % list(counts.values())[0])
 
 
 def check_manifest_version():
