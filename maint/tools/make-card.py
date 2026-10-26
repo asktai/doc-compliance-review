@@ -465,7 +465,7 @@ def render_card(version, f_serif, f_sans, f_sansb, f_seal, ss=2, verbose=False):
         wrapped = [wrap_text(d, it, f_body, CW * U - 92 * U) for it in items]
         bh = HEAD + sum(len(w) for w in wrapped) * LH + BOTP
         d.rounded_rectangle([PAD * U, ytop, W - PAD * U, ytop + bh], radius=20 * U,
-                            fill=(19, 40, 62), outline=GOLD + (46,), width=max(1, int(1.4 * S)))
+                            fill=(14, 32, 52), outline=GOLD + (52,), width=max(1, int(1.4 * S)))
         put((PAD * U + 26 * U, ytop + 22 * U), title, f_h, GOLD_LT, "la")
         d.rectangle([PAD * U + 26 * U, ytop + 70 * U, W - PAD * U - 26 * U, ytop + 71 * U],
                     fill=GOLD + (60,))
@@ -474,7 +474,7 @@ def render_card(version, f_serif, f_sans, f_sansb, f_seal, ss=2, verbose=False):
             if k % 2 == 0:   # 隔行淡底色条，分隔条目便于阅读
                 d.rounded_rectangle(
                     [PAD * U + 14 * U, yy - 4 * U, W - PAD * U - 14 * U, yy + LH - 2 * U],
-                    radius=8 * U, fill=(41, 60, 80))
+                    radius=8 * U, fill=(23, 44, 66))
             d.ellipse([PAD * U + 28 * U, yy + 11 * U, PAD * U + 37 * U, yy + 20 * U], fill=GOLD + (220,))
             # 冒号前能力名：金色加粗；其余正文提亮
             first = ws[0]
@@ -500,7 +500,7 @@ def render_card(version, f_serif, f_sans, f_sansb, f_seal, ss=2, verbose=False):
 
     # ============ 交付什么（亮点块：金色描边加粗） ============
     d.rounded_rectangle([PAD * U, y, W - PAD * U, y + deli_h], radius=20 * U,
-                        fill=(26, 48, 72), outline=GOLD_LT + (150,), width=max(2, int(2.2 * S)))
+                        fill=(19, 40, 62), outline=GOLD_LT + (165,), width=max(2, int(2.2 * S)))
     put((PAD * U + 26 * U, y + 22 * U), DELIVER_TITLE, f_h, GOLD_LT, "la")
     d.rectangle([PAD * U + 26 * U, y + 70 * U, W - PAD * U - 26 * U, y + 71 * U], fill=GOLD + (90,))
     put((PAD * U + 26 * U, y + HEAD + 6 * U), DELIVER, f_deli, FG2, "la")
