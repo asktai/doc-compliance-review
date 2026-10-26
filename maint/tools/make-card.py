@@ -4,14 +4,15 @@
 文档合规审查助手AI合同 · 竖版技能介绍卡（1080×1440）生成
 ==============================================================================
 产出「方便发群／朋友圈／资料库展示」的竖版介绍卡：一张图讲清技能是什么、
-能做什么、规则库怎么分层、覆盖哪些风险维度、出什么交付物。
+能做什么、凭什么可信、出什么交付物。全部文案取自技能推介文，
+不留任何易变数字（规则条数、法规条数随版本浮动，卡片不背这个账）。
 
 归属说明
     · 本脚本属于**维护侧**（/workspace/dev/maint/tools/），**不随技能包分发**；
-    · 这样技能包仍维持 16 个脚本的既有口径，不必为一张卡片增脚本并联动全套文档；
-    · 版本号自动读自 SKILL.md frontmatter —— 升版后重跑一次即可刷新卡片。
+    · 这样技能包仍维持既有脚本数口径，不必为一张卡片增脚本并联动全套文档；
+    · 版本号／日期均自动读自 version.json（升版后重跑一次即可刷新卡片）。
 
-排版引擎（V2，2026-09-24 重写）
+排版引擎（V2 起，2026-10 重写）
     V1 的病灶（由 layout-audit 实测坐实）：
       (1) 主标题与副标**真实重叠 8px** —— CJK 字身框高是字号的约 1.45 倍（60px→87px），
          旧代码按"字号"估位置，估小了；
@@ -19,21 +20,31 @@
       (3) 73 个文字块挤在 1080×1440，密度过高。
     V2 的三条对策：
       A. **按墨迹框排布**：所有文字以"基线 + em 框"定位，不再用字身框拍脑袋；
-      B. **字号整体上调**：正文 17.5→22、chips 17→19、页脚 16→18，最小字号 17；
-      C. **降密度换空间**：K 组从独立圆角卡改为 chips 区内的高亮金色 chip
-         （信息一条不丢，省掉一整块卡壳的 123px），腾出的空间全给字号与行距。
+      B. **字号整体上调**：正文 22px，标题 30/64px，最小字号 16px；
+      C. **降密度换空间**：删掉风险维度 chips 区与独立高亮卡，把版面让给
+         「能做什么／凭什么可信／交付什么」三块浅底大字。
     并内建 `LayoutAudit`：每次出图前两两比对所有文字墨迹框，
     **真重叠即拒绝出图**（返回 None），间距不足则告警——排版错误不再靠肉眼发现。
 
+渲染陷阱（本环境实测，勿改回）
+    · **Pillow 的 RGBA 直绘不做混合**：`ImageDraw.Draw(img,"RGBA")` 的半透明
+      fill 会把 alpha 直接丢弃、写成实色像素。故所有半透明底色一律
+      **预混成不透明色**再画（BX_FILL／BX_STRIPE／BX_HL／底纹横线）。
+      踩坑记录：底纹横线曾以 alpha=7 绘制，实际渲成实心亮蓝实线，
+      满屏条纹看着"沉闷"。
+    · **字体不混族**：标题与正文统一黑体族（Noto Sans CJK），
+      早期"宋体标题＋黑体正文"中西混排发涩，且宋体 Bold 缩略后笔画糊团。
+
 设计
     · 纯本地绘制（Pillow），零联网、零外部素材；超采样 2× 后降采样，边缘平滑；
-    · 标题用思源宋体粗（中式文书感），正文用思源黑体（清晰易读）；
-    · 视觉基调沿用头标：深色（深蓝＋金）＋ 朱印元素 ＋ 三色风险点签名元素。
+    · 页面亮蓝渐变＋顶部金线，三块浅底（浅绿／浅粉／浅黄）承载正文，
+      深色文字压浅底、对比充足，整页轻快；
+    · 视觉基调沿用头标：深蓝＋金 ＋ 朱印元素 ＋ 三色风险点签名元素。
 
 用法
     python3 make-card.py                      生成到技能包 assets/skill-card.png
     python3 make-card.py --out <路径>          指定输出文件
-    python3 make-card.py --version Vx.y.z      覆盖版本串（默认读 SKILL.md）
+    python3 make-card.py --version Vx.y.z      覆盖版本串（默认读 version.json）
     python3 make-card.py --ss 3                超采样倍率（默认 2，出图更精细但更慢）
     python3 make-card.py --dry-run             只跑排版审计与数字核对，不出图
 
@@ -133,14 +144,23 @@ PAD = 64                                   # 左右安全边
 CW = BOARD_W - PAD * 2                     # 正文可用宽 952
 MIN_GAP = 10                               # 任意两块文字墨迹框的最小垂直间隙（审计阈值）
 
+# 字体族：**全卡统一黑体族（Noto Sans CJK / 苹方 / 微软雅黑）**——
+# 旧版把"标题"指向 serif_bold，候选首项还是微软雅黑（本机无此文件），
+# 回退到 Noto Serif CJK Bold，于是**衬线标题配黑体正文**，中西文混排发涩；
+# 且正文用 Bold 22px，缩略后笔画糊成团。现统一：标题亦用黑体 Bold，
+# 正文用 Regular（细字更清），关键信息用 Bold，靠**字重**分层次而非靠字体族。
 FONT_CANDIDATES = {
-    "serif_bold": [r"C:\Windows\Fonts\msyhbd.ttc", "/usr/share/fonts/opentype/noto/NotoSerifCJK-Bold.ttc",
-                   "/System/Library/Fonts/PingFang.ttc"],
-    "sans_reg": [r"C:\Windows\Fonts\msyh.ttc", "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+    "sans_reg": ["/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+                 r"C:\Windows\Fonts\msyh.ttc",
                  "/System/Library/Fonts/PingFang.ttc"],
-    "sans_bold": [r"C:\Windows\Fonts\msyhbd.ttc", "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
+    "sans_bold": ["/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
+                  r"C:\Windows\Fonts\msyhbd.ttc",
                   "/System/Library/Fonts/PingFang.ttc"],
-    "seal": [r"C:\Windows\Fonts\msyhl.ttc", "/usr/share/fonts/opentype/noto/NotoSerifCJK-Regular.ttc",
+    "serif_bold": ["/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
+                   r"C:\Windows\Fonts\msyhbd.ttc",
+                   "/System/Library/Fonts/PingFang.ttc"],
+    "seal": ["/usr/share/fonts/opentype/noto/NotoSerifCJK-Bold.ttc",
+             r"C:\Windows\Fonts\msyhbd.ttc",
              "/System/Library/Fonts/PingFang.ttc"],
 }
 
@@ -182,11 +202,14 @@ def radial(size, color):
 
 
 def scan_lines(d, w, h, color, unit=1, alpha=9):
+    """底纹横线。本环境 Pillow 的 RGBA 直绘**不做混合**（半透明 fill 被写成
+    实色像素，alpha 直接丢弃），故这里把 alpha 与底色**预混成不透明色**再画，
+    否则 alpha=7 也会变成一条亮蓝实线，满屏条纹。"""
     st = int(30 * unit)
     lw = max(1, int(unit))
     y = st
     while y < h:
-        d.line([(0, y), (w, y)], fill=color + (alpha,), width=lw)
+        d.line([(0, y), (w, y)], fill=color, width=lw)
         y += st
 
 
@@ -392,9 +415,19 @@ def render_card(version, f_serif, f_sans, f_sansb, f_seal, ss=2, verbose=False):
         """已知墨迹顶、用 anchor='ls' 绘制时应传的基线 y。"""
         return ink_top + 0.88 * f.size
 
-    scan_lines(d, W, H, (150, 205, 245), unit=S, alpha=7)
-    d.rectangle([0, 0, W, 7 * S], fill=GOLD + (180,))
-    d.rectangle([0, H - 5 * S, W, H], fill=GOLD + (110,))
+    # 底纹横线：预混不透明色（浅蓝白 7/255 混进底色梯度），避免 RGBA 直绘不混合
+    def _mix_tint(base, tint, a):
+        return tuple(int(base[i] * (1 - a) + tint[i] * a) for i in range(3))
+
+    def scan_tint(yy):
+        t = yy / float(H)
+        base = tuple(int(BG_TOP[i] * (1 - t) + BG_BOT[i] * t) for i in range(3))
+        return _mix_tint(base, (150, 205, 245), 7 / 255.0)
+
+    for _sy in range(int(30 * S), H, int(30 * S)):
+        d.line([(0, _sy), (W, _sy)], fill=scan_tint(_sy), width=max(1, int(S)))
+    d.rectangle([0, 0, W, 7 * S], fill=GOLD)
+    d.rectangle([0, H - 5 * S, W, H], fill=_mix_tint(BG_BOT, GOLD, 110 / 255.0))
 
     # ============ 头部 ============
     seal_cx, seal_cy = W - PAD * S - 62 * S, 100 * S
@@ -446,9 +479,9 @@ def render_card(version, f_serif, f_sans, f_sansb, f_seal, ss=2, verbose=False):
     y0 = sub_row_bottom + 30 * U + f_tag.size                    # 内容区起点
 
     # ============ 先量：各段高度 ============
-    f_h = font(f_serif, 28 * U)        # 区块标题
-    f_body = font(f_sansb, 22 * U)     # 正文（粗体亮白，缩略可读）
-    f_bodyb = f_body                    # 能力名同字体，靠金色区分
+    f_h = font(f_sansb, 30 * U)        # 区块标题（黑体 Bold，30px）
+    f_body = font(f_sans, 22 * U)      # 正文用 Regular（细字在浅底上更清）
+    f_bodyb = font(f_sansb, 22 * U)    # 能力名用 Bold，与正文靠字重分层次
     LH, HEAD, BOTP = 37 * U, 84 * U, 22 * U
 
     def block_h(items):
@@ -532,7 +565,9 @@ def render_card(version, f_serif, f_sans, f_sansb, f_seal, ss=2, verbose=False):
     y = y + deli_h + gap
 
     # ============ 页脚（底部锚定，行间按墨迹盒推进） ============
-    d.rectangle([PAD * U, fy, W - PAD * U, fy + 2 * U], fill=GOLD + (70,))
+    d.rectangle([PAD * U, fy, W - PAD * U, fy + 2 * U],
+                fill=_mix_tint(tuple(int(BG_BOT[i] * (1 - fy / float(H)) + BG_BOT[i] * (fy / float(H)))
+                                     for i in range(3)), GOLD, 70 / 255.0))
     prev = fy + 2 * U
 
     def fline(s, f, fill, g):
@@ -559,6 +594,16 @@ def render_card(version, f_serif, f_sans, f_sansb, f_seal, ss=2, verbose=False):
 
 
 def read_version():
+    """版本真源＝version.json 的 latest.version；取不到再回落 SKILL.md frontmatter。
+    卡片上的日期同理走 version.json 的 latest.date（见 card_date）。"""
+    p = os.path.join(SKILL_ROOT, "version.json")
+    try:
+        d = json.load(open(p, encoding="utf-8"))
+        v = str((d.get("latest") or {}).get("version") or "").strip()
+        if v:
+            return v if v.lower().startswith("v") else "v" + v
+    except (OSError, ValueError):
+        pass
     p = os.path.join(SKILL_ROOT, "SKILL.md")
     try:
         with open(p, encoding="utf-8-sig") as f:
@@ -584,38 +629,105 @@ def count_seed_industries():
         return None
 
 
-def verify_copy():
-    """卡片文案数字守卫：卡片文字烧进 PNG 像素，check.py 扫 .md 永远扫不到，
+def verify_copy(version=None):
+    """卡片文案守卫：卡片文字烧进 PNG 像素，check.py 扫 .md 永远扫不到，
     是校验盲区（V3.8.2 统一口径时就漏了卡片，"140 条"多挂了两版；V3.10.1
     又抓到"行业库 8 个"未随 realestate 转正）。故在**源头**——每次重绘时——
-    拿文案里的数字与代码实扫值核对，不一致即拒绝出图。"""
+    核对卡片上的断言与技能实况，不一致即拒绝出图。
+
+    口径变更（V3.23.6 后）：卡片文案已按推介文改写，**不再出现任何易变数字**
+    （规则条数／法规条数／内置库个数），故原先「N 条跨行业规则」「行业库 N 个内置」
+    两道数字守卫已无对象、等于形同虚设，一并撤下。改为守卫**不会随版本漂移的
+    结构性断言**：格式徽章必须对得上技能真实交付能力、交付物清单不得出现
+    技能不产出的东西、版本串必须与 version.json 一致。
+    """
     ok = True
-    # (1) 通用库规则数 ↔ core/01 实扫
-    core = os.path.join(SKILL_ROOT, "core", "01-general-risk-rules.md")
-    if os.path.exists(core):
-        real = len(re.findall(r"(?m)^\|\s*[A-Z]\d+\s*\|", open(core, encoding="utf-8").read()))
-        written = 0
-        for _t, items in BLOCKS:
-            for it in items:
-                m = re.search(r"(\d+)\s*条跨行业规则", it)
-                if m:
-                    written = int(m.group(1))
-        if written and written != real:
-            print("[make-card] 卡片文案数字失准：写 %d 条，core/01 实为 %d 条。" % (written, real),
-                  file=sys.stderr)
+
+    # (1) 格式徽章 ↔ 技能真实交付能力：徽章是给用户看的承诺，不能凭空许诺。
+    #     真源是 make-docx.py 的 --formats 取值集合（README「文件格式」章同源）。
+    #     **双向核对**：卡片列出的每个徽章都要有实据；技能支持的每个格式
+    #     也都应出现在卡片上（少列＝少承诺，用户以为不支持）。
+    fmt_src = os.path.join(SKILL_ROOT, "scripts", "make-docx.py")
+    fmt_declared = set()
+    if os.path.exists(fmt_src):
+        src = open(fmt_src, encoding="utf-8").read()
+        # 匹配**全部** --formats 出现处再取并集：文件里既有用法示例也有
+        # argparse 定义，只取第一处会撞上文档说明行（"文件格式（--formats，逗号分隔）："）
+        for line in src.splitlines():
+            if "--formats" in line:
+                fmt_declared |= set(re.findall(r"docx|md|excel|html|pdf", line))
+    card_fmt = {"Word": "docx", "Markdown": "md", "Excel": "excel",
+                "HTML": "html", "PDF": "pdf"}
+    card_exts = set()
+    for fmt, _why in FORMATS:
+        ext = card_fmt.get(fmt)
+        if ext is None:
+            print("[make-card] 格式徽章「%s」不在受支持的格式表内（%s），疑为臆造。"
+                  % (fmt, "／".join(sorted(card_fmt))), file=sys.stderr)
             ok = False
-    # (2) 内置行业库数量 ↔ guard.py SEED_INDUSTRIES
-    seeds = count_seed_industries()
-    if seeds:
-        written = 0
-        for _t, items in BLOCKS:
-            for it in items:
-                m = re.search(r"行业库：(\d+)\s*个内置", it)
-                if m:
-                    written = int(m.group(1))
-        if written and written != seeds:
-            print("[make-card] 卡片文案数字失准：写 %d 个内置行业库，guard.py 种子库实为 %d 个。"
-                  % (written, seeds), file=sys.stderr)
+            continue
+        card_exts.add(ext)
+        if fmt_declared and ext not in fmt_declared:
+            print("[make-card] 卡片承诺了「%s」交付，但 make-docx.py --formats 未声明 %s。"
+                  % (fmt, ext), file=sys.stderr)
+            ok = False
+    if fmt_declared:
+        missing = fmt_declared - card_exts
+        if missing:
+            print("[make-card] 技能支持但卡片未列出的格式：%s（用户会误以为不支持）。"
+                  % "／".join(sorted(missing)), file=sys.stderr)
+            ok = False
+
+    # (2) 交付物清单 ↔ 引擎能力：**双向核对**——
+    #     (2a) 已知交付物不得从卡片清单里漏掉；
+    #     (2b) 卡片清单里出现清单外的条目＝技能不产出的东西，拒出图。
+    deliverables = {
+        "审查意见报告": ("review", "审查"),
+        "原稿级修订版": ("tracked", "redline"),
+        "比对台账": ("diff", "compare"),
+        "脱敏版": ("mask", "desens"),
+        "模板版": ("template", "tpl"),
+    }
+    scripts_text = ""
+    sc = os.path.join(SKILL_ROOT, "scripts")
+    if os.path.isdir(sc):
+        for f in os.listdir(sc):
+            if f.endswith(".py"):
+                try:
+                    scripts_text += open(os.path.join(sc, f), encoding="utf-8").read()
+                except OSError:
+                    pass
+    for key, needles in deliverables.items():
+        if key not in DELIVER:
+            print("[make-card] 交付物清单缺项：%s。" % key, file=sys.stderr)
+            ok = False
+        elif scripts_text and not any(n in scripts_text for n in needles):
+            print("[make-card] 交付物「%s」在 scripts/ 中找不到对应实现（%s）。"
+                  % (key, "/".join(needles)), file=sys.stderr)
+            ok = False
+    # 卡片清单条目逐个核对：凡不在已知交付物表内的，须能在 scripts/ 找到实现证据
+    listed = [x.strip() for x in re.split(r"[·/｜|、,，]", DELIVER) if x.strip()]
+    known = set(deliverables) | {"摘要与思维导图"}
+    for item in listed:
+        if item in known:
+            continue
+        if scripts_text and not any(w in scripts_text for w in re.split(r"[^\w一-鿿]+", item)):
+            print("[make-card] 交付物清单出现未知项「%s」，在 scripts/ 中找不到实现证据。"
+                  % item, file=sys.stderr)
+            ok = False
+
+    # (3) 版本串 ↔ version.json：卡片上的版本必须与技能包真实版本一致
+    vj = os.path.join(SKILL_ROOT, "version.json")
+    try:
+        latest = (json.load(open(vj, encoding="utf-8")).get("latest") or {})
+        real_v = str(latest.get("version") or "")
+    except (OSError, ValueError):
+        real_v = ""
+    if real_v:
+        shown = str(version or "").lstrip("v")
+        if shown and shown != real_v.lstrip("v"):
+            print("[make-card] 版本串失准：卡片写 %s，version.json 为 %s。"
+                  % (shown, real_v), file=sys.stderr)
             ok = False
     return ok
 
@@ -632,9 +744,10 @@ def main():
 
     ver = a.version or read_version()
     if not ver:
-        print("无法从 SKILL.md 读取版本号；请用 --version 显式指定。", file=sys.stderr)
+        print("无法读取版本号（version.json / SKILL.md 均未取到）；请用 --version 显式指定。",
+              file=sys.stderr)
         return 2
-    if not verify_copy():
+    if not verify_copy(ver):
         return 2
     f_serif = pick_font("serif_bold", a.font_serif)
     f_sans = pick_font("sans_reg", a.font_sans)
