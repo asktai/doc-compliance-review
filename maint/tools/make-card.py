@@ -86,14 +86,14 @@ BLOCKS = [
         "原稿级修订：Word 原生修订痕迹，逐条取舍",
         "改稿比对：条款级差异，夹带私货藏不住",
         "涉密纯本地：全量脱敏，正文不出电脑",
-        "起草合同与各类文书 · 公文风排版",
+        "起草文书：合同与各类文书，可选公文风排版",
         "非合同也审：授权书／制度／NDA／SLA",
     ]),
     ("凭什么可信", [
-        "法条逐条比对原文，不靠模型记忆",
-        "法规库本地＋云：云端双源双向校验",
-        "安全机制逐条登记，钉着在跑的代码判据",
-        "文档数字门禁实扫，对不上出不了包",
+        "法条原文：逐条比对，不靠模型记忆",
+        "法规库校验：本地＋云，双源双向核对",
+        "机制登记：逐条钉着在跑的代码判据",
+        "数字实扫：门禁核对，对不上出不了包",
     ]),
 ]
 
@@ -105,7 +105,8 @@ TAX_CHIPS = ["发票与税率 · 三流一致", "银行承兑 · 红字冲红", 
 
 DELIVER_TITLE = "交付什么"
 DELIVER = "审查意见报告 · 原稿级修订版 · 比对台账 · 脱敏版 · 模板版 · 摘要与思维导图"
-FORMATS = ["Word", "Markdown", "Excel", "HTML", "PDF"]
+FORMATS = [("Word", "可编辑原稿"), ("Markdown", "纯文本"), ("Excel", "差异台账"),
+           ("HTML", "在线查阅"), ("PDF", "归档发送")]
 DISCLAIM = "仅辅助用途，不构成法律意见；须经执业律师复核后方可据此决策。"
 LICENSE = "个人使用授权 · 商业使用须取得书面授权"
 
@@ -123,6 +124,8 @@ BX_LINE = [(120, 178, 142, 190), (216, 138, 160, 190), (214, 178, 84, 200)]
 BX_TITLE = [(31, 104, 66), (158, 52, 82), (146, 100, 20)]     # 框标题深色
 BX_NAME = [(24, 122, 74), (176, 58, 90), (150, 98, 16)]       # 能力名（对应底色系）
 BX_TEXT = [(32, 52, 44), (58, 38, 44), (52, 46, 28)]          # 正文深色
+# 能力名高亮块：白 14% 预混到框底（不用 alpha——Pillow 混合失效会直接写成实色盖住字）
+BX_HL = [(214, 238, 224), (250, 219, 229), (252, 240, 206)]
 RISK = [("高", (216, 68, 60)), ("中", (227, 166, 55)), ("低", (62, 155, 107))]
 
 # —— 版面尺度（设计单位 px，1 设计单位最终 = 1 出图像素）——
@@ -454,7 +457,7 @@ def render_card(version, f_serif, f_sans, f_sansb, f_seal, ss=2, verbose=False):
 
     f_deli = font(f_sans, 21 * U)
     f_fmt = font(f_sansb, 19 * U)
-    deli_h = HEAD + 44 * U + 46 * U    # 标题 + 交付物一行 + 格式徽章一行
+    deli_h = HEAD + 44 * U + 62 * U    # 标题 + 交付物一行 + 格式徽章一行
     hs = [block_h(BLOCKS[i][1]) for i in range(len(BLOCKS))] + [deli_h]
 
     FOOT_BOX = 96 * U                  # 页脚占用的底部高度（固定，底部锚定）
@@ -488,8 +491,12 @@ def render_card(version, f_serif, f_sans, f_sansb, f_seal, ss=2, verbose=False):
             first = ws[0]
             name, sep, rest = first.partition("：")
             if sep:
-                put((PAD * U + 52 * U, yy), name + "：", f_bodyb, BX_NAME[bi], "la")
                 nw = d.textlength(name + "：", font=f_bodyb)
+                # 能力名加同色系浅底块，做视觉锚点（一眼扫到"是什么"）
+                d.rounded_rectangle(
+                    [PAD * U + 46 * U, yy - 2 * U, PAD * U + 52 * U + nw + 6 * U, yy + LH - 6 * U],
+                    radius=6 * U, fill=BX_HL[bi])
+                put((PAD * U + 52 * U, yy), name + "：", f_bodyb, BX_NAME[bi], "la")
                 put((PAD * U + 52 * U + nw, yy), rest, f_body, BX_TEXT[bi], "la")
             else:
                 put((PAD * U + 52 * U, yy), first, f_body, BX_TEXT[bi], "la")
@@ -514,12 +521,14 @@ def render_card(version, f_serif, f_sans, f_sansb, f_seal, ss=2, verbose=False):
     put((PAD * U + 26 * U, y + HEAD + 6 * U), DELIVER, f_deli, BX_TEXT[2], "la")
     # 格式徽章一排
     bx = PAD * U + 26 * U
-    for fm in FORMATS:
-        tw = d.textlength(fm, font=f_fmt) + 34 * U
-        d.rounded_rectangle([bx, y + HEAD + 50 * U, bx + tw, y + HEAD + 88 * U], radius=11 * U,
-                            fill=(255, 252, 236), outline=BX_LINE[2], width=max(1, int(1.6 * S)))
-        put((bx + tw / 2, y + HEAD + 69 * U), fm, f_fmt, BX_TITLE[2], "mm")
-        bx += tw + 12 * U
+    for fm, why in FORMATS:
+        tw = max(d.textlength(fm, font=f_fmt),
+                 d.textlength(why, font(f_sans, 16 * U))) + 30 * U
+        d.rounded_rectangle([bx, y + HEAD + 42 * U, bx + tw, y + HEAD + 106 * U], radius=11 * U,
+                            fill=(255, 252, 238), outline=BX_LINE[2], width=max(1, int(1.6 * S)))
+        put((bx + tw / 2, y + HEAD + 62 * U), fm, f_fmt, BX_TITLE[2], "mm")
+        put((bx + tw / 2, y + HEAD + 92 * U), why, font(f_sans, 16 * U), (110, 88, 40), "mm")
+        bx += tw + 10 * U
     y = y + deli_h + gap
 
     # ============ 页脚（底部锚定，行间按墨迹盒推进） ============
