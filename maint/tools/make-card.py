@@ -65,8 +65,8 @@ BOARD_W, BOARD_H = 1080, 1440
 EN_SUB = "DOCUMENT COMPLIANCE REVIEW ASSISTANT"
 TITLE_MAIN = "文档合规审查助手"
 SUB_TEXT = "AI 合同"
-TAGLINE = "对合同、协议及授权书、承诺函等商务/业务文档做脱敏、逐条审查、三色分级与红线修订"
-AUTHOR = "作者：胡皓"
+TAGLINE = "逐条对标标准立场 · 风险三色分级 · 出可交付的审查成果"
+AUTHOR = "胡皓"
 
 
 def card_date():
@@ -78,24 +78,20 @@ def card_date():
     except (OSError, ValueError):
         return ""
 
+
+# 三块正文（全部按推介文提炼，冒号前为亮点名，金色加粗）
 BLOCKS = [
-    ("功能", [
-        "逐条审查：三色分级＋标准立场＋话术",
-        "原稿级修订：Word 原生修订，逐条取舍",
-        "改稿比对：条款级差异，夹私货藏不住",
+    ("能做什么", [
+        "逐条审查：三色分级＋标准立场＋可用话术",
+        "原稿级修订：Word 原生修订痕迹，逐条取舍",
+        "改稿比对：条款级差异，夹带私货藏不住",
         "涉密纯本地：全量脱敏，正文不出电脑",
-        "非合同也审：授权书／制度／NDA 等",
-        "尺度两轴：粗细 × 强弱各有打法",
         "起草合同与各类文书 · 公文风排版",
-        "好文档转模板 · 私有库沉淀内控口径",
+        "非合同也审：授权书／制度／NDA／SLA",
     ]),
-    ("架构：三库十五引擎", [
-        "规则库三层叠加：通用只读／行业可选／私有最高",
-        "法规库：本地＋云，云端双源双向校验",
-        "模板库出件三道硬校验；冲突消解交人工",
-    ]),
-    ("优势：可信是分界线", [
+    ("凭什么可信", [
         "法条逐条比对原文，不靠模型记忆",
+        "法规库本地＋云：云端双源双向校验",
         "安全机制逐条登记，钉着在跑的代码判据",
         "文档数字门禁实扫，对不上出不了包",
     ]),
@@ -107,7 +103,9 @@ DIMENSIONS = ["付款与违约金", "交付验收", "知识产权", "保密与�
 # K 组高亮 chip：原为独立圆角卡，V2 改为 chips 区内的金色一组（省卡壳、信息不减）
 TAX_CHIPS = ["发票与税率 · 三流一致", "银行承兑 · 红字冲红", "虚开发票红线 ★★★"]
 
-DELIVER = "交付物 10 类 × 5 格式（WORD · MD · Excel · HTML · PDF）"
+DELIVER_TITLE = "交付什么"
+DELIVER = "审查意见报告 · 原稿级修订版 · 比对台账 · 脱敏版 · 模板版 · 摘要与思维导图"
+FORMATS = ["Word", "Markdown", "Excel", "HTML", "PDF"]
 DISCLAIM = "仅辅助用途，不构成法律意见；须经执业律师复核后方可据此决策。"
 LICENSE = "个人使用授权 · 商业使用须取得书面授权"
 
@@ -116,7 +114,7 @@ BG_TOP, BG_BOT = (11, 32, 56), (7, 21, 37)
 GLOW_GOLD = (201, 162, 74, 30)
 GLOW_BLUE = (46, 107, 168, 34)
 GOLD, GOLD_LT = (201, 162, 74), (227, 192, 113)
-FG, FG2, FG3 = (255, 255, 255), (224, 234, 244), (116, 140, 168)
+FG, FG2, FG3 = (255, 255, 255), (240, 246, 252), (168, 190, 214)
 SEAL_PAPER, SEAL_INK = (252, 249, 242), (179, 39, 30)
 RISK = [("高", (216, 68, 60)), ("中", (227, 166, 55)), ("低", (62, 155, 107))]
 
@@ -426,7 +424,8 @@ def render_card(version, f_serif, f_sans, f_sansb, f_seal, ss=2, verbose=False):
     d.rounded_rectangle([xb, sub_ink_mid - 22 * U, xb + bw, sub_ink_mid + 22 * U], radius=17 * U,
                         fill=GOLD + (255,))
     put((xb + bw / 2, sub_ink_mid), badge, f_badge, (11, 32, 56), "mm")
-    put((xb + bw + 20 * U, sub_ink_mid), "%s ｜ %s" % (AUTHOR, card_date()), font(f_sans, 18 * U), FG3, "lm")
+    put((xb + bw + 26 * U, sub_ink_mid), "%s · %s" % (AUTHOR, card_date()),
+        font(f_sansb, 21 * U), FG2, "lm")
     # 取本行最高的元素作为行底（胶囊 46px 比文字墨迹高）
     sub_row_bottom = max(sub_base + 0.12 * f_sub.size, sub_ink_mid + cap_h / 2, sub_ink_mid + 22 * U)
 
@@ -446,9 +445,12 @@ def render_card(version, f_serif, f_sans, f_sansb, f_seal, ss=2, verbose=False):
         n = sum(len(wrap_text(d, it, f_body, CW * U - 92 * U)) for it in items)
         return HEAD + n * LH + BOTP
 
-    hs = [block_h(BLOCKS[i][1]) for i in range(len(BLOCKS))]
+    f_deli = font(f_sans, 21 * U)
+    f_fmt = font(f_sansb, 19 * U)
+    deli_h = HEAD + 44 * U + 46 * U    # 标题 + 交付物一行 + 格式徽章一行
+    hs = [block_h(BLOCKS[i][1]) for i in range(len(BLOCKS))] + [deli_h]
 
-    FOOT_BOX = 126 * U                 # 页脚占用的底部高度（固定，底部锚定）
+    FOOT_BOX = 96 * U                  # 页脚占用的底部高度（固定，底部锚定）
     fy = H - FOOT_BOX - 18 * U
     avail = (fy - 20 * U) - y0
     gap = (avail - sum(hs)) / max(1, len(hs))
@@ -496,6 +498,22 @@ def render_card(version, f_serif, f_sans, f_sansb, f_seal, ss=2, verbose=False):
     for title, items in BLOCKS:
         y = draw_block(y, title, items) + gap
 
+    # ============ 交付什么（亮点块：金色描边加粗） ============
+    d.rounded_rectangle([PAD * U, y, W - PAD * U, y + deli_h], radius=20 * U,
+                        fill=(26, 48, 72), outline=GOLD_LT + (150,), width=max(2, int(2.2 * S)))
+    put((PAD * U + 26 * U, y + 22 * U), DELIVER_TITLE, f_h, GOLD_LT, "la")
+    d.rectangle([PAD * U + 26 * U, y + 70 * U, W - PAD * U - 26 * U, y + 71 * U], fill=GOLD + (90,))
+    put((PAD * U + 26 * U, y + HEAD + 6 * U), DELIVER, f_deli, FG2, "la")
+    # 格式徽章一排
+    bx = PAD * U + 26 * U
+    for fm in FORMATS:
+        tw = d.textlength(fm, font=f_fmt) + 34 * U
+        d.rounded_rectangle([bx, y + HEAD + 50 * U, bx + tw, y + HEAD + 88 * U], radius=11 * U,
+                            fill=GOLD + (48,), outline=GOLD_LT + (140,), width=max(1, int(1.4 * S)))
+        put((bx + tw / 2, y + HEAD + 69 * U), fm, f_fmt, GOLD_LT, "mm")
+        bx += tw + 12 * U
+    y = y + deli_h + gap
+
     # ============ 页脚（底部锚定，行间按墨迹盒推进） ============
     d.rectangle([PAD * U, fy, W - PAD * U, fy + 2 * U], fill=GOLD + (70,))
     prev = fy + 2 * U
@@ -505,9 +523,8 @@ def render_card(version, f_serif, f_sans, f_sansb, f_seal, ss=2, verbose=False):
         put((PAD * U, ls_y(prev + g, f)), s, f, fill, "ls")
         prev = ls_y(prev + g, f) + 0.12 * f.size
 
-    fline(DISCLAIM, font(f_sans, 18 * U), FG3, 20 * U)
-    fline(DELIVER, font(f_sansb, 20 * U), GOLD_LT, 16 * U)
-    fline(LICENSE, font(f_sans, 18 * U), FG3, 14 * U)
+    fline(DISCLAIM, font(f_sans, 18 * U), FG3, 24 * U)
+    fline(LICENSE, font(f_sans, 18 * U), FG2, 16 * U)
     if prev > H - 30 * U:
         print("[make-card] 页脚溢出：底 %.0f 越过安全线 %.0f。" % (prev / U, (H - 30 * U) / U),
               file=sys.stderr)
