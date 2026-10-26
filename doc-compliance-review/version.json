@@ -3,16 +3,17 @@
   "product": "文档合规审查助手AI合同",
   "skill_id": "doc-compliance-review",
   "latest": {
-    "version": "v3.23.6",
+    "version": "v3.24.0",
     "date": "2026-10-26",
-    "summary": "引擎质检修复闭环：把 v3.23.5 立起的十五引擎骨架从「登记了」补到「真在跑且门禁认得」——落点反查补目录型、冒烟补 13/14 引擎独立用例、四类核验补回格式维（GB/T 9704 占位）、引擎表 #5 补 rule-baseline.py 落点；冒烟 155→162 项",
+    "summary": "补齐剩余两个引擎（结构化、公文格式）＋新增法规检索引擎：十六引擎、十八项能力全部可用，不再有「规划中」；核验引擎第四维（GB/T 9704）由占位转为真判据",
     "changes": [
-      "质检逐项实跑门禁、对引擎表与 scripts/·core/ 真实落点逐一对账，发现四处「登记了却没真落实」的洞",
-      "(a) 门禁引擎表落点反查补「目录型」校验：此前只认 .py/.md/.json 文件落点，漏检 industries/ 这类目录落点，现三处候选目录（ROOT/scripts/core）逐一查找",
-      "(b) 冒烟补 13/14 引擎独立用例：法规库失效巡检离线自检（freshness-patrol.py --self-test，三组断言——同条必判一致／混入条目标题须判不一致／库内 sources 均带 grp/enc）；法规库交叉验证算法（legal-crosscheck.py verdict() 三组已知答案——全等→multi-ok/verified、明显不同→conflict、单源→single/verified=False 绝不伪装已核）＋库内条文层下钻断言无 single/conflict 瞒报",
-      "(c) README 引擎表 #11 与能力表「能核」行补「格式维＝GB/T 9704 随公文格式引擎接入（当前占位）」注——此前四类核验只写法条／模板／口径三条，格式维被漏标（SKILL 核验章节早已诚实写明「未接入→不冒充通过」）",
-      "(d) SKILL 引擎表 #5 补 rule-baseline.py 落点——规则库实现落点此前漏登该文件",
-      "冒烟 155 → 162 项（passed 155／skipped 7／failed 0），门禁与冒烟全绿；版本真源 SKILL.md frontmatter 与 VERSION.md 沿革、version.json latest 三处同步"
+      "结构化引擎（structure.py）：文档抽成字段树——当事人／金额／比例金额／日期／期限／标的／关键条款，每个取值带原文锚点，抽不到标「未识别」不猜；「另行约定」标为另约而非漏抽；比例型金额（合同总价 20%／千分之一／万分之五）单独识别，与固定金额分开记",
+      "公文格式引擎（gb9704.py）：按 GB/T 9704—2012 逐项体检——纸张／四边页边距／版心／正文字号／标题字号与对齐，不符合给偏差值；每页行数字数等算不出的项明标「需人工」，不拿半吊子判据冒充国标核验",
+      "法规检索引擎（legal-search.py）：按问题或「法名＋条号」检索条文，输出原文＋出处＋适用要件拆解；只讲要件不下结论（输出结构里没有结论字段），库外明说未收录不凭记忆补，每次都自报覆盖面",
+      "核验引擎第四维（GB/T 9704 格式核验）由占位转为真判据：给了 --docx 就真跑体检，没给就如实标「未启用」，仍不冒充通过",
+      "免责声明补边界：条文检索与适用要件呈现仅为法律信息提供，不预测案件结果、不判断具体情形是否成立，具体适用须经执业律师结合事实认定",
+      "冒烟 162 → 174 项：新增三个引擎各自独立用例（含「脚本生成部分无结论性用语」的红线守卫）",
+      "联网分档同步：三个新脚本均为 L0 绝对离线（接触文档内容、零网络库），L0 18 → 21 个，脚本总数 23 → 26"
     ],
     "download_page": "https://github.com/asktai/doc-compliance-review/releases",
     "files": {
@@ -21,6 +22,24 @@
     }
   },
   "history": [
+    {
+      "version": "v3.23.6",
+      "date": "2026-10-26",
+      "summary": "引擎质检修复闭环：把 v3.23.5 立起的十五引擎骨架从「登记了」补到「真在跑且门禁认得」——落点反查补目录型、冒烟补 13/14 引擎独立用例、四类核验补回格式维（GB/T 9704 占位）、引擎表 #5 补 rule-baseline.py 落点；冒烟 155→162 项",
+      "changes": [
+        "质检逐项实跑门禁、对引擎表与 scripts/·core/ 真实落点逐一对账，发现四处「登记了却没真落实」的洞",
+        "(a) 门禁引擎表落点反查补「目录型」校验：此前只认 .py/.md/.json 文件落点，漏检 industries/ 这类目录落点，现三处候选目录（ROOT/scripts/core）逐一查找",
+        "(b) 冒烟补 13/14 引擎独立用例：法规库失效巡检离线自检（freshness-patrol.py --self-test，三组断言——同条必判一致／混入条目标题须判不一致／库内 sources 均带 grp/enc）；法规库交叉验证算法（legal-crosscheck.py verdict() 三组已知答案——全等→multi-ok/verified、明显不同→conflict、单源→single/verified=False 绝不伪装已核）＋库内条文层下钻断言无 single/conflict 瞒报",
+        "(c) README 引擎表 #11 与能力表「能核」行补「格式维＝GB/T 9704 随公文格式引擎接入（当前占位）」注——此前四类核验只写法条／模板／口径三条，格式维被漏标（SKILL 核验章节早已诚实写明「未接入→不冒充通过」）",
+        "(d) SKILL 引擎表 #5 补 rule-baseline.py 落点——规则库实现落点此前漏登该文件",
+        "冒烟 155 → 162 项（passed 155／skipped 7／failed 0），门禁与冒烟全绿；版本真源 SKILL.md frontmatter 与 VERSION.md 沿革、version.json latest 三处同步"
+      ],
+      "download_page": "https://github.com/asktai/doc-compliance-review/releases",
+      "files": {
+        "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.23.6/文档合规审查助手AI合同_v3.23.6_20261026_(doc-compliance-review).skill",
+        "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.23.6/文档合规审查助手AI合同_v3.23.6_20261026_(doc-compliance-review).zip"
+      }
+    },
     {
       "version": "v3.23.5",
       "date": "2026-10-23",
@@ -320,5 +339,5 @@
   ],
   "_维护说明": "出包后请同步更新本文件（latest 段与 history）。真源是 SKILL.md 的 version 与 VERSION.md 的沿革；本文件是'对外公布的清单'，须与真源一致，否则使用者会被引向旧版。",
   "schema": 1,
-  "version": "v3.23.6"
+  "version": "3.24.0"
 }

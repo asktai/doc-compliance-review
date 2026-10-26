@@ -539,7 +539,11 @@ def main():
                 continue
             tip = "（需 Poppler + Tesseract）" if need_ocr else "（需 LibreOffice 转换 .doc）"
             if a.fast and need_ocr:   # 只跳 OCR（耗时大头）；.doc 转换保留，以保住 A/B 比对链路
-                for sub in ("提取并可审" + tip, "取出可审文本", "内容可识别（关键词命中）"):
+                # 跳过项须与全量档**逐项一一对上**，否则两档总数不守恒，
+                # 而 check.py 的项数守卫默认「两档一致」，文档写哪个数都会漂。
+                # 全量档此用例真正 check 的是 3 项：预处理执行 / 取出可审文本 /
+                # 内容可识别（「提取并可审」不是独立 check，故此处也不记）。
+                for sub in ("预处理执行", "取出可审文本", "内容可识别（关键词命中）"):
                     skip(f"{label} {sub}", "快速档已跳过（耗时项；跑全量档加 --full）")
                 continue
             if need_ocr and not ocr_ok:
@@ -1285,6 +1289,170 @@ def main():
                   not bad, "异常状态: %s" % bad[:5])
     except Exception as e:
         check("法规库交叉验证自检", False, repr(e))
+
+    # --- 3.51 法规检索引擎（引擎 16：检索 + 要件呈现，红线是「不下结论」）---
+    print("\n[3.51] 法规检索引擎（要件呈现 + 红线：不下结论）")
+    try:
+        lp = os.path.join(HERE, "legal-search.py")
+        if not os.path.exists(lp):
+            check("法规检索：脚本存在", False, "缺 scripts/legal-search.py")
+        else:
+            check("法规检索：脚本存在", True, "scripts/legal-search.py")
+
+            # (a) 精确条号命中，且要件是原文片段
+            r = run([PY, lp, "--article", "民法典", "585"])
+            o = r.stdout or ""
+            check("法规检索：精确条号命中并给出原文",
+                  r.returncode == 0 and "第五百八十五条" not in o and "违约金" in o,
+                  head_lines(o))
+            check("法规检索：要件逐条列出（非空即说明抽取生效）",
+                  "适用要件" in o or "无可机械拆解" in o, head_lines(o))
+
+            # (b) 未命中必须明说「未收录」，退出码 1
+            r2 = run([PY, lp, "--article", "民法典", "99999"])
+            o2 = r2.stdout or ""
+            check("法规检索：库外条号明说未收录、不猜（退出码 1）",
+                  r2.returncode == 1 and "未收录" in o2 and "不凭记忆" in o2,
+                  head_lines(o2))
+
+            # (c) 覆盖面必须自报（防止被当成法律全集）
+            r3 = run([PY, lp, "--coverage"])
+            o3 = r3.stdout or ""
+            check("法规检索：主动报覆盖面（非法律全集）",
+                  r3.returncode == 0 and "不是法律全集" in o3, head_lines(o3))
+
+            # (d) 红线：脚本生成部分不得出现结论性用语
+            #     法条原文里的「构成违约」是法条自己的话，须先剔除再扫
+            import importlib.util as _ilu2
+            _sp = _ilu2.spec_from_file_location("_ls_probe", lp)
+            _ls = _ilu2.module_from_spec(_sp)
+            _sp.loader.exec_module(_ls)
+            _db = _ls.load_db()
+            BANNED = ["建议你", "你应当", "你可以主张", "胜诉", "败诉", "胜算",
+                      "本案应", "你有权要求", "结论是", "因此你", "判令", "法院会"]
+            dirty = []
+            for _q in ["竞业限制期限", "违约金", "个人信息处理", "格式条款",
+                       "劳动合同解除", "担保"]:
+                _res = _ls.search_in_db(_q, _db, limit=5)
+                if not _res:
+                    continue
+                _md = _ls.render(_res, _q, _db)
+                _scrub = _md
+                for _r in _res:
+                    _scrub = _scrub.replace(_r["text"], "")
+                    _rq = _ls.split_requirements(_r["text"])
+                    for _x in [_rq["scene"]] + _rq["reqs"] + _rq["excepts"]:
+                        if _x:
+                            _scrub = _scrub.replace(_x, "")
+                _hit = [w for w in BANNED if w in _scrub]
+                if _hit:
+                    dirty.append((_q, _hit))
+            check("法规检索：脚本生成部分无结论性用语（只讲要件不下结论）",
+                  not dirty, "越界: %s" % dirty[:3])
+    except Exception as e:
+        check("法规检索引擎自检", False, repr(e))
+
+    # --- 3.52 结构化引擎（引擎 3：字段树 + 原文锚点）---
+    print("\n[3.52] 结构化引擎（字段树 + 原文锚点）")
+    try:
+        sp2 = os.path.join(HERE, "structure.py")
+        if not os.path.exists(sp2):
+            check("结构化：脚本存在", False, "缺 scripts/structure.py")
+        else:
+            check("结构化：脚本存在", True, "scripts/structure.py")
+            sample = ("甲方：北京某某科技有限公司\n乙方：上海某某贸易有限公司\n"
+                      "第二条 标的：服务器设备一批\n"
+                      "第三条 甲方应于2026年1月1日前支付货款100万元。\n"
+                      "第四条 乙方应于收到货款后30日内交付。\n"
+                      "第五条 违约责任：按合同总价20%支付违约金。\n"
+                      "第六条 其他事项另行约定。")
+            r = run([PY, sp2, "--text", sample])
+            o = r.stdout or ""
+            check("结构化：当事人/金额/日期/期限/标的均抽出",
+                  r.returncode == 0 and "北京某某科技有限公司" in o
+                  and "100万元" in o and "2026年1月1日" in o
+                  and "30日内" in o and "服务器设备一批" in o, head_lines(o))
+            check("结构化：比例型金额单独识别（合同总价20%）",
+                  "比例金额" in o and "合同总价20%" in o, head_lines(o))
+            check("结构化：「另行约定」标为另约而非漏抽",
+                  "另约" in o, head_lines(o))
+            check("结构化：每个取值都带原文锚点",
+                  o.count("…") >= 6, "锚点数 %d" % o.count("…"))
+            # 抽不到必须明说未识别，不许编
+            r2 = run([PY, sp2, "--text", "本合同未尽事宜由双方协商解决。"])
+            o2 = r2.stdout or ""
+            check("结构化：抽不到即标「未识别」，不猜测",
+                  "未识别" in o2 and "不猜测" in o2, head_lines(o2))
+    except Exception as e:
+        check("结构化引擎自检", False, repr(e))
+
+    # --- 3.53 公文格式引擎（引擎 10：GB/T 9704 体检）---
+    print("\n[3.53] 公文格式引擎（GB/T 9704 体检）")
+    try:
+        gp = os.path.join(HERE, "gb9704.py")
+        if not os.path.exists(gp):
+            check("公文格式：脚本存在", False, "缺 scripts/gb9704.py")
+        else:
+            check("公文格式：脚本存在", True, "scripts/gb9704.py")
+            r = run([PY, gp, "--rules"])
+            o = r.stdout or ""
+            check("公文格式：覆盖项清单可读，且标注可机测与否",
+                  r.returncode == 0 and "可机器判定" in o and "否" in o, head_lines(o))
+
+            # 造两份 docx：一份合标、一份故意不合规，验证判据方向不反
+            try:
+                from docx import Document
+                from docx.shared import Pt, Mm
+                from docx.enum.text import WD_ALIGN_PARAGRAPH
+                import tempfile as _tf
+                _td = _tf.mkdtemp(prefix="gb9704-")
+                good = os.path.join(_td, "good.docx")
+                d = Document()
+                s = d.sections[0]
+                s.page_width, s.page_height = Mm(210), Mm(297)
+                s.top_margin, s.bottom_margin = Mm(37), Mm(35)
+                s.left_margin, s.right_margin = Mm(28), Mm(26)
+                p = d.add_paragraph()
+                p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                p.add_run("关于开展检查工作的通知").font.size = Pt(22)
+                p2 = d.add_paragraph()
+                p2.add_run("各单位应于本月底前完成自查。").font.size = Pt(16)
+                d.save(good)
+
+                bad = os.path.join(_td, "bad.docx")
+                d2 = Document()
+                s2 = d2.sections[0]
+                s2.top_margin, s2.left_margin = Mm(25), Mm(20)
+                p3 = d2.add_paragraph()
+                p3.add_run("标题").font.size = Pt(14)
+                d2.save(bad)
+
+                rg = run([PY, gp, "--check", good])
+                rb = run([PY, gp, "--check", bad])
+                check("公文格式：合标件判通过（退出码 0）",
+                      rg.returncode == 0 and "不符合 0 项" in (rg.stdout or ""),
+                      head_lines(rg.stdout))
+                check("公文格式：不合规件报不符合并给偏差值（退出码 1）",
+                      rb.returncode == 1 and "差" in (rb.stdout or "")
+                      and "不符合" in (rb.stdout or ""), head_lines(rb.stdout))
+                check("公文格式：算不出的项明标「需人工」，不冒充机测",
+                      "需人工" in (rg.stdout or ""), head_lines(rg.stdout))
+
+                # 接入核验引擎第四维：给 docx 应真跑，不给应如实标未启用
+                vp = os.path.join(HERE, "verify.py")
+                v1 = run([PY, vp, "--text", "测试", "--only", "fmt"])
+                v2 = run([PY, vp, "--text", "测试", "--only", "fmt", "--docx", good])
+                check("公文格式：未给 docx 时核验引擎如实标「未启用」",
+                      "未启用" in (v1.stdout or ""), head_lines(v1.stdout))
+                check("公文格式：给了 docx 后核验引擎第四维真跑（不再是占位）",
+                      "GB/T 9704 版式" in (v2.stdout or "")
+                      and "未启用" not in (v2.stdout or ""), head_lines(v2.stdout))
+                import shutil as _sh
+                _sh.rmtree(_td, ignore_errors=True)
+            except ImportError:
+                skip("公文格式：docx 体检（需 python-docx）")
+    except Exception as e:
+        check("公文格式引擎自检", False, repr(e))
 
     # --- 3.5 版本与依赖（分发与落地成本）---
     print("\n[3.5] 版本与依赖")

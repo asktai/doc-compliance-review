@@ -455,18 +455,57 @@ def _find_amount_pairs(text):
 
 # ---------------------------------------------------------------- ④ 格式核验
 
-def verify_format(text, fmt=None):
-    """格式核验。GB/T 9704 尚未接入，如实标「未接入」，不冒充通过。"""
-    return [Finding("格式核验", PASS, "未启用",
-                    "GB/T 9704 版式核验随公文格式引擎接入（当前为规划中，不做任何版式判断）")]
+def verify_format(text, fmt=None, docx_path=None):
+    """格式核验：GB/T 9704 版式体检。
+
+    判据来自同目录的 gb9704.py（公文格式引擎）。**拿不到 docx 就不假装核过**：
+      · 传了 docx_path → 真跑体检，逐项给结论
+      · 只有文本     → 如实标「未提供 docx，版式无从核验」，仍不冒充通过
+    """
+    if not docx_path:
+        return [Finding("格式核验", PASS, "未启用",
+                        "未提供 .docx，版式无从核验（GB/T 9704 体检需读源文件）；"
+                        "给出 --docx 后本项才真正生效")]
+
+    import importlib.util as _ilu
+    import os as _os
+    _p = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), "gb9704.py")
+    try:
+        _sp = _ilu.spec_from_file_location("gb9704", _p)
+        gb = _ilu.module_from_spec(_sp)
+        _sp.loader.exec_module(gb)
+        items, err = gb.check(docx_path)
+    except Exception as e:                                    # noqa: BLE001
+        return [Finding("格式核验", MANUAL, "未完成",
+                        "GB/T 9704 体检执行失败：%s" % e)]
+
+    if err:
+        return [Finding("格式核验", MANUAL, "未完成", "GB/T 9704 体检失败：%s" % err)]
+
+    bad = [x for x in items if not x.ok]
+    man = [x for x in items if x.manual]
+    if bad:
+        detail = "；".join("%s 应为 %s、实为 %s" % (x.name, x.want, x.got) for x in bad[:5])
+        more = "" if len(bad) <= 5 else "（另有 %d 项）" % (len(bad) - 5)
+        return [Finding("格式核验", BLOCK, "不符合 %d 项" % len(bad),
+                        "GB/T 9704 版式：%s%s" % (detail, more))]
+    if man:
+        return [Finding("格式核验", PASS, "可测项全符合",
+                        "GB/T 9704 版式：可机器判定的 %d 项全部符合；"
+                        "另有 %d 项需人工核对（%s）"
+                        % (len(items) - len(man), len(man),
+                           "、".join(x.name for x in man)))]
+    return [Finding("格式核验", PASS, "全部符合",
+                    "GB/T 9704 版式 %d 项全部符合" % len(items))]
 
 
 # ---------------------------------------------------------------- 汇总
 
-def run(text, spec=None, switches=None, only=None):
+def run(text, spec=None, switches=None, only=None, docx_path=None):
     """跑全部核验，返回 dict(findings, level, counts, law_rows)。
 
     only: 只跑指定项（"law"/"tpl"/"caliber"/"fmt"），便于单项调试。
+    docx_path: 产物 .docx 路径；格式核验（GB/T 9704）需读源文件才生效。
     """
     findings, law_rows = [], []
     want = set(only or ["law", "tpl", "caliber", "fmt"])
@@ -479,7 +518,7 @@ def run(text, spec=None, switches=None, only=None):
     if "caliber" in want:
         findings.extend(verify_caliber(text))
     if "fmt" in want:
-        findings.extend(verify_format(text))
+        findings.extend(verify_format(text, docx_path=docx_path))
 
     level = PASS
     for f in findings:
@@ -534,6 +573,7 @@ def main():
     ap.add_argument("--switch", action="append", default=[],
                     help="条件段开关，形如 name=1（可多次）")
     ap.add_argument("--only", default="", help="只跑指定项：law,tpl,caliber,fmt（逗号分隔）")
+    ap.add_argument("--docx", help="产物 .docx 路径；给了才做 GB/T 9704 版式体检")
     ap.add_argument("--json", help="把机读结果写到该路径")
     ap.add_argument("--level", default="manual", choices=["manual", "block"],
                     help="达到哪一档即返回非零退出码（默认 manual）")
@@ -570,7 +610,7 @@ def main():
         switches[k.strip()] = v.strip()
 
     only = [x.strip() for x in a.only.split(",") if x.strip()] or None
-    res = run(text, spec=spec, switches=switches, only=only)
+    res = run(text, spec=spec, switches=switches, only=only, docx_path=a.docx)
     sys.stdout.write(render_md(res, src, res["law_rows"]))
 
     if a.json:
