@@ -1654,6 +1654,58 @@ def _check_engine_count():
     _check_capability_count()
     _check_trigger_words()
     _check_subprocess_encoding()
+    _check_format_default()
+
+
+def _check_format_default():
+    """「--formats 的默认值」必须与 SKILL 登记的默认值一致，且缺省必须被询问。
+
+    为什么立这条（v3.25.6，千问办公用户反馈「产出物为何只有一个格式」）：
+    `make-docx.py` 的 `--formats` 默认只有 `docx`，而文档对外承诺「10 类 × 5 格式」。
+    默认值窄是有意的（不给用户塞一堆文件），但它是个**静默开关**——AI 跳过开场清单
+    直接执行时，用户拿到「承诺 5 格式、实际 1 格式」，全程没有任何提示。
+    **文档与代码在字面上一致**（文档确实写了「不选→仅 WORD」），所以此前门禁从不报错：
+    字面一致不等于用户知情。
+
+    判据刻意**不守措辞**（措辞一改守卫就废），而守两件事实：
+      ① 代码里的 default 值，必须能在 SKILL 的文件格式节找到对应登记（文档别说谎）；
+      ② 该节必须写明缺省时「必须问一次」（不许默默按默认值出件）。
+    """
+    mp = os.path.join(ROOT, "scripts", "make-docx.py")
+    sp = os.path.join(ROOT, "SKILL.md")
+    if not (os.path.exists(mp) and os.path.exists(sp)):
+        return
+    m = re.search(r'add_argument\(\s*"--formats"\s*,\s*default\s*=\s*"([^"]+)"',
+                  _read(mp))
+    if not m:
+        return
+    default = m.group(1)
+    src = _read(sp)
+    i = src.find("**文件格式（5 种")
+    if i < 0:
+        return
+    sec = src[i:i + 1200]
+    # ① 文档登记的默认值须与代码一致（映射 WORD→docx 等）
+    name_map = {"docx": "WORD", "md": "MD", "excel": "Excel", "html": "HTML", "pdf": "PDF"}
+    codenames = [c.strip() for c in default.split(",") if c.strip()]
+    for c in codenames:
+        label = name_map.get(c, c)
+        if label not in sec:
+            err("SKILL.md 的文件格式节未登记代码默认值 %s（%s）——文档与代码分家，"
+                "用户看到的承诺与实得的格式对不上" % (c, label))
+    # 双向判：守卫首版只判了「默认窄、文档没写」，漏了反向「默认宽、文档还写仅 WORD」
+    # （注入实测：把 default 改成 5 种，文档仍写「仅 WORD」，门禁全绿——漏报）。
+    says_only_word = ("仅 WORD" in sec or "仅WORD" in sec)
+    if len(codenames) == 1 and not says_only_word:
+        err("代码默认只出 %s，而 SKILL 文件格式节未写「仅 WORD」——缺省行为必须写在明处"
+            % default)
+    if len(codenames) > 1 and says_only_word:
+        err("代码默认已出 %d 种（%s），而 SKILL 文件格式节仍写「仅 WORD」——文档说的比给的少"
+            % (len(codenames), default))
+    # ② 缺省必须被询问，不许默默按默认值出件
+    if "必须问" not in sec:
+        err("SKILL.md 文件格式节未写明「产出前必须问一次」——缺省值窄可以，"
+            "但不许不声不响只用默认格式出件")
 
 
 def _check_subprocess_encoding():

@@ -7,7 +7,7 @@ description_zh: "给每天要看合同的人。可信是本技能与其他「AI 
 description_en: "Trustworthy by construction, which separates this skill from other AI contract review tools: every cited provision is compared verbatim against locally stored statutory text rather than recalled by the model; the library is re-verified against dual public sources so amended or repealed articles are flagged, not silently reused; document text, the desensitisation map and private rule sets never enter any request, and classified material is processed entirely on the local machine; every published figure is checked by a gate script and can be re-verified after install. Desensitises, reviews clause by clause, grades risks in three colours and produces redline revisions, comparison ledgers and opinion reports for contracts, agreements, authorisation and commitment letters, notices, policies, NDAs, SLAs and DPAs, covering payment and liquidated damages, delivery and acceptance, IP, confidentiality and non-compete, jurisdiction, arbitration, dispute resolution, limitation of action, contract validity, standard terms and personal information protection. Accepts background materials, adapts the review to a strong, balanced or weak bargaining position, summarises documents into key points and a mind map, and drafts contracts, reusable templates and converted templates. Also returns statutory text by question or article number with its source and an element-by-element breakdown (elements only, never a conclusion); compiles selected articles into a bound volume with contents and index, each statute carrying its version and effective date, transcribed verbatim rather than paraphrased; and checks documents against the GB/T 9704 official-document format standard, reporting the actual deviation. Nine industry rule sets included; handles Word, PDF, images and scanned files. Advisory only, not legal advice; review by a licensed lawyer is required."
 category: writing
 argument-hint: "<文档路径或文本> [版本/角色/尺度] | 审查 | 起草 | 比对 | 背景资料 | 脱敏 | 精要总结 | 思维导图 | 向导 | 撰写合同 | 撰写模板 | 文档转模板 | 合同转模板 | 技能版本 | 技能更新 | 技能升级 | 立查得 | 小查 | 帮助|help|? | 教程 | 私有库维护/备份/回溯/导入/导出 | 行业库维护/备份/回溯/导入/导出"
-version: 3.25.5
+version: 3.25.6
 license: 个人使用授权 · 商业使用须取得书面授权（见 `LICENSE.md`）
 author: 胡皓
 examples_zh:
@@ -26,7 +26,7 @@ examples_en:
 
 ![文档合规审查助手AI合同 · 合同与商务文档逐条审查 · 风险三色分级](assets/banner-dark.png)
 
-**v3.25.5** ｜ 作者：胡皓 ｜ 许可：个人使用授权 · 商业使用须取得书面授权（详见 `LICENSE.md`）
+**v3.25.6** ｜ 作者：胡皓 ｜ 许可：个人使用授权 · 商业使用须取得书面授权（详见 `LICENSE.md`）
 
 > **免责声明**：本技能仅作辅助法律工作，**不构成法律意见**，输出内容须经**执业律师复核**；**同一对话内首次使用时由技能先输出全文**（同一对话只此一次）——见**步骤 0.0**，全文亦见 `LICENSE.md`。
 
@@ -482,6 +482,16 @@ Qn+10 11. 补充（选填，可跳过：截止时间／重点条款／交易背�
   1. WORD（默认）  2. MD  3. Excel  4. HTML  5. PDF
   （不选或回「默认」→ 仅 WORD）
   ```
+
+  > **格式是产出前必收项**（与「审查人名称」同级，见本节末）：**不得因为用户没提就默默按 WORD 出件**。
+  > 清单已收则按清单执行、不再追问；**清单被跳过或该项未答时，产出前必须问一次**——用户回「默认」
+  > 或直接回车即按 WORD 出，但**这一问本身不能省**。
+  > 为什么写死：本技能对外承诺 10 类 × 5 种，而 `make-docx.py` 的 `--formats` 默认值只有 `docx`——
+  > **不传参就只出 Word**。这条默认值是有意的（不给用户塞一堆文件），但**它同时也是个静默开关**：
+  > AI 跳过清单直接执行时，用户拿到的是「承诺 5 种、到手只有 Word」，而全程没有任何提示告诉他本可以要更多。
+  > 缺省值可以窄，**窄必须是用户知道的窄**。
+  > **纯自动化**（无人值守、无人可问）时免问，但须在产出后如实说明本次只出了 WORD，
+  > 并列出可通过勾选获得的其余 4 种——**不许让缺省悄悄变成隐瞒**。
 
   对应参数 `--formats docx,md,excel,html,pdf`；五者均由 `make-docx.py` 实现——Excel 用 openpyxl，HTML 由 md 转换，PDF 由 docx 经 LibreOffice 转换。
   - **HTML 网页浏览版（第 5 种格式）**：产出**单文件网页**（CSS/JS 全内联、零外部资源，断网可开、可直接转发）；带**顶部固定目录导航**（锚点服务端生成，禁用 JS 也能跳转）、**点击标题折叠/展开条款**、右上角「**打印 / 存 PDF**」（`@media print` 已排 A4 版心并隐藏导航与按钮）；评级 ★/★★/★★★ 着色为**三色标签**（高红／中橙／低绿，与三色分级同色值）。由 md 转换，**优先用 `markdown` 库、缺失则自动降级内置转换器**（不报错、不阻断出件）。

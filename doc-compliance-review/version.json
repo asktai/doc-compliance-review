@@ -3,24 +3,43 @@
   "product": "文档合规审查助手AI合同",
   "skill_id": "doc-compliance-review",
   "latest": {
-    "version": "v3.25.5",
+    "version": "v3.25.6",
     "date": "2026-10-26",
-    "summary": "修 Windows 装机冒烟 8 项全灭的编码缺陷：subprocess text=True 六处锁定 UTF-8＋run_gate 假绿洞＋新增 subprocess 编码守卫（千问办公实测报告驱动）",
+    "summary": "产出物只出一个格式的定位与修复：非缺陷而是静默默认值（--formats 默认 docx），改为清单跳过时产出前必须问格式，并加格式默认值守卫",
     "changes": [
-      "根因：check.py 两处门禁自检子进程 text=True 未指定 encoding，Windows 下按 GBK 解码 UTF-8 输出致中文乱码、JSON 解析失败、报「门禁无输出」；开发侧 Linux 全 UTF-8 从不暴露",
-      "修复：六处 subprocess.run（check.py×2／smoke-test.py×1／make-docx.py×1／preprocess.py×2）统一 encoding=utf-8＋errors=replace，run_gate 的 env 加 PYTHONIOENCODING=utf-8 两端锁死",
-      "假绿洞：run_gate 门禁无输出时原返回 errs=[]，正向用例会把「门禁没跑成」当「通过」；改为 errs 带说明，正负用例两端都失败",
-      "新增守卫 _check_subprocess_encoding：text=True 须伴随恰好一个 encoding，按括号配平抓完整参数区判（按行 grep 会被多行调用骗）",
-      "守卫立起过程中自己炸一次：make-docx 续行已有 encoding 被按行 grep 误判为缺、又塞一个，keyword argument repeated 把冒烟炸成 33 失败，冒烟当场抓住；判据因此定为「恰好一次」",
-      "冒烟恢复 183/0/7，门禁 0 错 0 警"
+      "定位：不传 --formats 出 3 个文件全是 .docx，传全则 15 个（3 类 × 5 种）——5 种格式全部可用，非功能缺失；默认值 docx 自 v3.7.1 起如此，与文档「不选→仅 WORD」字面一致",
+      "真问题在路径：格式由开场清单第 9 项收集，清单被跳过时落到默认值且无任何提示；用户直接传文档审查即走此路径",
+      "采纳「不改默认值，改为强制询问」：SKILL 文件格式节新增产出前必收规则（与审查人名称同级），清单被跳过或未答时必须问一次，用户回默认即按 WORD；纯自动化免问但须如实说明只出 WORD 并列出其余 4 种",
+      "新增守卫 _check_format_default：守代码 default 与文档登记一致、缺省必须问，刻意不守措辞而守事实",
+      "守卫补反向漏洞：首版只判「默认窄文档没写」，注入「default 改 5 种、文档仍写仅 WORD」时全绿漏报；补为双向判",
+      "修文档时新写说明句含「实际 1 格式」被既有格式守卫抓为与「5 格式」打架（守卫正确、文案不当），已改为「到手只有 Word」；README 一句话流程同步补充",
+      "门禁 0 错 0 警，冒烟 183/0/7"
     ],
     "download_page": "https://github.com/asktai/doc-compliance-review/releases",
     "files": {
-      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.25.5/文档合规审查助手AI合同_v3.25.5_20261026_(doc-compliance-review).skill",
-      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.25.5/文档合规审查助手AI合同_v3.25.5_20261026_(doc-compliance-review).zip"
+      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.25.6/文档合规审查助手AI合同_v3.25.6_20261026_(doc-compliance-review).skill",
+      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.25.6/文档合规审查助手AI合同_v3.25.6_20261026_(doc-compliance-review).zip"
     }
   },
   "history": [
+    {
+      "version": "v3.25.5",
+      "date": "2026-10-26",
+      "summary": "修 Windows 装机冒烟 8 项全灭的编码缺陷：subprocess text=True 六处锁定 UTF-8＋run_gate 假绿洞＋新增 subprocess 编码守卫（千问办公实测报告驱动）",
+      "changes": [
+        "根因：check.py 两处门禁自检子进程 text=True 未指定 encoding，Windows 下按 GBK 解码 UTF-8 输出致中文乱码、JSON 解析失败、报「门禁无输出」；开发侧 Linux 全 UTF-8 从不暴露",
+        "修复：六处 subprocess.run（check.py×2／smoke-test.py×1／make-docx.py×1／preprocess.py×2）统一 encoding=utf-8＋errors=replace，run_gate 的 env 加 PYTHONIOENCODING=utf-8 两端锁死",
+        "假绿洞：run_gate 门禁无输出时原返回 errs=[]，正向用例会把「门禁没跑成」当「通过」；改为 errs 带说明，正负用例两端都失败",
+        "新增守卫 _check_subprocess_encoding：text=True 须伴随恰好一个 encoding，按括号配平抓完整参数区判（按行 grep 会被多行调用骗）",
+        "守卫立起过程中自己炸一次：make-docx 续行已有 encoding 被按行 grep 误判为缺、又塞一个，keyword argument repeated 把冒烟炸成 33 失败，冒烟当场抓住；判据因此定为「恰好一次」",
+        "冒烟恢复 183/0/7，门禁 0 错 0 警"
+      ],
+      "download_page": "https://github.com/asktai/doc-compliance-review/releases",
+      "files": {
+        "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.25.5/文档合规审查助手AI合同_v3.25.5_20261026_(doc-compliance-review).skill",
+        "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.25.5/文档合规审查助手AI合同_v3.25.5_20261026_(doc-compliance-review).zip"
+      }
+    },
     {
       "version": "v3.25.4",
       "date": "2026-10-26",
