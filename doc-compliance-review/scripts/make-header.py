@@ -116,10 +116,14 @@ FONT_CANDIDATES = {
     # 印章印文用：**必须选细体/中体**。膨胀是等量向内外推进的，
     # 粗体字的内腔本就窄，一膨胀就被吃掉、糊成墨团（实测 msyhbd 在 5.5% 膨胀下已不可辨）；
     # 细体的字腔宽，膨胀后既足够厚重、又保得住结构。
+    # 思源黑体＝Noto Sans CJK（Adobe/Google 联合开发，Google 发布版即 Noto）：
+    # 本机无 Light 字重时回退 Regular——Regular 字腔远宽于 Bold，膨胀后结构可保；
+    # 实测 Bold 回退（旧链在 Linux 无 Light 时落空）把「审」糊成墨团，即此病灶。
     "seal": [r"C:\Windows\Fonts\msyhl.ttc", r"C:\Windows\Fonts\Dengl.ttf",
              r"C:\Windows\Fonts\simhei.ttf", r"C:\Windows\Fonts\msyhbd.ttc",
              "/System/Library/Fonts/PingFang.ttc",
-             "/usr/share/fonts/opentype/noto/NotoSansCJK-Light.ttc"],
+             "/usr/share/fonts/opentype/noto/NotoSansCJK-Light.ttc",
+             "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"],
 }
 
 
@@ -262,15 +266,22 @@ def draw_risk_dots(d, cx, cy, color, font_path, unit):
 #      同时把笔画的端头与折角一并磨圆 —— 正是“粗壮圆润、饱满”的圆笔效果（半径 5.5% 为实测最佳）。
 
 
-def thick_glyph_mask(ch, w, h, font_path, grow=0.055, steps=36, blur=1.0):
+def thick_glyph_mask(ch, w, h, font_path, grow=0.055, steps=36, blur=1.0, grow_max=None):
     """生成一个字的「粗圆体」蒙版（L 模式，尺寸 w×h）。
 
     做法：先把字渲染到留足膨胀余量的字号，再沿半径为「grow×短边」的圆周
     重复绘制并取并集（＝圆盘膨胀），最后轻微模糊把折角磨圆。
+
+    grow_max＝膨胀半径的**绝对上限**（像素）。比例膨胀在小字上会把笔画
+    间隙粘死（图标印文 218px × 4.8% ≈ 21px，思源 Regular 的横画间隙
+    只有 20–28px，一膨胀就糊成墨团），大字则嫌不够。给上限后小字少膨、
+    大字照常，一个参数两头兼顾。
     """
     w, h = max(2, int(w)), max(2, int(h))
     side = min(w, h)
     r = side * grow
+    if grow_max is not None:
+        r = min(r, side * grow_max)
     target = side - 2 * r                      # 膨胀后正好填满短边
 
     # 1. 定字号：在 100 号下量一次真实包围盒，再按目标尺寸等比换算
@@ -299,11 +310,12 @@ def thick_glyph_mask(ch, w, h, font_path, grow=0.055, steps=36, blur=1.0):
     return canvas.crop((pad, pad, pad + w, pad + h))
 
 
-def render_thick_char(ch, w, h, color, font_path, grow=0.055, blur=1.0):
+def render_thick_char(ch, w, h, color, font_path, grow=0.055, blur=1.0, grow_max=None):
     """一个字的粗圆体成品图（RGBA，可直接 alpha_composite 到画布）。"""
     w, h = int(round(w)), int(round(h))
     out = Image.new("RGBA", (w, h), tuple(color) + (0,))
-    out.putalpha(thick_glyph_mask(ch, w, h, font_path, grow=grow, blur=blur))
+    out.putalpha(thick_glyph_mask(ch, w, h, font_path, grow=grow, blur=blur,
+                                  grow_max=grow_max))
     return out
 
 
@@ -334,7 +346,7 @@ def draw_seal_scan(img, cx, cy, size, t, unit=1, font_heavy=None, frame_size=Non
     # 内细边同步收到 0.066，双框不糊（小尺寸下更需留白）
     gs = size * 0.82
     g = render_thick_char("审", gs, gs, t["seal_ink"], font_heavy,
-                          grow=0.048, blur=1.0 * unit)
+                          grow=0.048, blur=1.0 * unit, grow_max=0.024)
     img.alpha_composite(g, (int(cx - g.width / 2), int(cy - g.height / 2)))
     # 外侧四角取景框：锚定**固定框**（半边长＝基准/2＋基准×0.24），与印章大小解耦，
     # 印章放大时取景框停在原处不动（若锚在印章外框上，印面一大就把框顶到圆角处被裁）；
