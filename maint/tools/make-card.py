@@ -86,12 +86,19 @@ BLOCKS = [
         "非合同也审：授权书／制度／NDA 等",
         "尺度两轴：粗细 × 强弱各有打法",
     ]),
-    ("安全 · 起草 · 沉淀 · 三层规则库", [
+    ("功能：安全 · 起草 · 沉淀", [
         "涉密纯本地：全量脱敏，正文不出电脑",
         "起草合同与各类文书 · 公文风排版",
-        "好文档转模板 · 私有库沉淀口径",
+        "好文档转模板 · 私有库沉淀内控口径",
+    ]),
+    ("架构：三库十五引擎", [
         "规则库三层叠加：通用只读／行业可选／私有最高",
-        "冲突按 私有 ＞ 行业 ＞ 通用，消解不掉交人工",
+        "法规库：本地＋云，云端双源双向校验",
+        "模板库出件三道硬校验；冲突消解交人工",
+    ]),
+    ("优势：可信是分界线", [
+        "法条比对原文不靠记忆；安全机制逐条登记",
+        "文档数字门禁实扫，对不上出不了包",
     ]),
 ]
 
@@ -426,39 +433,22 @@ def render_card(version, f_serif, f_sans, f_sansb, f_seal, ss=2, verbose=False):
 
     # (4) 一句话定位 22px（单行；超宽会在审计里以粘连/重叠形式暴露）
     f_tag = font(f_sans, 22 * U)
-    put((PAD * U, ls_y(sub_row_bottom + 30 * U, f_tag)), TAGLINE, f_tag, FG2, "ls")
+    tag_y = ls_y(sub_row_bottom + 30 * U, f_tag)
+    put((PAD * U, tag_y), TAGLINE, f_tag, FG2, "ls")
     y0 = sub_row_bottom + 30 * U + f_tag.size                    # 内容区起点
 
     # ============ 先量：各段高度 ============
     f_h = font(f_serif, 28 * U)        # 区块标题
     f_body = font(f_sans, 22 * U)      # 正文
-    f_chip = font(f_sans, 19 * U)      # chips
     LH, HEAD, BOTP = 37 * U, 84 * U, 22 * U
-    PITCH = 50 * U                     # chips 行距
-
-    def lay_chips(items, max_w):
-        sizes = [(c, d.textlength(c, font=f_chip) + 32 * U) for c in items]
-        rows, cur, cw = [], [], 0.0
-        for c, t in sizes:
-            if cw + t > max_w and cur:
-                rows.append((cur, cw))
-                cur, cw = [], 0.0
-            cur.append((c, t))
-            cw += t + 12 * U
-        if cur:
-            rows.append((cur, cw))
-        return rows
 
     def block_h(items):
         n = sum(len(wrap_text(d, it, f_body, CW * U - 92 * U)) for it in items)
         return HEAD + n * LH + BOTP
 
-    rows_dim = lay_chips(DIMENSIONS, CW * U - 8 * U)
-    rows_tax = lay_chips(TAX_CHIPS, CW * U - 8 * U)
-    chip_h = HEAD + len(rows_dim) * PITCH + 12 * U + len(rows_tax) * PITCH + 24 * U
-    hs = [block_h(BLOCKS[i][1]) for i in range(len(BLOCKS))] + [chip_h]
+    hs = [block_h(BLOCKS[i][1]) for i in range(len(BLOCKS))]
 
-    FOOT_BOX = 152 * U                 # 页脚占用的底部高度（固定，底部锚定）
+    FOOT_BOX = 126 * U                 # 页脚占用的底部高度（固定，底部锚定）
     fy = H - FOOT_BOX - 18 * U
     avail = (fy - 20 * U) - y0
     gap = (avail - sum(hs)) / max(1, len(hs))
@@ -485,39 +475,12 @@ def render_card(version, f_serif, f_sans, f_sansb, f_seal, ss=2, verbose=False):
                 yy += LH
         return ytop + bh
 
-    def draw_chips(ytop):
-        d.rounded_rectangle([PAD * U, ytop, W - PAD * U, ytop + chip_h], radius=20 * U,
-                            fill=(255, 255, 255, 10), outline=GOLD + (46,), width=max(1, int(1.4 * S)))
-        put((PAD * U + 26 * U, ytop + 22 * U), "覆盖风险维度", f_h, GOLD_LT, "la")
-        # 三色风险点：与"风险维度"标题同排右端（原在页脚，被交付物行压着）
-        draw_risk_dots(d, W - PAD * U - 148 * U, ytop + 40 * U, FG3 + (255,), f_sans, U,
-                       reg=lambda x, y, s, f, an: AUD.add(x, y, s, f, an))
-        d.rectangle([PAD * U + 26 * U, ytop + 70 * U, W - PAD * U - 26 * U, ytop + 71 * U],
-                    fill=GOLD + (60,))
-        cyy = ytop + HEAD
-        for row, _rw in rows_dim:
-            cx = PAD * U + 26 * U
-            for c, t in row:
-                d.rounded_rectangle([cx, cyy, cx + t, cyy + 38 * U], radius=11 * U,
-                                    fill=GOLD + (34,), outline=GOLD + (70,), width=max(1, int(1.2 * S)))
-                put((cx + t / 2, cyy + 19 * U), c, f_chip, FG2, "mm")
-                cx += t + 12 * U
-            cyy += PITCH
-        cyy += 12 * U
-        for row, _rw in rows_tax:                       # K 组：金色高亮，与通用维度区分
-            cx = PAD * U + 26 * U
-            for c, t in row:
-                d.rounded_rectangle([cx, cyy, cx + t, cyy + 38 * U], radius=11 * U,
-                                    fill=GOLD + (58,), outline=GOLD_LT + (150,), width=max(1, int(1.4 * S)))
-                put((cx + t / 2, cyy + 19 * U), c, f_chip, GOLD_LT, "mm")
-                cx += t + 12 * U
-            cyy += PITCH
-        return ytop + chip_h
-
     y = y0 + gap
+    # 三色风险点签名：首块标题行右端（chips 区已移除，签名迁至此处）
+    draw_risk_dots(d, W - PAD * U - 200 * U, y + 36 * U, FG3 + (255,), f_sans, U,
+                   reg=lambda x, y2, sa, fa, an: AUD.add(x, y2, sa, fa, an))
     for title, items in BLOCKS:
         y = draw_block(y, title, items) + gap
-    y = draw_chips(y) + gap
 
     # ============ 页脚（底部锚定，行间按墨迹盒推进） ============
     d.rectangle([PAD * U, fy, W - PAD * U, fy + 2 * U], fill=GOLD + (70,))
