@@ -79,15 +79,13 @@ def card_date():
         return ""
 
 BLOCKS = [
-    ("功能：审查 · 修订 · 比对", [
+    ("功能", [
         "逐条审查：三色分级＋标准立场＋话术",
         "原稿级修订：Word 原生修订，逐条取舍",
         "改稿比对：条款级差异，夹私货藏不住",
+        "涉密纯本地：全量脱敏，正文不出电脑",
         "非合同也审：授权书／制度／NDA 等",
         "尺度两轴：粗细 × 强弱各有打法",
-    ]),
-    ("功能：安全 · 起草 · 沉淀", [
-        "涉密纯本地：全量脱敏，正文不出电脑",
         "起草合同与各类文书 · 公文风排版",
         "好文档转模板 · 私有库沉淀内控口径",
     ]),
@@ -97,7 +95,8 @@ BLOCKS = [
         "模板库出件三道硬校验；冲突消解交人工",
     ]),
     ("优势：可信是分界线", [
-        "法条比对原文不靠记忆；安全机制逐条登记",
+        "法条逐条比对原文，不靠模型记忆",
+        "安全机制逐条登记，钉着在跑的代码判据",
         "文档数字门禁实扫，对不上出不了包",
     ]),
 ]
@@ -117,7 +116,7 @@ BG_TOP, BG_BOT = (11, 32, 56), (7, 21, 37)
 GLOW_GOLD = (201, 162, 74, 30)
 GLOW_BLUE = (46, 107, 168, 34)
 GOLD, GOLD_LT = (201, 162, 74), (227, 192, 113)
-FG, FG2, FG3 = (255, 255, 255), (176, 194, 214), (116, 140, 168)
+FG, FG2, FG3 = (255, 255, 255), (224, 234, 244), (116, 140, 168)
 SEAL_PAPER, SEAL_INK = (252, 249, 242), (179, 39, 30)
 RISK = [("高", (216, 68, 60)), ("中", (227, 166, 55)), ("低", (62, 155, 107))]
 
@@ -439,7 +438,8 @@ def render_card(version, f_serif, f_sans, f_sansb, f_seal, ss=2, verbose=False):
 
     # ============ 先量：各段高度 ============
     f_h = font(f_serif, 28 * U)        # 区块标题
-    f_body = font(f_sans, 22 * U)      # 正文
+    f_body = font(f_sansb, 22 * U)     # 正文（粗体亮白，缩略可读）
+    f_bodyb = f_body                    # 能力名同字体，靠金色区分
     LH, HEAD, BOTP = 37 * U, 84 * U, 22 * U
 
     def block_h(items):
@@ -463,14 +463,28 @@ def render_card(version, f_serif, f_sans, f_sansb, f_seal, ss=2, verbose=False):
         wrapped = [wrap_text(d, it, f_body, CW * U - 92 * U) for it in items]
         bh = HEAD + sum(len(w) for w in wrapped) * LH + BOTP
         d.rounded_rectangle([PAD * U, ytop, W - PAD * U, ytop + bh], radius=20 * U,
-                            fill=(255, 255, 255, 10), outline=GOLD + (46,), width=max(1, int(1.4 * S)))
+                            fill=(19, 40, 62), outline=GOLD + (46,), width=max(1, int(1.4 * S)))
         put((PAD * U + 26 * U, ytop + 22 * U), title, f_h, GOLD_LT, "la")
         d.rectangle([PAD * U + 26 * U, ytop + 70 * U, W - PAD * U - 26 * U, ytop + 71 * U],
                     fill=GOLD + (60,))
         yy = ytop + HEAD
-        for ws in wrapped:
-            d.ellipse([PAD * U + 28 * U, yy + 11 * U, PAD * U + 37 * U, yy + 20 * U], fill=GOLD + (200,))
-            for ln in ws:
+        for k, ws in enumerate(wrapped):
+            if k % 2 == 0:   # 隔行淡底色条，分隔条目便于阅读
+                d.rounded_rectangle(
+                    [PAD * U + 14 * U, yy - 4 * U, W - PAD * U - 14 * U, yy + LH - 2 * U],
+                    radius=8 * U, fill=(41, 60, 80))
+            d.ellipse([PAD * U + 28 * U, yy + 11 * U, PAD * U + 37 * U, yy + 20 * U], fill=GOLD + (220,))
+            # 冒号前能力名：金色加粗；其余正文提亮
+            first = ws[0]
+            name, sep, rest = first.partition("：")
+            if sep:
+                put((PAD * U + 52 * U, yy), name + "：", f_bodyb, GOLD_LT, "la")
+                nw = d.textlength(name + "：", font=f_bodyb)
+                put((PAD * U + 52 * U + nw, yy), rest, f_body, FG2, "la")
+            else:
+                put((PAD * U + 52 * U, yy), first, f_body, FG2, "la")
+            yy += LH
+            for ln in ws[1:]:
                 put((PAD * U + 52 * U, yy), ln, f_body, FG2, "la")
                 yy += LH
         return ytop + bh
