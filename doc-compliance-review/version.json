@@ -3,24 +3,42 @@
   "product": "文档合规审查助手AI合同",
   "skill_id": "doc-compliance-review",
   "latest": {
-    "version": "v3.23.5",
-    "date": "2026-10-23",
-    "summary": "质检修复：安全口径收敛到 SECURITY.md 真源、门禁数字一致性守卫扩到 SKILL.md 并加联网档位一致性断言、引擎表登记化（十一→十五引擎＋实现落点反查）",
+    "version": "v3.23.6",
+    "date": "2026-10-26",
+    "summary": "引擎质检修复闭环：把 v3.23.5 立起的十五引擎骨架从「登记了」补到「真在跑且门禁认得」——落点反查补目录型、冒烟补 13/14 引擎独立用例、四类核验补回格式维（GB/T 9704 占位）、引擎表 #5 补 rule-baseline.py 落点；冒烟 155→162 项",
     "changes": [
-      "质检发现对外文档三处失准且安全声明联网面比实际少（同型病灶第三次复发）：README 仍写「20 个脚本全部不联网」「仅检查更新会联网」两档旧口径、联网边界表缺「法规时效巡检」一行；SKILL 写「147 项冒烟」（实为 155）且门禁数字守卫不校验 SKILL 自己；骨架「十一引擎」表漏登 4 个实际在跑的引擎",
-      "安全口径收敛到 SECURITY.md 一处真源：README 2.1 联网边界改为四档表（L0/L1/L2/L3＋下载），档位计数不再写死在 README，改引用 SECURITY.md 第五章；删掉「20 个脚本」「仅检查更新会联网」旧表述",
-      "门禁数字一致性守卫从 README/教程扩到 SKILL.md（155 项冒烟等数字现在 SKILL 也受常驻校验）；新增 check_net_tier_consistency()：README/SKILL/教程/提示词版不得再出现两档旧口径、且「N 个脚本」须与真实数一致",
-      "引擎表登记化：补登安全引擎(check.py)、法规库失效巡检(freshness-patrol.py)、法规库交叉验证(legal-crosscheck.py)、失衡画像(imbalance.py) 共 4 行，十一→十五引擎；新增 check_engine_implementations() 反查文档点名的实现文件是否真实存在",
-      "三个新守卫均做负向验证：注入「20 个脚本」「仅检查更新会联网」「imbalance_NOTEXIST.py」三类错误全部当场拦下，确认守卫真在拦而不是永远绿",
-      "SKILL「数字只报实测值」条修正：147→155，并说明这些数字由门禁常驻校验而非靠记忆"
+      "质检逐项实跑门禁、对引擎表与 scripts/·core/ 真实落点逐一对账，发现四处「登记了却没真落实」的洞",
+      "(a) 门禁引擎表落点反查补「目录型」校验：此前只认 .py/.md/.json 文件落点，漏检 industries/ 这类目录落点，现三处候选目录（ROOT/scripts/core）逐一查找",
+      "(b) 冒烟补 13/14 引擎独立用例：法规库失效巡检离线自检（freshness-patrol.py --self-test，三组断言——同条必判一致／混入条目标题须判不一致／库内 sources 均带 grp/enc）；法规库交叉验证算法（legal-crosscheck.py verdict() 三组已知答案——全等→multi-ok/verified、明显不同→conflict、单源→single/verified=False 绝不伪装已核）＋库内条文层下钻断言无 single/conflict 瞒报",
+      "(c) README 引擎表 #11 与能力表「能核」行补「格式维＝GB/T 9704 随公文格式引擎接入（当前占位）」注——此前四类核验只写法条／模板／口径三条，格式维被漏标（SKILL 核验章节早已诚实写明「未接入→不冒充通过」）",
+      "(d) SKILL 引擎表 #5 补 rule-baseline.py 落点——规则库实现落点此前漏登该文件",
+      "冒烟 155 → 162 项（passed 155／skipped 7／failed 0），门禁与冒烟全绿；版本真源 SKILL.md frontmatter 与 VERSION.md 沿革、version.json latest 三处同步"
     ],
     "download_page": "https://github.com/asktai/doc-compliance-review/releases",
     "files": {
-      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.23.5/文档合规审查助手AI合同_v3.23.5_20261023_(doc-compliance-review).skill",
-      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.23.5/文档合规审查助手AI合同_v3.23.5_20261023_(doc-compliance-review).zip"
+      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.23.6/文档合规审查助手AI合同_v3.23.6_20261026_(doc-compliance-review).skill",
+      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.23.6/文档合规审查助手AI合同_v3.23.6_20261026_(doc-compliance-review).zip"
     }
   },
   "history": [
+    {
+      "version": "v3.23.5",
+      "date": "2026-10-23",
+      "summary": "质检修复：安全口径收敛到 SECURITY.md 真源、门禁数字一致性守卫扩到 SKILL.md 并加联网档位一致性断言、引擎表登记化（十一→十五引擎＋实现落点反查）",
+      "changes": [
+        "质检发现对外文档三处失准且安全声明联网面比实际少（同型病灶第三次复发）：README 仍写「20 个脚本全部不联网」「仅检查更新会联网」两档旧口径、联网边界表缺「法规时效巡检」一行；SKILL 写「147 项冒烟」（实为 155）且门禁数字守卫不校验 SKILL 自己；骨架「十一引擎」表漏登 4 个实际在跑的引擎",
+        "安全口径收敛到 SECURITY.md 一处真源：README 2.1 联网边界改为四档表（L0/L1/L2/L3＋下载），档位计数不再写死在 README，改引用 SECURITY.md 第五章；删掉「20 个脚本」「仅检查更新会联网」旧表述",
+        "门禁数字一致性守卫从 README/教程扩到 SKILL.md（155 项冒烟等数字现在 SKILL 也受常驻校验）；新增 check_net_tier_consistency()：README/SKILL/教程/提示词版不得再出现两档旧口径、且「N 个脚本」须与真实数一致",
+        "引擎表登记化：补登安全引擎(check.py)、法规库失效巡检(freshness-patrol.py)、法规库交叉验证(legal-crosscheck.py)、失衡画像(imbalance.py) 共 4 行，十一→十五引擎；新增 check_engine_implementations() 反查文档点名的实现文件是否真实存在",
+        "三个新守卫均做负向验证：注入「20 个脚本」「仅检查更新会联网」「imbalance_NOTEXIST.py」三类错误全部当场拦下，确认守卫真在拦而不是永远绿",
+        "SKILL「数字只报实测值」条修正：147→155，并说明这些数字由门禁常驻校验而非靠记忆"
+      ],
+      "download_page": "https://github.com/asktai/doc-compliance-review/releases",
+      "files": {
+        "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.23.5/文档合规审查助手AI合同_v3.23.5_20261023_(doc-compliance-review).skill",
+        "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.23.5/文档合规审查助手AI合同_v3.23.5_20261023_(doc-compliance-review).zip"
+      }
+    },
     {
       "version": "v3.23.4",
       "date": "2026-10-23",
@@ -302,5 +320,5 @@
   ],
   "_维护说明": "出包后请同步更新本文件（latest 段与 history）。真源是 SKILL.md 的 version 与 VERSION.md 的沿革；本文件是'对外公布的清单'，须与真源一致，否则使用者会被引向旧版。",
   "schema": 1,
-  "version": "v3.21.0"
+  "version": "v3.23.6"
 }

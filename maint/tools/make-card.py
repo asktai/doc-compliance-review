@@ -43,6 +43,7 @@ import os
 import re
 import sys
 import math
+import json
 import argparse
 
 try:
@@ -63,9 +64,19 @@ BOARD_W, BOARD_H = 1080, 1440
 # 保证每条恰好一行不折行；折行会让版面高度失控，故 length 由 verify_copy 兜底校验。
 EN_SUB = "DOCUMENT COMPLIANCE REVIEW ASSISTANT"
 TITLE_MAIN = "文档合规审查助手"
-SUB_TEXT = "AI 合同审核全能版"
+SUB_TEXT = "AI 合同"
 TAGLINE = "对合同、协议及授权书、承诺函等商务/业务文档做脱敏、逐条审查、三色分级与红线修订"
-AUTHOR_LINE = "作者：胡皓 ｜ 2026-09-24"
+AUTHOR = "作者：胡皓"
+
+
+def card_date():
+    """日期唯一真源＝version.json 的 latest.date，升版即随动，不再硬编码陈旧。"""
+    p = os.path.join(SKILL_ROOT, "version.json")
+    try:
+        d = json.load(open(p, encoding="utf-8"))
+        return (d.get("latest") or {}).get("date") or ""
+    except (OSError, ValueError):
+        return ""
 
 BLOCKS = [
     ("核心能力", [
@@ -408,7 +419,7 @@ def render_card(version, f_serif, f_sans, f_sansb, f_seal, ss=2, verbose=False):
     d.rounded_rectangle([xb, sub_ink_mid - 22 * U, xb + bw, sub_ink_mid + 22 * U], radius=17 * U,
                         fill=GOLD + (255,))
     put((xb + bw / 2, sub_ink_mid), badge, f_badge, (11, 32, 56), "mm")
-    put((xb + bw + 20 * U, sub_ink_mid), AUTHOR_LINE, font(f_sans, 18 * U), FG3, "lm")
+    put((xb + bw + 20 * U, sub_ink_mid), "%s ｜ %s" % (AUTHOR, card_date()), font(f_sans, 18 * U), FG3, "lm")
     # 取本行最高的元素作为行底（胶囊 46px 比文字墨迹高）
     sub_row_bottom = max(sub_base + 0.12 * f_sub.size, sub_ink_mid + cap_h / 2, sub_ink_mid + 22 * U)
 

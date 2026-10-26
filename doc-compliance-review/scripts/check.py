@@ -1531,18 +1531,37 @@ def check_engine_implementations():
         p = os.path.join(ROOT, rel)
         if not os.path.exists(p):
             continue
+        in_engine_tbl = False          # 只盯「对应实现」表头之下的引擎表行——
+                                       # README 还有守卫工具表等「| N |」编号表，
+                                       # 其说明列也会提到 `private/` 等目录，非实现落点，不可误扫
         for ln in _read(p).splitlines():
-            if not re.match(r"^\|\s*\d+\s*\|", ln):   # 只盯「| N |」开头的引擎表行
+            if "对应实现" in ln and ln.lstrip().startswith("|"):
+                in_engine_tbl = True
+                continue
+            if in_engine_tbl and not ln.lstrip().startswith("|"):
+                in_engine_tbl = False   # 表结束（空行/新章节）
+            if not (in_engine_tbl and re.match(r"^\|\s*\d+\s*\|", ln)):
                 continue
             for tok in re.findall(r"`([^`]+)`", ln):
                 tok = tok.strip()
-                # 只认「纯文件名型」落点：`make-docx.py`／`core/x.md`；
-                # 跳过命令型（`python scripts/check.py`，带空格）与非文件标记（`net-tier`）。
-                if " " in tok or not re.match(r"^[\w./+-]+\.(py|md|json)$", tok):
+                # 跳过命令型（`python scripts/check.py`，带空格）与非落点标记（`net-tier`）。
+                if " " in tok:
                     continue
-                cand = [os.path.join(ROOT, tok),
-                        os.path.join(ROOT, "scripts", tok),
-                        os.path.join(ROOT, "core", tok)]
+                # 纯文件名型落点：`make-docx.py`／`core/x.md`；
+                is_file = re.match(r"^[\w./+-]+\.(py|md|json)$", tok)
+                # 目录型落点：`industries/`（引擎表「对应实现」列也会写目录而非单文件）。
+                is_dir = re.match(r"^[\w./+-]+/$", tok)
+                if not (is_file or is_dir):
+                    continue
+                if is_dir:
+                    base = tok.rstrip("/")
+                    cand = [os.path.join(ROOT, base),
+                            os.path.join(ROOT, "scripts", base),
+                            os.path.join(ROOT, "core", base)]
+                else:
+                    cand = [os.path.join(ROOT, tok),
+                            os.path.join(ROOT, "scripts", tok),
+                            os.path.join(ROOT, "core", tok)]
                 if not any(os.path.exists(c) for c in cand):
                     missing.append("%s 引擎表声称的实现 `%s` 在技能目录里找不到" % (rel, tok))
     if missing:

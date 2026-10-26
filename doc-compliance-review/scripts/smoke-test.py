@@ -1228,6 +1228,64 @@ def main():
     except Exception as e:
         check("失衡画像自检", False, repr(e))
 
+    # --- 3.49 法规库失效巡检（引擎 13：库与已登记源是否仍一致）---
+    print("\n[3.49] 法规库失效巡检（离线自检，不联网）")
+    try:
+        fp = os.path.join(HERE, "freshness-patrol.py")
+        if not os.path.exists(fp):
+            check("法规库失效巡检：脚本存在", False, "缺 scripts/freshness-patrol.py")
+        else:
+            check("法规库失效巡检：脚本存在", True, "scripts/freshness-patrol.py")
+            r = run([PY, fp, "--self-test"])
+            o = r.stdout or ""
+            check("法规库失效巡检：离线自检全过（判据可分辨一致/换版，库内源可定位）",
+                  r.returncode == 0
+                  and "同一条文必判一致" in o
+                  and "混入条目标题须判不一致" in o
+                  and "库内 sources 均带 grp/enc" in o,
+                  head_lines(o))
+    except Exception as e:
+        check("法规库失效巡检自检", False, repr(e))
+
+    # --- 3.50 法规库交叉验证（引擎 14：库内条文多源比对是否可信）---
+    print("\n[3.50] 法规库交叉验证（多源比对算法 + 库内置信）")
+    try:
+        xc = os.path.join(HERE, "legal-crosscheck.py")
+        if not os.path.exists(xc):
+            check("法规库交叉验证：模块存在", False, "缺 scripts/legal-crosscheck.py")
+        else:
+            check("法规库交叉验证：模块存在", True, "scripts/legal-crosscheck.py")
+            import importlib.util as _ilu
+            _sp = _ilu.spec_from_file_location("_xc_probe", xc)
+            _xm = _ilu.module_from_spec(_sp)
+            _sp.loader.exec_module(_xm)
+            a_same = "用人单位自用工之日起即与劳动者建立劳动关系。"
+            a_diff = "经营者不得实施下列混淆行为，引人误认为是他人商品。"
+            v_same = _xm.verdict([("A", a_same), ("B", a_same)])
+            v_diff = _xm.verdict([("A", a_same), ("B", a_diff)])
+            v_single = _xm.verdict([("A", a_same)])
+            check("法规库交叉验证：两源全等判 multi-ok（已核）",
+                  v_same["status"] == "multi-ok" and v_same["verified"] is True, str(v_same))
+            check("法规库交叉验证：两源明显不同判 conflict（不猜谁对）",
+                  v_diff["status"] == "conflict", str(v_diff))
+            check("法规库交叉验证：单源判 single、verified=False（绝不伪装已核）",
+                  v_single["status"] == "single" and v_single["verified"] is False, str(v_single))
+            # 库内置信：下钻到条文层，凡有 status 字段者不得瞒报 single/conflict
+            dbp = os.path.join(os.path.dirname(HERE), "core", "legal-articles.json")
+            db = json.load(open(dbp, encoding="utf-8"))
+            arts = []
+            for _lw, _val in (db.get("laws") or {}).items():
+                if isinstance(_val, dict):
+                    arts.extend(_val.values())
+                elif isinstance(_val, list):
+                    arts.extend(_val)
+            bad = [a.get("status") for a in arts
+                   if isinstance(a, dict) and a.get("status") not in ("multi-ok", None)]
+            check("法规库交叉验证：库内条文状态可信（无 single/conflict 瞒报）",
+                  not bad, "异常状态: %s" % bad[:5])
+    except Exception as e:
+        check("法规库交叉验证自检", False, repr(e))
+
     # --- 3.5 版本与依赖（分发与落地成本）---
     print("\n[3.5] 版本与依赖")
     try:
