@@ -239,10 +239,12 @@ def draw_risk_dots(d, cx, cy, color, fpath, unit=1.0, reg=None):
         x += gap
 
 
-def thick_glyph_mask(ch, w, h, font_path, grow=0.05, steps=36, blur=1.0):
+def thick_glyph_mask(ch, w, h, font_path, grow=0.05, steps=36, blur=1.0, grow_max=None):
     w, h = max(2, int(w)), max(2, int(h))
     side = min(w, h)
     r = side * grow
+    if grow_max is not None:
+        r = min(r, side * grow_max)   # 膨胀半径绝对上限：小印文少膨，防笔画间隙粘连
     target = side - 2 * r
 
     def extent_of(size):
@@ -268,10 +270,11 @@ def thick_glyph_mask(ch, w, h, font_path, grow=0.05, steps=36, blur=1.0):
     return canvas.crop((pad, pad, pad + w, pad + h))
 
 
-def render_thick_char(ch, w, h, color, font_path, grow=0.05, blur=1.0):
+def render_thick_char(ch, w, h, color, font_path, grow=0.05, blur=1.0, grow_max=None):
     w, h = int(round(w)), int(round(h))
     out = Image.new("RGBA", (w, h), tuple(color) + (0,))
-    out.putalpha(thick_glyph_mask(ch, w, h, font_path, grow=grow, blur=blur))
+    out.putalpha(thick_glyph_mask(ch, w, h, font_path, grow=grow, blur=blur,
+                                  grow_max=grow_max))
     return out
 
 
@@ -289,7 +292,9 @@ def draw_seal(img, cx, cy, size, unit=1.0, fseal=None):
                         radius=rad * 0.55, outline=SEAL_INK + (150,),
                         width=max(2, int(1.8 * unit)))
     gs = size * 0.80
-    g = render_thick_char("审", gs, gs, SEAL_INK, fseal, grow=0.048, blur=1.0 * unit)
+    # blur 相对印文的比例与 icon（make-header ss=4 降采样）对齐：0.4*unit
+    g = render_thick_char("审", gs, gs, SEAL_INK, fseal, grow=0.030, blur=0.4 * unit,
+                          grow_max=0.012)
     img.alpha_composite(g, (int(cx - g.width / 2), int(cy - g.height / 2)))
     return d
 

@@ -116,13 +116,13 @@ FONT_CANDIDATES = {
     # 印章印文用：**必须选细体/中体**。膨胀是等量向内外推进的，
     # 粗体字的内腔本就窄，一膨胀就被吃掉、糊成墨团（实测 msyhbd 在 5.5% 膨胀下已不可辨）；
     # 细体的字腔宽，膨胀后既足够厚重、又保得住结构。
-    # 思源黑体＝Noto Sans CJK（Adobe/Google 联合开发，Google 发布版即 Noto）：
-    # 本机无 Light 字重时回退 Regular——Regular 字腔远宽于 Bold，膨胀后结构可保；
-    # 实测 Bold 回退（旧链在 Linux 无 Light 时落空）把「审」糊成墨团，即此病灶。
-    "seal": [r"C:\Windows\Fonts\msyhl.ttc", r"C:\Windows\Fonts\Dengl.ttf",
+    # 印文字体与 skill-card（make-card.py）**同源**：思源宋体 Bold 优先——卡片的印文
+    # 即此字体，横粗竖细＋衬线才有印章味；此前 header 用黑体族、卡片用宋体，两边分家，
+    # 已统一到卡片基准。思源黑体 Regular 仍留作回退（有衬线字体缺失时保底不糊）。
+    "seal": ["/usr/share/fonts/opentype/noto/NotoSerifCJK-Bold.ttc",
+             r"C:\Windows\Fonts\msyhl.ttc", r"C:\Windows\Fonts\Dengl.ttf",
              r"C:\Windows\Fonts\simhei.ttf", r"C:\Windows\Fonts\msyhbd.ttc",
              "/System/Library/Fonts/PingFang.ttc",
-             "/usr/share/fonts/opentype/noto/NotoSansCJK-Light.ttc",
              "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"],
 }
 
@@ -346,7 +346,7 @@ def draw_seal_scan(img, cx, cy, size, t, unit=1, font_heavy=None, frame_size=Non
     # 内细边同步收到 0.066，双框不糊（小尺寸下更需留白）
     gs = size * 0.82
     g = render_thick_char("审", gs, gs, t["seal_ink"], font_heavy,
-                          grow=0.048, blur=1.0 * unit, grow_max=0.024)
+                          grow=0.030, blur=0.8 * unit, grow_max=0.012)
     img.alpha_composite(g, (int(cx - g.width / 2), int(cy - g.height / 2)))
     # 外侧四角取景框：锚定**固定框**（半边长＝基准/2＋基准×0.24），与印章大小解耦，
     # 印章放大时取景框停在原处不动（若锚在印章外框上，印面一大就把框顶到圆角处被裁）；
@@ -452,7 +452,7 @@ def render_banner(theme_name, version, font_bold, font_reg, ss=4, k=1.0, font_se
             mx = pad_x + i * gw + gw / 2.0
             my = pad_y + gh / 2.0
             g = render_thick_char(ch, cell, cell, t["seal_ink"], fseal,
-                                  grow=0.048, blur=1.0 * S)
+                                  grow=0.030, blur=0.8 * S, grow_max=0.012)
             seal.alpha_composite(g, (int(mx - g.width / 2), int(my - g.height / 2)))
         seal = seal.rotate(-2, resample=Image.BICUBIC, expand=True)
         img.alpha_composite(seal, (int(cx - seal.width / 2), int(170 * U - seal.height / 2)))
