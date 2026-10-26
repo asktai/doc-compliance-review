@@ -110,12 +110,19 @@ DISCLAIM = "仅辅助用途，不构成法律意见；须经执业律师复核�
 LICENSE = "个人使用授权 · 商业使用须取得书面授权"
 
 # —— 配色（沿用头标 dark 主题）——
-BG_TOP, BG_BOT = (11, 32, 56), (7, 21, 37)
+BG_TOP, BG_BOT = (30, 74, 128), (18, 52, 96)
 GLOW_GOLD = (201, 162, 74, 30)
-GLOW_BLUE = (46, 107, 168, 34)
+GLOW_BLUE = (108, 178, 236, 42)
 GOLD, GOLD_LT = (201, 162, 74), (227, 192, 113)
 FG, FG2, FG3 = (255, 255, 255), (240, 246, 252), (168, 190, 214)
 SEAL_PAPER, SEAL_INK = (252, 249, 242), (179, 39, 30)
+# 三框浅底（浅绿 / 浅粉 / 浅黄）＋ 边线 ＋ 隔行条；深色文字压浅底，对比足、页面轻快
+BX_FILL = [(226, 243, 232), (252, 232, 238), (253, 246, 220)]
+BX_STRIPE = [(212, 235, 221), (246, 218, 227), (250, 239, 203)]
+BX_LINE = [(120, 178, 142, 190), (216, 138, 160, 190), (214, 178, 84, 200)]
+BX_TITLE = [(31, 104, 66), (158, 52, 82), (146, 100, 20)]     # 框标题深色
+BX_NAME = [(24, 122, 74), (176, 58, 90), (150, 98, 16)]       # 能力名（对应底色系）
+BX_TEXT = [(32, 52, 44), (58, 38, 44), (52, 46, 28)]          # 正文深色
 RISK = [("高", (216, 68, 60)), ("中", (227, 166, 55)), ("低", (62, 155, 107))]
 
 # —— 版面尺度（设计单位 px，1 设计单位最终 = 1 出图像素）——
@@ -382,7 +389,7 @@ def render_card(version, f_serif, f_sans, f_sansb, f_seal, ss=2, verbose=False):
         """已知墨迹顶、用 anchor='ls' 绘制时应传的基线 y。"""
         return ink_top + 0.88 * f.size
 
-    scan_lines(d, W, H, (46, 107, 168), unit=S, alpha=8)
+    scan_lines(d, W, H, (150, 205, 245), unit=S, alpha=7)
     d.rectangle([0, 0, W, 7 * S], fill=GOLD + (180,))
     d.rectangle([0, H - 5 * S, W, H], fill=GOLD + (110,))
 
@@ -461,56 +468,57 @@ def render_card(version, f_serif, f_sans, f_sansb, f_seal, ss=2, verbose=False):
     gap = min(gap, 66 * U)             # 别把版面拉散
 
     # ============ 后画：主体区块 ============
-    def draw_block(ytop, title, items):
+    def draw_block(ytop, title, items, bi):
         wrapped = [wrap_text(d, it, f_body, CW * U - 92 * U) for it in items]
         bh = HEAD + sum(len(w) for w in wrapped) * LH + BOTP
         d.rounded_rectangle([PAD * U, ytop, W - PAD * U, ytop + bh], radius=20 * U,
-                            fill=(14, 32, 52), outline=GOLD + (52,), width=max(1, int(1.4 * S)))
-        put((PAD * U + 26 * U, ytop + 22 * U), title, f_h, GOLD_LT, "la")
+                            fill=BX_FILL[bi], outline=BX_LINE[bi], width=max(1, int(1.6 * S)))
+        put((PAD * U + 26 * U, ytop + 22 * U), title, f_h, BX_TITLE[bi], "la")
         d.rectangle([PAD * U + 26 * U, ytop + 70 * U, W - PAD * U - 26 * U, ytop + 71 * U],
-                    fill=GOLD + (60,))
+                    fill=BX_LINE[bi])
         yy = ytop + HEAD
         for k, ws in enumerate(wrapped):
             if k % 2 == 0:   # 隔行淡底色条，分隔条目便于阅读
                 d.rounded_rectangle(
                     [PAD * U + 14 * U, yy - 4 * U, W - PAD * U - 14 * U, yy + LH - 2 * U],
-                    radius=8 * U, fill=(23, 44, 66))
-            d.ellipse([PAD * U + 28 * U, yy + 11 * U, PAD * U + 37 * U, yy + 20 * U], fill=GOLD + (220,))
+                    radius=8 * U, fill=BX_STRIPE[bi])
+            d.ellipse([PAD * U + 28 * U, yy + 11 * U, PAD * U + 37 * U, yy + 20 * U],
+                      fill=BX_NAME[bi] + (235,))
             # 冒号前能力名：金色加粗；其余正文提亮
             first = ws[0]
             name, sep, rest = first.partition("：")
             if sep:
-                put((PAD * U + 52 * U, yy), name + "：", f_bodyb, GOLD_LT, "la")
+                put((PAD * U + 52 * U, yy), name + "：", f_bodyb, BX_NAME[bi], "la")
                 nw = d.textlength(name + "：", font=f_bodyb)
-                put((PAD * U + 52 * U + nw, yy), rest, f_body, FG2, "la")
+                put((PAD * U + 52 * U + nw, yy), rest, f_body, BX_TEXT[bi], "la")
             else:
-                put((PAD * U + 52 * U, yy), first, f_body, FG2, "la")
+                put((PAD * U + 52 * U, yy), first, f_body, BX_TEXT[bi], "la")
             yy += LH
             for ln in ws[1:]:
-                put((PAD * U + 52 * U, yy), ln, f_body, FG2, "la")
+                put((PAD * U + 52 * U, yy), ln, f_body, BX_TEXT[bi], "la")
                 yy += LH
         return ytop + bh
 
     y = y0 + gap
     # 三色风险点签名：首块标题行右端（chips 区已移除，签名迁至此处）
-    draw_risk_dots(d, W - PAD * U - 200 * U, y + 36 * U, FG3 + (255,), f_sans, U,
+    draw_risk_dots(d, W - PAD * U - 200 * U, y + 36 * U, (58, 84, 118) + (255,), f_sans, U,
                    reg=lambda x, y2, sa, fa, an: AUD.add(x, y2, sa, fa, an))
-    for title, items in BLOCKS:
-        y = draw_block(y, title, items) + gap
+    for bi, (title, items) in enumerate(BLOCKS):
+        y = draw_block(y, title, items, bi) + gap
 
     # ============ 交付什么（亮点块：金色描边加粗） ============
     d.rounded_rectangle([PAD * U, y, W - PAD * U, y + deli_h], radius=20 * U,
-                        fill=(19, 40, 62), outline=GOLD_LT + (165,), width=max(2, int(2.2 * S)))
-    put((PAD * U + 26 * U, y + 22 * U), DELIVER_TITLE, f_h, GOLD_LT, "la")
-    d.rectangle([PAD * U + 26 * U, y + 70 * U, W - PAD * U - 26 * U, y + 71 * U], fill=GOLD + (90,))
-    put((PAD * U + 26 * U, y + HEAD + 6 * U), DELIVER, f_deli, FG2, "la")
+                        fill=BX_FILL[2], outline=BX_LINE[2], width=max(2, int(2.4 * S)))
+    put((PAD * U + 26 * U, y + 22 * U), DELIVER_TITLE, f_h, BX_TITLE[2], "la")
+    d.rectangle([PAD * U + 26 * U, y + 70 * U, W - PAD * U - 26 * U, y + 71 * U], fill=BX_LINE[2])
+    put((PAD * U + 26 * U, y + HEAD + 6 * U), DELIVER, f_deli, BX_TEXT[2], "la")
     # 格式徽章一排
     bx = PAD * U + 26 * U
     for fm in FORMATS:
         tw = d.textlength(fm, font=f_fmt) + 34 * U
         d.rounded_rectangle([bx, y + HEAD + 50 * U, bx + tw, y + HEAD + 88 * U], radius=11 * U,
-                            fill=GOLD + (48,), outline=GOLD_LT + (140,), width=max(1, int(1.4 * S)))
-        put((bx + tw / 2, y + HEAD + 69 * U), fm, f_fmt, GOLD_LT, "mm")
+                            fill=(255, 252, 236), outline=BX_LINE[2], width=max(1, int(1.6 * S)))
+        put((bx + tw / 2, y + HEAD + 69 * U), fm, f_fmt, BX_TITLE[2], "mm")
         bx += tw + 12 * U
     y = y + deli_h + gap
 
