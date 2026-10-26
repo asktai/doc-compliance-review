@@ -1454,6 +1454,107 @@ def main():
     except Exception as e:
         check("公文格式引擎自检", False, repr(e))
 
+    # --- 3.54 法规汇编引擎（引擎 17：编册，红线是「只搬运不撰写」）---
+    print("\n[3.54] 法规汇编引擎（编册 + 红线：只搬运不撰写）")
+    try:
+        cp2 = os.path.join(HERE, "legal-compile.py")
+        if not os.path.exists(cp2):
+            check("法规汇编：脚本存在", False, "缺 scripts/legal-compile.py")
+        else:
+            check("法规汇编：脚本存在", True, "scripts/legal-compile.py")
+            import tempfile as _tf2
+            _ctd = _tf2.mkdtemp(prefix="compile-")
+
+            # (a) 按主题汇编：必须成册——目录、正文、索引、附录齐备
+            out1 = os.path.join(_ctd, "a.md")
+            r = run([PY, cp2, "--ask", "竞业限制", "--title", "竞业限制法规汇编",
+                     "--out", out1])
+            md = ""
+            if os.path.exists(out1):
+                md = open(out1, encoding="utf-8").read()
+            check("法规汇编：按主题成册，体例五段齐备（说明/目录/条文/索引/附录）",
+                  r.returncode == 0 and all(k in md for k in
+                                            ("一、编制说明", "二、目录", "三、条文",
+                                             "四、条号索引", "五、附录")),
+                  head_lines(md))
+            check("法规汇编：每部法带版本与施行日（时效可核）",
+                  "版本" in md and "施行" in md, head_lines(md))
+            check("法规汇编：自报覆盖面，明说非法律全集",
+                  "不是法律全集" in md, head_lines(md))
+
+            # (b) 逐条指定：跨法、条号升序、区间紧凑
+            out2 = os.path.join(_ctd, "b.md")
+            r2 = run([PY, cp2, "--articles", "民法典:585,577 劳动合同法:23",
+                      "--title", "跨法汇编", "--out", out2])
+            md2 = open(out2, encoding="utf-8").read() if os.path.exists(out2) else ""
+            check("法规汇编：逐条指定可跨法成册且条号升序",
+                  r2.returncode == 0 and md2.index("第577条") < md2.index("第585条")
+                  and "劳动合同法" in md2, head_lines(md2))
+
+            # (c) 库外条号：明说未收录、列名、不补不替，退出码 1（全未收录不产空册）
+            r3 = run([PY, cp2, "--articles", "民法典:99999", "--title", "空册",
+                      "--out", os.path.join(_ctd, "c.md")])
+            o3 = (r3.stdout or "") + (r3.stderr or "")
+            check("法规汇编：库外条号明说未收录且不产空册（退出码 1）",
+                  r3.returncode == 1 and "未收录" in o3 and "不凭记忆" in o3,
+                  head_lines(o3))
+
+            # (d) 部分未收录：命中照录、缺失逐条列名
+            out4 = os.path.join(_ctd, "d.md")
+            run([PY, cp2, "--articles", "民法典:585,99999", "--title", "部分",
+                 "--out", out4])
+            md4 = open(out4, encoding="utf-8").read() if os.path.exists(out4) else ""
+            check("法规汇编：部分未收录时命中照录、缺失项在附录逐条列名",
+                  "第585条" in md4 and "5.2 未收录" in md4 and "第99999条" in md4,
+                  head_lines(md4))
+
+            # (e) 红线：汇编全文不得出现结论性用语
+            #     与 3.51 同理——法条原文里的话是法条自己的，先剔除再扫
+            import importlib.util as _ilu3
+            _sp3 = _ilu3.spec_from_file_location("_lc_probe", cp2)
+            _lc = _ilu3.module_from_spec(_sp3)
+            _sp3.loader.exec_module(_lc)
+            _cdb = _lc.load_db()
+            BANNED2 = ["建议", "评析", "我们认为", "本案", "胜诉", "败诉",
+                       "风险等级", "综上", "因此可", "结论是", "应予认定",
+                       "应认定", "构成违约", "属于违法", "宜认定", "不宜"]
+            _pk, _ab = _lc.collect(_cdb, ask="个人信息", limit=20)
+            _mdx, _st = _lc.build(_cdb, _pk, _ab, "红线自检", ask="个人信息")
+            _scrub2 = _mdx
+            for _r in _pk:
+                _scrub2 = _scrub2.replace(_r["text"], "")
+                _rq2 = _lc.ls.split_requirements(_r["text"])
+                for _x in [_rq2["scene"]] + _rq2["reqs"] + _rq2["excepts"]:
+                    if _x:
+                        _scrub2 = _scrub2.replace(_x, "")
+            _hit2 = [w for w in BANNED2 if w in _scrub2]
+            check("法规汇编：脚本生成部分无结论性用语（只搬运不撰写）",
+                  not _hit2 and _st["articles"] > 0, "越界: %s" % _hit2)
+
+            # (f) docx 输出不得漏出 Markdown 标记
+            try:
+                out5 = os.path.join(_ctd, "e.docx")
+                r5 = run([PY, cp2, "--ask", "竞业限制", "--title", "汇编 Word 版",
+                          "--format", "docx", "--out", out5])
+                if r5.returncode == 0 and os.path.exists(out5):
+                    from docx import Document as _Doc
+                    _d5 = _Doc(out5)
+                    _ps5 = [p.text for p in _d5.paragraphs if p.text.strip()]
+                    _leak = [x for x in _ps5 if "**" in x or "`" in x or "<sub>" in x]
+                    check("法规汇编：Word 版不漏 Markdown 标记且正文非空",
+                          not _leak and len(_ps5) > 5,
+                          "残留 %d 处 / 段落 %d" % (len(_leak), len(_ps5)))
+                else:
+                    check("法规汇编：Word 版不漏 Markdown 标记且正文非空",
+                          False, head_lines(r5.stderr))
+            except ImportError:
+                skip("法规汇编：Word 版（需 python-docx）")
+
+            import shutil as _sh2
+            _sh2.rmtree(_ctd, ignore_errors=True)
+    except Exception as e:
+        check("法规汇编引擎自检", False, repr(e))
+
     # --- 3.5 版本与依赖（分发与落地成本）---
     print("\n[3.5] 版本与依赖")
     try:

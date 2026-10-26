@@ -873,7 +873,8 @@ def _check_no_bytecode():
             "%s；应在首个 import 前加 `import sys as _sys` ＋ `_sys.dont_write_bytecode = True`"
             % ", ".join(bad))
         return
-    info("缓存防护: %d 个脚本均在 import 前关闭字节码写入（被 import 也不留 .pyc）"
+    info("缓存防护: %d 个脚本均在 import 前关闭字节码写入（被 import 也不留 .pyc；"
+         "计数不含门禁自身 check.py）"
          % len([p for p in _script_files() if p.endswith(".py")]))
 
 
