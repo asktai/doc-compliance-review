@@ -517,9 +517,24 @@ def read_skill_version(base):
     """
     try:
         with open(os.path.join(base, "SKILL.md"), encoding="utf-8-sig") as f:
-            # 注意：frontmatter 的 description 会随版本变长（曾出现 1200 字符读不到 version 行、
-            # 静默退化成 v0.0.0 包的事故），故取足 4000 字符，并只从 frontmatter 段内匹配。
-            head = f.read(4000)
+            # 曾经的写法是「读前 4000 字符再匹配」——这是一处隐患：description 会
+            # 随版本变长（确实出过 1200 字符时读不到 version 行、静默退化成 v0.0.0
+            # 包的事故），4000 只是把窗口往后推，**迟早还会被顶破**。而一旦顶破，
+            # 失败方式是静默的：不报错，直接打出 v0.0.0 的包。
+            # 改为**读到 frontmatter 结束为止**（第二个 --- 行），与长度彻底解耦。
+            buf, delim, n = [], 0, 0
+            for ln in f:
+                if ln.strip() == "---":
+                    delim += 1
+                    if delim == 2:
+                        break
+                    continue
+                if delim == 1:
+                    buf.append(ln)
+                n += 1
+                if n > 2000:      # 兜底：frontmatter 异常时不无限读
+                    break
+        head = "".join(buf)
         m = re.search(r"(?m)^version:\s*([0-9][0-9A-Za-z.\-]*)", head)
         if m:
             v = m.group(1).strip()
