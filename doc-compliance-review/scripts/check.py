@@ -1675,11 +1675,29 @@ def _check_format_default():
     sp = os.path.join(ROOT, "SKILL.md")
     if not (os.path.exists(mp) and os.path.exists(sp)):
         return
-    m = re.search(r'add_argument\(\s*"--formats"\s*,\s*default\s*=\s*"([^"]+)"',
-                  _read(mp))
-    if not m:
+    src_m = _read(mp)
+    # v3.25.7：default 改为哨兵 None，真值落在 FORMAT_FALLBACK 常量。
+    # 哨兵不是装饰——只有它能区分「用户没指定」与「用户显式写了 docx」，
+    # 而这两者的唯一区别就是前者必须留一句提示。哨兵一丢，缺省提示永不触发。
+    # 正则须同时吃下 default="docx" 与 default=None 两种写法（裸 None 不带引号）
+    m = re.search(r'add_argument\(\s*"--formats"\s*,\s*default\s*=\s*"?([^",)\s]+)"?', src_m)
+    raw = m.group(1) if m else None
+    if raw == "None":
+        fb = re.search(r'^FORMAT_FALLBACK\s*=\s*"([^"]+)"', src_m, re.M)
+        if not fb:
+            err("--formats 用了哨兵 default=None，但找不到 FORMAT_FALLBACK 常量——"
+                "缺省值无处可查，文档登记也就无从核对")
+            return
+        default = fb.group(1)
+    else:
+        default = raw
+        if raw is not None:
+            err("--formats 的 default 写成了固定值 %r 而非哨兵 None——"
+                "这样无法区分「用户没指定」与「用户显式指定 %s」，缺省提示永不触发"
+                % (raw, raw))
+    if raw is None:
+        err("--formats 未找到 default 声明，无法核对缺省格式")
         return
-    default = m.group(1)
     src = _read(sp)
     i = src.find("**文件格式（5 种")
     if i < 0:

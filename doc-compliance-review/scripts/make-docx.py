@@ -129,6 +129,13 @@ TYPE_ORDER = ["tracked", "reportc", "clean", "redline", "report",
               "masked", "original", "diff", "compare", "template"]
 # 用户未勾选时的默认产出：1 修订版 / 2 审查意见批注版 / 3 修改后清洁版
 DEFAULT_TYPES = ["tracked", "reportc", "clean"]
+# 用户未指定 --formats 时的兜底格式（v3.25.7）。
+# 真源在此一处：argparse 的 default 是哨兵 None，实际取值与门禁登记都读这个常量，
+# 避免「default 一改、文档又没跟上」这类分家。
+FORMAT_FALLBACK = "docx"
+# 全部可用格式，用于未指定时提示「你还可以拿到什么」
+FORMAT_ALL = ["docx", "md", "excel", "html", "pdf"]
+FORMAT_LABEL = {"docx": "WORD", "md": "MD", "excel": "Excel", "html": "HTML", "pdf": "PDF"}
 # 原文脱敏版默认 **12 类全脱**（含信用代码/金额/地址/人名；比例不脱）。
 # 真源＝desensitize.py 的 ALL_TYPES，此处直接取用，避免两处各写一份而漂移。
 MASK_TYPES = (_d.ALL_TYPES.split(",") if _d is not None
@@ -1863,7 +1870,11 @@ def main():
     ap.add_argument("--round", default=None); ap.add_argument("--ts", default=None)
     ap.add_argument("--types", default=None,
                     help="逗号分隔：tracked,reportc,clean,redline,report,masked,original,diff,compare,template（默认 1、2、3 三类；全部 10 类请显式列出；亦可写中文类型名）")
-    ap.add_argument("--formats", default="docx", help="逗号分隔：docx,md,excel,pdf,html（PDF 由 docx 转换；HTML 由 md 转换）")
+    # v3.25.7：默认值改哨兵 None，为的是能区分「用户没指定」与「用户显式写了 docx」。
+    # 二者结果相同（都只出 WORD），但前者必须留一句提示——缺省不许不声不响。
+    # 真正的兜底值在 FORMAT_FALLBACK 常量，门禁按它而不是按 default 守文档一致性。
+    ap.add_argument("--formats", default=None,
+                    help="逗号分隔：docx,md,excel,pdf,html（不写则仅 docx；PDF 由 docx 转换；HTML 由 md 转换）")
     ap.add_argument("--comments", action="store_true", help="兼容保留：等价于在 --types 中追加 reportc（审查意见批注版）")
     ap.add_argument("--style", default=None,
                     help="排版样式档位：default（不改动）/contract（合同风，默认）/official（公文风）；亦可写 spec.style 或 config.json 的 render.style；只对 1、3、4、6、7 五类生效")
@@ -1941,7 +1952,14 @@ def main():
         print("[make-docx] 提示：忽略无法识别的类型名 %s（可用 slug：%s）" % (",".join(unknown), ",".join(TYPE_ORDER)))
     if not types:
         print("[make-docx] 错误：--types 未包含任何有效类型。"); sys.exit(2)
-    fmts = [f.strip().lower() for f in a.formats.split(",") if f.strip()]
+    # v3.25.7：区分「没指定」与「显式写了 docx」——结果一样，但前者要留提示。
+    fmt_explicit = a.formats is not None
+    fmts = [f.strip().lower() for f in (a.formats or FORMAT_FALLBACK).split(",") if f.strip()]
+    bad = [f for f in fmts if f not in FORMAT_ALL]
+    if bad:
+        print("[make-docx] 提示：忽略无法识别的格式名 %s（可用：%s）"
+              % (",".join(bad), ",".join(FORMAT_ALL)))
+        fmts = [f for f in fmts if f in FORMAT_ALL]
     if not fmts:
         print("[make-docx] 错误：--formats 至少包含 docx / md / excel / pdf / html 之一。"); sys.exit(2)
     # 兼容：--comments 等价于选中 reportc（批注版＝正式交付物类型 5）
@@ -1978,6 +1996,14 @@ def main():
             made += export_pdf(docx_paths, a.out)
     print(f"[make-docx] 审查人={REVIEWER} 轮次=r{ROUND} 产出 {len(made)} 个文件于", os.path.abspath(a.out))
     for m in made: print("  -", m)
+    # v3.25.7：格式缺省不许不声不响。SKILL 要求「产出前必须问一次」，但模型若不问，
+    # 用户拿到手的仍只有 WORD 且毫不知情——这道尾注是那句承诺的兜底，不是替它问。
+    if not fmt_explicit:
+        rest = [FORMAT_LABEL[f] for f in FORMAT_ALL if f not in fmts]
+        if rest:
+            print("[make-docx] 提示：本次未指定 --formats，按默认只出了 %s；"
+                  "另有 %s 四种可勾选获得（--formats %s），需要请说明。"
+                  % (FORMAT_LABEL.get(fmts[0], fmts[0]), "／".join(rest), ",".join(FORMAT_ALL)))
 
 if __name__ == "__main__":
     try:

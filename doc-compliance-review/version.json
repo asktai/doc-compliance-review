@@ -3,7 +3,7 @@
   "product": "文档合规审查助手AI合同",
   "skill_id": "doc-compliance-review",
   "latest": {
-    "version": "v3.25.6",
+    "version": "v3.25.7",
     "date": "2026-10-26",
     "summary": "产出物只出一个格式的定位与修复：非缺陷而是静默默认值（--formats 默认 docx），改为清单跳过时产出前必须问格式，并加格式默认值守卫",
     "changes": [
@@ -17,8 +17,8 @@
     ],
     "download_page": "https://github.com/asktai/doc-compliance-review/releases",
     "files": {
-      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.25.6/文档合规审查助手AI合同_v3.25.6_20261026_(doc-compliance-review).skill",
-      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.25.6/文档合规审查助手AI合同_v3.25.6_20261026_(doc-compliance-review).zip"
+      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.25.7/文档合规审查助手AI合同_v3.25.7_20261028_(doc-compliance-review).skill",
+      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.25.7/文档合规审查助手AI合同_v3.25.7_20261028_(doc-compliance-review).zip"
     }
   },
   "history": [

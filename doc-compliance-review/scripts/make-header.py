@@ -523,6 +523,143 @@ def render_icon(theme_name, font_bold, ss=4, font_seal=None):
     return out.resize((ICON, ICON), Image.LANCZOS)
 
 
+def render_card(version, font_bold, font_reg, date_str=None, ss=2, font_seal=None):
+    """技能卡片（810×1080）：发布页/商店卡片用。
+
+    为什么并入本脚本：此前卡片由临时脚本 make-card.py 生成、用完即删，
+    skill-card.png 成了无生成器的孤儿——升版后没人记得怎么重刷，
+    门禁「头标版本串过期」守卫已两次拦下漏刷（v3.25.1、v3.25.7）。
+    并入后 make-header.py 一次出齐 5 张，孤儿问题根治。
+    版式复刻 v3.25.6 卡片：深蓝金底、三色信息区块、朱印「审」、格式胶囊。
+    """
+    import datetime as _dt
+    date_str = date_str or _dt.date.today().strftime("%Y-%m-%d")
+    W, H = 810 * ss, 1080 * ss
+    U = ss                                   # 1 单位 = 810 宽坐标系下的 1px
+    t = dict(THEMES["dark"])                 # 卡片固定深色版
+    img = Image.new("RGBA", (W, H), t["bg_top"])
+    img.paste(vgrad(W, H, t["bg_top"], t["bg_bot"]), (0, 0))
+    d = ImageDraw.Draw(img, "RGBA")
+
+    # 顶部装饰：扫描线 + 取景框角
+    scan_lines(d, W, H, t["scan"], unit=U)
+    gold, gold_lt, fg, fg2, fg3 = t["gold"], t["gold_lt"], t["fg"], t["fg2"], t["fg3"]
+
+    f_caps = font(font_bold, 15 * U)         # 英文小标题
+    f_title = font(font_bold, 46 * U)        # 主标题
+    f_badge = font(font_bold, 22 * U)        # 徽章行
+    f_meta = font(font_reg, 17 * U)          # 作者·日期
+    f_sub = font(font_reg, 16 * U)           # 副题
+    f_h2 = font(font_bold, 24 * U)           # 区块标题
+    f_item = font(font_reg, 16 * U)          # 区块条目
+    f_note = font(font_reg, 12 * U)          # 底部免责
+    f_tag = font(font_bold, 15 * U)          # 格式胶囊主字
+    f_tag2 = font(font_reg, 10 * U)          # 格式胶囊小字
+
+    def pill(x, y, txt, f, pad_x, pad_y, fill, fg_, radius=None, outline=None):
+        w_ = text_w(d, txt, f) + pad_x * 2 * U
+        h_ = f.size + pad_y * 2 * U
+        d.rounded_rectangle((x, y, x + w_, y + h_), radius=radius or h_ / 2,
+                            fill=fill, outline=outline, width=2 * U if outline else 0)
+        # 垂直居中按**墨迹实测**（getbbox）：CJK 字体 ascent 大、拉丁字面偏下，
+        # 按 f.size 居中会让字母贴底（实测 AI 徽章贴底）。y0/y1＝ink 上下界。
+        x0, y0, x1, y1 = d.textbbox((0, 0), txt, font=f)
+        d.text((x + pad_x * U - x0, y + (h_ - (y1 - y0)) // 2 - y0), txt, font=f, fill=fg_)
+        return w_, h_
+
+    def section(x, y, w_, title, items, bg, head, item_bg, row_h=None):
+        """三色信息区块：圆角底 + 标题 + 条目（隔行底条）。"""
+        rh = row_h or 34 * U
+        pad = 18 * U
+        h_ = pad + 34 * U + len(items) * rh + 10 * U
+        d.rounded_rectangle((x, y, x + w_, y + h_), radius=14 * U, fill=bg)
+        d.text((x + pad, y + pad), title, font=f_h2, fill=head)
+        d.line((x + pad, y + pad + 30 * U, x + w_ - pad, y + pad + 30 * U),
+               fill=head + (70,), width=1 * U)
+        iy = y + pad + 38 * U
+        for i, it in enumerate(items):
+            if i % 2 == 0:
+                d.rounded_rectangle((x + pad - 6 * U, iy - 2 * U, x + w_ - pad + 6 * U, iy + rh - 8 * U),
+                                    radius=6 * U, fill=item_bg)
+            d.ellipse((x + pad + 2 * U, iy + rh / 2 - 9 * U, x + pad + 2 * U + 8 * U, iy + rh / 2 - 1 * U),
+                      fill=head)
+            d.text((x + pad + 18 * U, iy + 2 * U), it, font=f_item, fill=head)
+            iy += rh
+        return h_
+
+    # ---- 顶部文字区
+    y = 46 * U
+    draw_tracked(d, (36 * U, y), "DOCUMENT COMPLIANCE REVIEW ASSISTANT",
+                 f_caps, gold, tracking=4 * U)
+    y += 30 * U
+    d.text((36 * U, y), "文档合规审查助手", font=f_title, fill=fg)
+    # 右上朱印「审」+ 取景框
+    draw_seal_scan(img, 726 * U, 96 * U, 96 * U, t, unit=U, font_heavy=font_seal,
+                   frame_size=126 * U)
+    d = ImageDraw.Draw(img, "RGBA")
+    y += 66 * U
+    bx = 36 * U
+    w_, h_ = pill(bx, y, "AI", f_badge, 18, 6, gold, t["bg_top"]); bx += w_ + 10 * U
+    d.text((bx, y + 2 * U), "AI 合同", font=f_badge, fill=gold_lt); bx += text_w(d, "AI 合同", f_badge) + 16 * U
+    w_, h_ = pill(bx, y, version, f_badge, 10, 3, gold, t["bg_top"]); bx += w_ + 14 * U
+    d.text((bx, y + 6 * U), "胡皓 · " + date_str, font=f_meta, fill=fg2)
+    y += h_ + 14 * U
+    d.text((36 * U, y), "逐条对标标准立场 · 风险三分级 · 出可交付的审查成果", font=f_sub, fill=fg2)
+
+    # ---- 三色区块
+    X, WD = 36 * U, 738 * U
+    y = 252 * U
+    y += section(X, y, WD, "能做什么", [
+        "逐条审查：三分分级＋标准立场＋可用话术",
+        "原稿级修订：Word 原生修订痕迹，逐条取舍",
+        "改稿比对：条款级差异，夹带私货藏不住",
+        "涉密纯本地：全量脱敏，正文不出电脑",
+        "起草文书：合同与各类文书，可选公文风排版",
+        "非合同也审：授权书／制度／NDA／SLA",
+        "法规检索：原文＋出处＋适用要件，不下结论",
+        "法规汇编：按主题编成册，带目录与时效",
+    ], bg=(223, 243, 228), head=(31, 122, 69), item_bg=(210, 236, 217))
+    y += 16 * U
+    y += section(X, y, WD, "凭什么可信", [
+        "法条原文：逐条比对，不靠模型记忆",
+        "法规库校验：本地＋云，双源双向核对",
+        "机制登记：逐条钉着在跑的代码判据",
+        "数字实扫：门禁核对，对不上出不了包",
+    ], bg=(251, 221, 227), head=(179, 39, 30), item_bg=(248, 203, 210))
+    y += 16 * U
+    # 黄块：标题 + 一行说明 + 格式胶囊
+    bh = 18 * U + 34 * U + 30 * U + 58 * U
+    d.rounded_rectangle((X, y, X + WD, y + bh), radius=14 * U, fill=(251, 239, 200))
+    hx = (139, 108, 40)
+    d.text((X + 18 * U, y + 18 * U), "交付什么", font=f_h2, fill=hx)
+    d.line((X + 18 * U, y + 18 * U + 30 * U, X + WD - 18 * U, y + 18 * U + 30 * U),
+           fill=hx + (70,), width=1 * U)
+    d.text((X + 18 * U, y + 56 * U),
+           "审查意见报告 · 原稿级修订版 · 比对台账 · 脱敏版 · 模板版 · 文档汇编 · 摘要与思维导图",
+           font=f_item, fill=(23, 38, 60))
+    tags = [("Word", "可编辑原稿"), ("Markdown", "纯文本"), ("Excel", "差异台账"),
+            ("HTML", "在线查阅"), ("PDF", "归档发送")]
+    tx = X + 18 * U
+    ty = y + 86 * U
+    for name, cap in tags:
+        tw = text_w(d, name, f_tag) + 20 * U
+        d.rounded_rectangle((tx, ty, tx + tw, ty + 48 * U), radius=8 * U,
+                            fill=(255, 253, 248), outline=gold, width=1 * U)
+        d.text((tx + 10 * U, ty + 5 * U), name, font=f_tag, fill=(23, 38, 60))
+        d.text((tx + 10 * U, ty + 27 * U), cap, font=f_tag2, fill=(120, 120, 110))
+        tx += tw + 12 * U
+    y += bh
+
+    # ---- 底部免责 + 金条
+    y = max(y + 14 * U, H - 62 * U)
+    d.text((36 * U, y), "仅辅助用途，不构成法律意见；须经执业律师复核后方可据此决策。",
+           font=f_note, fill=fg3)
+    d.text((36 * U, y + 20 * U), "个人使用授权 · 商业使用须取得书面授权", font=f_note, fill=fg3)
+    d.rectangle((0, H - 8 * U, W, H), fill=gold)
+
+    return img.resize((W // ss, H // ss), Image.LANCZOS).convert("RGB")
+
+
 def read_version():
     p = os.path.join(ROOT, "SKILL.md")
     try:
@@ -567,6 +704,9 @@ def main():
         jobs.append((os.path.join(a.out, "banner-%s%s.png" % (th, sfx)), "banner", th))
         if abs(a.scale - 1.0) < 1e-6:
             jobs.append((os.path.join(a.out, "icon-%s.png" % th), "icon", th))
+    # 技能卡片固定深色版一张（skill-card.png）；卡片无 --scale 缩放，仅原尺寸产出
+    if abs(a.scale - 1.0) < 1e-6 and a.theme in ("all", "dark"):
+        jobs.append((os.path.join(a.out, "skill-card.png"), "card", "dark"))
 
     if a.list:
         for p, kind, _ in jobs:
@@ -577,6 +717,8 @@ def main():
     for path, kind, th in jobs:
         if kind == "banner":
             im = render_banner(th, ver, fb, fr, ss=4, k=a.scale, font_seal=fseal)
+        elif kind == "card":
+            im = render_card(ver, fb, fr, ss=2, font_seal=fseal)
         else:
             im = render_icon(th, fb, ss=4, font_seal=fseal)
         # 把绘制时的版本串写进 PNG 元数据（tEXt），供 check.py 校验

@@ -215,6 +215,8 @@ try:
         m.check_net_tiers()
     elif which == "sec_matrix":
         m.check_security_matrix()
+    elif which == "fmt_default":
+        m._check_format_default()
     else:
         m._check_no_bytecode()
 except BaseException as e:
@@ -428,6 +430,78 @@ def _inject_gate_tests(tmp):
     else:
         out.append(("反向注入⑨：引入执行策略绕过 → M14 必须红", False, "注入点未命中"))
 
+    # ⑩–⑬ 格式缺省（v3.25.7）：代码默认只出 WORD 是有意的，但必须是**明示的缺省**，
+    #    不能是静默的。守卫一旦失效，症状不是报错而是"用户拿到一份 WORD 还以为只有这一种"。
+    #    副本根要先造一份 SKILL.md：格式门禁读不到「**文件格式（5 种」那一节就直接 return，
+    #    注入再狠也全绿——"副本缺文件"造成的假绿，比门禁失效更难发现（本轮实测踩过一次）。
+    _skill_ok = True
+    try:
+        with open(os.path.join(base, "SKILL.md"), "w", encoding="utf-8") as _f:
+            _f.write("## 十一、交付格式\n\n"
+                     "**文件格式（5 种：WORD／MD／Excel／HTML／PDF）**\n\n"
+                     "格式由开场清单第 9 项收集，不选或回「默认」→ 仅 WORD。\n\n"
+                     "格式是产出前必收项：清单被跳过或该项未答时，产出前必须问一次，"
+                     "用户回「默认」或直接回车即按 WORD 出，但这一问本身不能省。\n")
+    except Exception as e:
+        _skill_ok = False
+        out.append(("反向注入⑩–⑬：准备副本 SKILL.md", False, repr(e)))
+
+    def rewrite_root(fn, old, new):
+        """改副本根上的文档（格式门禁要拿 SKILL.md 与代码缺省值对账）。"""
+        fp = os.path.join(base, fn)
+        try:
+            t = open(fp, encoding="utf-8").read()
+        except Exception:
+            return False
+        if old not in t:
+            return False
+        open(fp, "w", encoding="utf-8").write(t.replace(old, new, 1))
+        return True
+
+    if _skill_ok:
+        # ⑩ 兜底值悄悄放宽到 5 种，文档却仍写「仅 WORD」——说的比给的少
+        if rewrite("make-docx.py", 'FORMAT_FALLBACK = "docx"',
+                   'FORMAT_FALLBACK = "docx,md,excel,html,pdf"'):
+            bad, errs, _ = run_gate("fmt_default")
+            hit = any("文档说的比给的少" in m for m in errs)
+            case("反向注入⑩：默认格式悄悄放宽到 5 种 → 文档仍写「仅 WORD」必须红",
+                 hit, "已报文档说的比给的少", "未报；" + (bad or "errs=%s" % errs))
+            rewrite("make-docx.py", 'FORMAT_FALLBACK = "docx,md,excel,html,pdf"',
+                    'FORMAT_FALLBACK = "docx"')
+        else:
+            out.append(("反向注入⑩：放宽 FORMAT_FALLBACK → 必须红", False, "注入点未命中"))
+
+        # ⑪ 文档删掉「必须问」——缺省不许不声不响，这是 v3.25.6 立的规矩
+        if rewrite_root("SKILL.md", "必须问", "必须-问"):
+            bad, errs, _ = run_gate("fmt_default")
+            hit = any("必须问" in m for m in errs)
+            case("反向注入⑪：SKILL 删掉「产出前必须问一次」→ 格式门禁必须红",
+                 hit, "已报缺省未要求询问", "未报；" + (bad or "errs=%s" % errs))
+            rewrite_root("SKILL.md", "必须-问", "必须问")
+        else:
+            out.append(("反向注入⑪：删「必须问」→ 必须红", False, "注入点未命中"))
+
+        # ⑫ 兜底值塞进文档压根没登记过的格式名
+        if rewrite("make-docx.py", 'FORMAT_FALLBACK = "docx"', 'FORMAT_FALLBACK = "docx,xyz"'):
+            bad, errs, _ = run_gate("fmt_default")
+            hit = any("未登记" in m and "xyz" in m for m in errs)
+            case("反向注入⑫：兜底值塞入未登记格式 xyz → 文档与代码分家必须红",
+                 hit, "已报 xyz 未登记", "未报；" + (bad or "errs=%s" % errs))
+            rewrite("make-docx.py", 'FORMAT_FALLBACK = "docx,xyz"', 'FORMAT_FALLBACK = "docx"')
+        else:
+            out.append(("反向注入⑫：塞未登记格式 → 必须红", False, "注入点未命中"))
+
+        # ⑬ 哨兵丢失：default 改回固定值后，再也分不清「用户没指定」与「用户显式写了 docx」，
+        #    缺省尾注永不触发；而文档与代码字面仍一致，这正是 v3.25.6 之前门禁从不报错的原因。
+        if rewrite("make-docx.py", '"--formats", default=None,', '"--formats", default="docx",'):
+            bad, errs, _ = run_gate("fmt_default")
+            hit = any("哨兵" in m for m in errs)
+            case("反向注入⑬：--formats 哨兵 default=None 改回固定值 → 必须红",
+                 hit, "已报哨兵丢失", "未报；" + (bad or "errs=%s" % errs))
+            rewrite("make-docx.py", '"--formats", default="docx",', '"--formats", default=None,')
+        else:
+            out.append(("反向注入⑬：哨兵改回固定值 → 必须红", False, "注入点未命中"))
+
     # ④ 对照组：副本**没改坏**时两个门禁都必须零 ERR。
     #    为什么要这一组：只验"改坏了会报"还不够——一个见谁报谁的门禁同样能通过 ①②③。
     #    必须同时证明"没改坏时不报"，才能说明报错是被注入的那一处触发的。
@@ -435,12 +509,13 @@ def _inject_gate_tests(tmp):
     bad2, errs2, _ = run_gate("bytecode")
     bad3, errs3, _ = run_gate("net_tiers")
     bad4, errs4, _ = run_gate("sec_matrix")
-    clean = not (errs or errs2 or errs3 or errs4)
-    out.append(("反向注入④（对照）：副本未改坏时四个门禁必须零报错",
+    bad5, errs5, _ = run_gate("fmt_default")
+    clean = not (errs or errs2 or errs3 or errs4 or errs5)
+    out.append(("反向注入④（对照）：副本未改坏时五个门禁必须零报错",
                 clean,
                 "均零报错" if clean
-                else ("误报：" + (bad or bad2 or bad3 or bad4
-                                 or str(errs + errs2 + errs3 + errs4)))))
+                else ("误报：" + (bad or bad2 or bad3 or bad4 or bad5
+                                 or str(errs + errs2 + errs3 + errs4 + errs5)))))
 
     shutil.rmtree(tmp, ignore_errors=True)
     return out
@@ -663,6 +738,21 @@ def main():
         check(f"产出 {k}.docx", any(k in f and f.endswith(".docx") and "批注版" not in f for f in produced))
     check("产出 审查意见批注版.docx（类型 2，--comments 兼容开关）",
           any("批注版" in f and f.endswith(".docx") for f in produced))
+
+    # 格式缺省尾注（v3.25.7）：不指定 --formats 时，出件后必须留一句"还有四种可勾选"；
+    # 显式指定则不许再啰嗦——两种情形出的文件一模一样，区别只在**用户有没有被问过**。
+    _ts = datetime.datetime.now().strftime("%Y%m%d-%H%M")
+    _od = os.path.join(work, "格式缺省")
+    _k = [PY, os.path.join(HERE, "make-docx.py"), spec, "--reviewer", "SMOKE-TEST",
+          "--ts", _ts, "--types", "tracked", "--out", _od]
+    _a = run(_k)
+    _oa = _a.stdout or ""
+    check("格式缺省：未指定 --formats 时出件后必须提示还有四种格式",
+          _a.returncode == 0 and "本次未指定 --formats" in _oa, tail_line(_oa))
+    _b = run(_k + ["--formats", "docx"])
+    _ob = _b.stdout or ""
+    check("格式缺省（对照）：显式指定 --formats docx 时不再提示",
+          _b.returncode == 0 and "本次未指定 --formats" not in _ob, tail_line(_ob))
     check("产出 Excel（.xlsx）", any(f.endswith(".xlsx") for f in produced))
     check("产出 HTML（.html，10 类全覆盖）",
           sum(1 for f in produced if f.endswith(".html")) >= 10)
