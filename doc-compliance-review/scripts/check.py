@@ -1243,20 +1243,27 @@ def check_doc_number_caliber():
     DOCS = ("SKILL.md", "README.md", "安装使用教程.md",
             "文档合规审查助手AI合同提示词版.md")
 
-    # ---- 真源 1：格式数 ----
+    # ---- 真源 1：格式数（make-docx.py 的 --formats 帮助串；锚定 --formats 并跨行，
+    #      以免被同文件的 --types 帮助「逗号分隔：tracked,…」抢匹配）----
     real_fmt = None
     mk = os.path.join(HERE, "make-docx.py")
     if os.path.exists(mk):
-        m = re.search(r'"--formats"[^\n]*?help="逗号分隔：([a-z,]+)', _read(mk))
+        m = re.search(r'"--formats".*?help="逗号分隔：([a-z,]+)', _read(mk), re.S)
         if m:
             real_fmt = len([x for x in m.group(1).split(",") if x])
-    # ---- 真源 2：菜单项数 ----
+    # ---- 真源 2：菜单项数（步骤 0.5 向导入口后的代码块，数「N. 」行；标题改名也不致失明）----
     real_menu = None
     sk = _read(os.path.join(ROOT, "SKILL.md")) if os.path.exists(os.path.join(ROOT, "SKILL.md")) else ""
-    m = re.search(r"【本技能功能 · 请单选】\n(.*?)```", sk, re.S)
+    m = re.search(r"步骤 0\.5 向导入口.*?```\n(.*?)```", sk, re.S)
     if m:
-        real_menu = len(re.findall(r"^\s*(\d+)\.\s", m.group(1), re.M))
-    # ---- 真源 3：内置库数 ----
+        real_menu = len(re.findall(r"^\s*\d+\.\s", m.group(1), re.M))
+    # ---- 真源 3：撰写合同要素项数（drafting-guide 要素清单里编号最大的项；标题/排版变动不致失明）----
+    real_elems = None
+    dg = _read(os.path.join(ROOT, "drafting-guide.md")) if os.path.exists(os.path.join(ROOT, "drafting-guide.md")) else ""
+    _en = [int(x) for x in re.findall(r"^\s*Qn(?:\+\d+)?\s+(\d+)\.\s", dg, re.M)]
+    if _en:
+        real_elems = max(_en)
+    # ---- 真源 4：内置库数 ----
     real_seed = None
     gd = os.path.join(HERE, "guard.py")
     if os.path.exists(gd):
@@ -1267,17 +1274,27 @@ def check_doc_number_caliber():
     src_note = []
     if real_fmt:  src_note.append("格式 %d" % real_fmt)
     if real_menu: src_note.append("菜单 %d 项" % real_menu)
+    if real_elems: src_note.append("要素 %d 项" % real_elems)
     if real_seed: src_note.append("内置库 %d 个" % real_seed)
+    # 真源解析失败＝守卫失明（v3.26.0 质检发现：菜单块标题改名、--formats 跨行，
+    # 曾导致 real_menu/real_fmt 静默为 None、整条数量守卫被跳过却 0 错通过）。
+    # 故解析不到一律**告警**，逼人修正则、而非假绿放行。
+    blind = [n for n, v in (("格式", real_fmt), ("菜单项数", real_menu),
+                            ("要素项数", real_elems), ("内置库数", real_seed)) if v is None]
+    if blind:
+        warn("数字口径：真源未能解析（%s），对应数量守卫已降级——请检查 make-docx.py / "
+             "SKILL.md 向导块 / drafting-guide.md 要素清单 / guard.py 的真源格式是否变动"
+             % "、".join(blind))
     if not src_note:
-        info("数字口径：真源未能解析，跳过")
         return
 
-    fmt_bad, menu_bad, seed_bad = [], [], []
+    fmt_bad, menu_bad, seed_bad, elems_bad = [], [], [], []
     for rel in DOCS:
         for ln, line in enumerate(_doc_lines(rel), 1):
-            # 格式数：「N 种格式」／「N 格式」／「N 种封装」不算（那是发布包封装格式）
+            # 格式数：「N 种格式」；必须带「种」字，否则会误伤「☐6 格式与体例降级」这类选项编号＋类别名。
+            # 「N 种封装」不算（那是发布包封装格式）。
             if real_fmt:
-                for m in re.finditer(r"(\d+)\s*种?\s*格式", line):
+                for m in re.finditer(r"(\d+)\s*种\s*格式", line):
                     if "封装" in line or ".skill" in line or ".zip" in line:
                         continue
                     n = int(m.group(1))
@@ -1301,6 +1318,17 @@ def check_doc_number_caliber():
                     n = int(m.group(1) or m.group(2))
                     if n != real_seed:
                         seed_bad.append("%s:%d 写 %d 个" % (rel, ln, n))
+            # 撰写合同要素项数：「N 项要素」必须＝ real_elems（v3.26.0 质检发现一处写 13、实为 15）
+            if real_elems and "要素" in line:
+                for ns in re.findall(r"(\d+)\s*项要素", line):
+                    n = int(ns)
+                    if n != real_elems:
+                        elems_bad.append("%s:%d 写 %d 项要素（应为 %d）" % (rel, ln, n, real_elems))
+            # drafting-guide 要素清单流水号自述须与真实项数对齐（Qn…Qn+K，K=real_elems-1）
+            if real_elems and rel == "drafting-guide.md" and "每项一个全局流水号" in line:
+                want = "Qn…Qn+%d" % (real_elems - 1)
+                if want not in line:
+                    elems_bad.append("%s:%d 流水号自述未写成 %s（实为 %d 项）" % (rel, ln, want, real_elems))
 
     msg = []
     if fmt_bad:
@@ -1312,6 +1340,9 @@ def check_doc_number_caliber():
     if seed_bad:
         err("内置行业库数失准（真源 `SEED_INDUSTRIES` 共 %d 个）：%s"
             % (real_seed, "；".join(seed_bad)))
+    if elems_bad:
+        err("撰写合同要素项数失准（真源 drafting-guide 要素清单共 %d 项）：%s"
+            % (real_elems, "；".join(elems_bad)))
 
     # ---- 真源 4：法规库规模（「17 部法 704 条」这类表述）----
     # 背景（v3.15.0/v3.16.0）：法条库从 85 条扩到 704 条，文档里「N 部法 M 条」出现在
@@ -1337,9 +1368,71 @@ def check_doc_number_caliber():
             err("法规库规模失准（真源 core/legal-articles.json 实为 %d 部法 %d 条）：%s"
                 % (real_laws, real_arts, "；".join(law_bad)))
 
-    if not (fmt_bad or menu_bad or seed_bad or law_bad):
+    if not (fmt_bad or menu_bad or seed_bad or elems_bad or law_bad):
         note = src_note + (["法条 %d 部 %d 条" % (real_laws, real_arts)] if real_laws else [])
-        info("数字口径：格式／菜单项数／内置库数／法规库规模与真源一致（%s）" % "、".join(note))
+        info("数字口径：格式／菜单项数／要素项数／内置库数／法规库规模与真源一致（%s）" % "、".join(note))
+
+
+def _check_doc_consistency():
+    """跨文件术语一致性 + 禁止陈旧/错误表述守卫（v3.26.0 质检后新增）。
+
+    专治两类复发：①「改了号没改话」——模型升级后旧表述残留（如尺度仍写「粗细×强弱两轴」、
+    漏掉新增的「侧重可多选」）；②「同一词文档内自相矛盾」——能检/能核 在 SKILL 与 README
+    内部各有一套相反定义。
+
+    设计：单一**禁止陈旧表述注册表 FORBID** 集中登记已知错误/陈旧写法，命中即报错；
+    另对 frontmatter 尺度描述、README 侧重清单做正向一致性断言。将来模型再变，改这里即可，
+    不必满文档找。
+    """
+    DOCS = ("SKILL.md", "README.md", "安装使用教程.md",
+            "文档合规审查助手AI合同提示词版.md", "drafting-guide.md")
+
+    def lines(rel):
+        p = os.path.join(ROOT, rel)
+        return [(i + 1, l) for i, l in enumerate(_read(p).split("\n"))] if os.path.exists(p) else []
+
+    # ---- 禁止陈旧/错误表述注册表（命中即错；改模型时同步更新此表）----
+    # 每条：(名称, 正则)。正则只抓「现行模型下绝不该出现」的写法。
+    FORBID = [
+        # 尺度旧两轴：把「强弱」错挂到「尺度」上、且漏掉 v3.26.0 新增的「侧重可多选」
+        ("尺度旧两轴·强弱挂尺度", r"审查尺度分粗细（严苛/中性/宽松）与强弱势"),
+        ("尺度旧两轴·强弱挂尺度·简", r"审查尺度分粗细与强弱势"),
+        # 能检/能核 互换错写：能检被说成「查风险」、能核被说成「机械错误」
+        ("能检错写成查风险", r"能检是\*\*查风险\*\*"),
+        ("能检错写成拿规则库查文档", r"能检 是拿规则库去查文档"),
+        ("能核错写成机械错误", r"能核\*\*是拿产物去对\"有没有机械错误\""),
+    ]
+    bad = []
+    for rel in DOCS:
+        for ln, line in lines(rel):
+            for name, pat in FORBID:
+                if re.search(pat, line):
+                    bad.append("%s:%d 命中禁止表述[%s]" % (rel, ln, name))
+    if bad:
+        err("文档含禁止的陈旧/错误表述（与现行模型冲突）：%s" % "；".join(bad))
+
+    # ---- frontmatter 的尺度描述须含「侧重可多选」（尺度模型已变，触发描述须同步）----
+    sk = _read(os.path.join(ROOT, "SKILL.md"))
+    fm = re.search(r"^---\n(.*?)\n---", sk, re.S)
+    if not fm:
+        err("SKILL.md 找不到 frontmatter 段，无法核对 description 尺度表述")
+    else:
+        fmb = fm.group(1)
+        for key in ("description:", "description_zh:"):
+            mm = re.search(r"^%s\s*(.*)$" % re.escape(key), fmb, re.M)
+            if not mm:
+                err("SKILL.md frontmatter 缺 %s 字段" % key)
+            elif "侧重可多选" not in mm.group(1):
+                err("SKILL.md frontmatter 的 %s 未含「侧重可多选」——尺度模型已变，触发描述须同步" % key)
+
+    # ---- README 侧重清单须含「自定义」（与开场清单第 6 题「侧重 4–8」逐处对齐）----
+    # 只在真正列举侧重项的行上查（以「合规底线加严」为标记），不误伤仅提及「侧重可多选」的简写行。
+    for ln, line in lines("README.md"):
+        if "合规底线加严" in line and "自定义" not in line:
+            err("README.md:%d 列举了侧重项却未含「自定义」——与开场清单第 6 题（侧重 4–8）不一致" % ln)
+
+    if not bad and fm:
+        info("术语一致性：尺度/能检表述与现行模型一致（FORBID 注册表无命中）")
 
 
 def check_package_fields():
@@ -2797,6 +2890,7 @@ def main():
         check_rule_metadata()
         check_smoke_count()
         check_doc_number_caliber()
+        _check_doc_consistency()
         check_package_fields()
         check_platform_limit()
         check_sample_baseline()
