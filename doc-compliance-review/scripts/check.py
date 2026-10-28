@@ -1427,6 +1427,68 @@ def check_package_fields():
         info("出包文件名示例：文档中的版本段与当前版本一致、形态合规（%s）" % tag)
 
 
+def _check_questionnaire_libraries():
+    """开场清单「加载库」一题须列全内置行业库；清单题号须连续 1–11。
+
+    为什么立这条（v3.26.0，用户要求「加载库时把 9 个库全部列出来，能多选」）：
+    清单是使用者**唯一能看见选项的地方**——漏列一个库，等于该库从此不会被加载，
+    而 industries/ 里的文件还在、其它守卫全绿，没人会发现。此前从没有守卫管这件事。
+    判据数据驱动：行业名从 industries/*-meta.md 的 industry 字段读，不硬编码名单，
+    新增行业库却忘了改清单，这里当场报出来。
+    """
+    sk = _read(os.path.join(ROOT, "SKILL.md"))
+    m = re.search(r"(?m)^\s*4\.\s+加载库", sk)
+    if not m:
+        err("开场清单里找不到「4. 加载库」一题——加载库是必答项，不得删除")
+        return
+    seg = sk[m.start():m.start() + 1200]
+    names = []
+    idir = os.path.join(ROOT, "industries")
+    if os.path.isdir(idir):
+        for f in sorted(os.listdir(idir)):
+            if not f.endswith("-meta.md") or f.startswith("_"):
+                continue
+            mm = re.search(r"(?m)^industry:\s*(.+)$", _read(os.path.join(idir, f)))
+            if mm and mm.group(1).strip():
+                names.append(mm.group(1).strip())
+    lost = [n for n in names if n not in seg]
+    if lost:
+        err("开场清单「加载库」未列出 %d 个内置行业库：%s——"
+            "使用者看不到的库等于不存在，该库从此不会被加载"
+            % (len(lost), "、".join(lost)))
+    # 题号连续性：清单必须 1–11 完整，缺号会让用户按题号作答时错位
+    body = sk[sk.find("【开场清单"):sk.find("【开场清单") + 2000]
+    nums = [int(x) for x in re.findall(r"(?m)^\s*(\d{1,2})\.\s", body)]
+    want = list(range(1, 12))
+    if nums[:11] != want:
+        err("开场清单题号不连续：实测 %s，应为 1–11" % (nums[:11] or "无"))
+    else:
+        info("开场清单：11 题题号连续，加载库已列全 %d 个内置行业库" % len(names))
+    # 尺度题必须「基准单选 ＋ 侧重多选」（v3.26.0 用户要求允许多选）。
+    # 双向判：缺侧重段＝退回纯单选（用户要多选）；把基准也写成可多选＝语义自相矛盾。
+    m6 = re.search(r"(?m)^\s*6\.\s+审查尺度", sk)
+    if not m6:
+        err("开场清单里找不到「6. 审查尺度」一题")
+    else:
+        seg6 = sk[m6.start():m6.start() + 900]
+        if "基准" not in seg6 or "侧重" not in seg6:
+            err("审查尺度须写明「基准（单选）＋侧重（可多选）」两段——"
+                "缺侧重段即退回纯单选，用户就没有多选可用了")
+        # 逐处检查：**每个**「侧重（…）」括号里都必须写「可多选」。
+        # 只判「全文某处有可多选」是不够的——实测漏过一次：清单处标了、执行口径处没标，
+        # 判据在别处命中就放行，等于两处表述分家却全绿。
+        for mm in re.finditer(r"侧重[（(]([^）)]{0,60})[）)]", sk):
+            if "可多选" not in mm.group(1):
+                err("审查尺度的侧重段未标「可多选」（原文：%s）——"
+                    "侧重是可叠加的多个方向，不标会被当成单选执行" % mm.group(0)[:40])
+        if re.search(r"基准（\*\*只选一个\*\*|基准（只选一个", seg6) is None:
+            err("审查尺度未标明基准「只选一个」——基准若也做成多选，「严苛＋宽松」会同时成立，语义矛盾")
+    # 作答语法必须存在（降低打字难度的落地条款），否则「回数字即可」成了空话
+    for must in ("3-11", "全默认", "同上"):
+        if must not in sk:
+            err("缺少作答语法写法 `%s`——用户少打字的入口被删了" % must)
+
+
 def check_version_consistency():
     """版本号一致性：SKILL.md frontmatter 为准，正文标题与各文档里的版本串都要跟上。
 
@@ -2753,6 +2815,7 @@ def main():
         check_gitignore()
         check_skill_ext_lowercase()
         check_version_consistency()
+        _check_questionnaire_libraries()
         check_manifest_version()
         check_config()
         check_hardcoded_paths()
