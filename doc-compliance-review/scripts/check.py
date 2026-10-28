@@ -1450,7 +1450,7 @@ def check_version_consistency():
     if not re.search(r"\*\*%s\*\*" % re.escape(v), t):
         bad.append("SKILL.md 正文标题")
     # 各文档里应出现该版本串
-    for rel in ("README.md", "SECURITY.md", "文档合规审查助手AI合同提示词版.md"):
+    for rel in ("README.md", "SECURITY.md", "文档合规审查助手AI合同提示词版.md", "安装使用教程.md"):
         p = os.path.join(ROOT, rel)
         if os.path.exists(p) and v not in _read(p):
             bad.append(rel)
@@ -2036,6 +2036,22 @@ def check_manifest_version():
                 err("version.json 的 history[%s] 的 %s 链接指向别版包（…%s）——"
                     "历史条目必须指向自己那一版" % (hv, k, u[-46:]))
                 break
+    # latest 的直链同理：文件名须含当前版本号（写成别版＝下载页把用户引向旧包）
+    for k, url in (lat.get("files") or {}).items():
+        u = str(url or "")
+        if u and ("_%s_" % tv) not in u:
+            err("version.json 的 latest.files.%s 指向的不是当前版本包（…%s）——"
+                "下载页会把用户引向旧包" % (k, u[-46:]))
+    # VERSION.md 是沿革的唯一载体（history 不随技能分发），故对外公布的每个版本
+    # 必须在沿革里出现过；反向不要求（沿革可以记未单独对外说明的版本）。
+    # 实测过一次：history 里有 v3.11.9，沿革整行缺——对外公布了沿革里没有的版本。
+    _vmd = _read(os.path.join(ROOT, "VERSION.md"))
+    _vset = set("v" + x.lower() for x in re.findall(r"(?m)^\| \*\*[vV]([\d.]+)\*\* \|", _vmd))
+    if _vset:
+        _lost = [x for x in _seen if x.lower() not in _vset]
+        if _lost:
+            err("version.json 的 history 里有 VERSION.md 沿革未记载的版本：%s——"
+                "history 是对外清单，不得公布沿革里没有的版本" % ("、".join(sorted(_lost))))
 
 
 def check_platform_limit():

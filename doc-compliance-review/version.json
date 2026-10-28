@@ -3,24 +3,42 @@
   "product": "文档合规审查助手AI合同",
   "skill_id": "doc-compliance-review",
   "latest": {
-    "version": "v3.25.8",
+    "version": "v3.25.9",
     "date": "2026-10-28",
-    "summary": "包内 version.json 只带 latest（history 不再随技能分发，沿革唯一载体是 VERSION.md）；新增 6 项冒烟（品牌头标 4 项·卡片孤儿防线 ＋ 出包裁剪 2 项）；顺手修掉 config.json 清空分支因路径前缀不匹配而从未生效的旧 bug",
+    "summary": "质检补漏：沿革与对外清单的版本集合对齐（补一处早期版本漏行），并把「安装使用教程进版本一致性校验」「latest 直链须指向当前版本」「history 不得公布沿革没有的版本」三道空档补成守卫",
     "changes": [
-      "包内 version.json 裁掉 history、只留 latest：history 属发布侧演进记录，与 VERSION.md 重复维护必分家（上一版实测断档与旧说明）。入包时由 strip_version_history() 裁剪，出包自检双向断言「包内不得含 history、latest.version 不得缺」",
-      "修旧 bug：_zip_write 以「带技能目录前缀的条目路径」比对不带前缀的 CONFIG_REL／VERSION_REL，判断永不命中——config.json 的 tools 清空其实一直没生效（因作者本机 tools 本就为空，多年未暴露）；改为同时接受带与不带前缀两种形态",
-      "冒烟新增 6 项：品牌头标 4 项（--list 须 5 项且含 skill-card.png／实跑生成 PNG 810×1080 且版本戳＝当前版本／版本戳随 --version 变化证明烧的是参数非写死／卡片非空白防纯色图），出包裁剪 2 项（裁剪函数只去 history 保留 latest／自检函数须含「包内不得含 history」判据）",
-      "四组元验证全部按预期变红（卡片改纯色／版本戳写死／卡片摘出产出清单／裁剪函数不裁），对照组零误报",
-      "附带清理交付目录里 6 个孤儿单文件（3.8.2–3.8.7 只有 zip 无 skill，属早期残件）",
-      "门禁 0 错 0 警，全量冒烟 202 项全绿"
+      "质检发现两处口径分家：对外清单的 history 里有某早期版本，而 VERSION.md 沿革整行缺失——等于对外公布了沿革里没有的版本；另有一道空档是「安装使用教程.md」从未纳入版本一致性校验（升版漏改它不会被拦）",
+      "新增守卫（三道，均双向或带明确方向）：① history 的每个版本必须在 VERSION.md 沿革里出现过（反向不要求：沿革可记未单独对外说明的版本）；② latest.files 的文件名须含当前版本号（写成别版＝下载页把用户引向旧包）；③ 安装使用教程.md 纳入版本串一致性校验",
+      "数据修正：补齐 VERSION.md 缺失的一处早期版本沿革行（描述取自对外清单，不改写事实）",
+      "三道新守卫均做反向注入：塞一条沿革没有的版本、把 latest 直链改指旧包、把教程里的版本串替换掉——全部当场拦下，对照组零误报",
+      "其余二十余项独立核算通过：17 部法 712 条（逐法明细）、159 条规则、9 个行业库（20 文件）、27 脚本与联网四档、17 引擎、20 能力、202 项冒烟（默认档 195+7、全量档 202+0，两档项数一致）、description 687 字符 43 触发词、包源对账仅差本机冒烟台账一项（有意排除）、文档引用文件全部存在、无旧数字残留",
+      "门禁 0 错 0 警"
     ],
     "download_page": "https://github.com/asktai/doc-compliance-review/releases",
     "files": {
-      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.25.8/文档合规审查助手AI合同_v3.25.8_20261028_(doc-compliance-review).skill",
-      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.25.8/文档合规审查助手AI合同_v3.25.8_20261028_(doc-compliance-review).zip"
+      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.25.9/文档合规审查助手AI合同_v3.25.9_20261028_(doc-compliance-review).skill",
+      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.25.9/文档合规审查助手AI合同_v3.25.9_20261028_(doc-compliance-review).zip"
     }
   },
   "history": [
+    {
+      "version": "v3.25.9",
+      "date": "2026-10-28",
+      "summary": "质检补漏：沿革与对外清单的版本集合对齐（补一处早期版本漏行），并把「安装使用教程进版本一致性校验」「latest 直链须指向当前版本」「history 不得公布沿革没有的版本」三道空档补成守卫",
+      "changes": [
+        "质检发现两处口径分家：对外清单的 history 里有某早期版本，而 VERSION.md 沿革整行缺失——等于对外公布了沿革里没有的版本；另有一道空档是「安装使用教程.md」从未纳入版本一致性校验（升版漏改它不会被拦）",
+        "新增守卫（三道，均双向或带明确方向）：① history 的每个版本必须在 VERSION.md 沿革里出现过（反向不要求：沿革可记未单独对外说明的版本）；② latest.files 的文件名须含当前版本号（写成别版＝下载页把用户引向旧包）；③ 安装使用教程.md 纳入版本串一致性校验",
+        "数据修正：补齐 VERSION.md 缺失的一处早期版本沿革行（描述取自对外清单，不改写事实）",
+        "三道新守卫均做反向注入：塞一条沿革没有的版本、把 latest 直链改指旧包、把教程里的版本串替换掉——全部当场拦下，对照组零误报",
+        "其余二十余项独立核算通过：17 部法 712 条（逐法明细）、159 条规则、9 个行业库（20 文件）、27 脚本与联网四档、17 引擎、20 能力、202 项冒烟（默认档 195+7、全量档 202+0，两档项数一致）、description 687 字符 43 触发词、包源对账仅差本机冒烟台账一项（有意排除）、文档引用文件全部存在、无旧数字残留",
+        "门禁 0 错 0 警"
+      ],
+      "download_page": "https://github.com/asktai/doc-compliance-review/releases",
+      "files": {
+        "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.25.9/文档合规审查助手AI合同_v3.25.9_20261028_(doc-compliance-review).skill",
+        "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.25.9/文档合规审查助手AI合同_v3.25.9_20261028_(doc-compliance-review).zip"
+      }
+    },
     {
       "version": "v3.25.8",
       "date": "2026-10-28",
@@ -612,5 +630,5 @@
   ],
   "_维护说明": "出包后请同步更新本文件（latest 段与 history）。真源是 SKILL.md 的 version 与 VERSION.md 的沿革；本文件是'对外公布的清单'，须与真源一致，否则使用者会被引向旧版。",
   "schema": 1,
-  "version": "3.25.8"
+  "version": "3.25.9"
 }
