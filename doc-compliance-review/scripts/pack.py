@@ -122,6 +122,12 @@ PLATFORM_MAX_DEPTH = 2
 # 出包时需清空的配置文件（相对技能根）——只清 tools 段，其余段（隐私/输出策略）保持原样
 CONFIG_REL = "scripts/config.json"
 
+# 对外版本清单：包内只留 latest（供「检查更新」用），**history 不随技能分发**（v3.25.8）。
+# 为什么：history 是发布侧演进记录，动辄几十条、每条数百字；使用者只需要知道
+# 「最新是哪版、改了什么、去哪下」。VERSION.md 已随包（沿革的唯一载体），
+# 包内再带一份 history 等于同一事实两处维护，必分家。
+VERSION_REL = "version.json"
+
 # zip 条目**固定时间戳**（可复现构建）：
 #   zf.write() 默认写源文件 mtime，而发布链 sync() 是 rmtree＋copytree 全量重建，
 #   重建后全部文件 mtime 都是同步时刻 → 同一版本每次重跑，包内容未变、字节却全变。
@@ -148,7 +154,24 @@ def neutralise_config(text):
     return json.dumps(d, ensure_ascii=False, indent=2) + "\n"
 
 
-def _zip_write(zf, fp, arc, blank_tools=False, report=None):
+def strip_version_history(text):
+    """把 version.json 的 history 数组整体移除，返回新文本；无 history 则返回 None。
+
+    包内只留 latest＋元信息：检查更新只用得上最新一版。history 属发布侧演进记录，
+    与 VERSION.md 重复维护必分家（v3.25.7 实测：history 断档、latest 说明没改，
+    对外清单显示「新版本号配旧说明」）。解析失败一律返回 None（宁原样打包，不出坏文件）。
+    """
+    try:
+        d = json.loads(text)
+    except Exception:
+        return None
+    if not isinstance(d, dict) or "history" not in d:
+        return None
+    d.pop("history", None)
+    return json.dumps(d, ensure_ascii=False, indent=2) + "\n"
+
+
+def _zip_write(zf, fp, arc, blank_tools=False, strip_history=False, report=None):
     """把单个文件写入 zip，**条目时间戳固定**，保证可复现构建。
 
     为什么要固定：`zf.write()` 默认把**源文件 mtime** 写进 zip 条目，而发布链的
@@ -158,7 +181,7 @@ def _zip_write(zf, fp, arc, blank_tools=False, report=None):
 
     config.json 的"清空工具路径"分支走 `writestr`，此处一并统一时间戳。
     """
-    if blank_tools and arc == CONFIG_REL:
+    if blank_tools and arc in (CONFIG_REL, SKILL_DIR + "/" + CONFIG_REL):
         try:
             with open(fp, encoding="utf-8") as cf:
                 got = neutralise_config(cf.read())
@@ -172,6 +195,20 @@ def _zip_write(zf, fp, arc, blank_tools=False, report=None):
             if report is not None:
                 report.append(arc)
             return
+    if strip_history and arc in (VERSION_REL, SKILL_DIR + "/" + VERSION_REL):
+        try:
+            with open(fp, encoding="utf-8") as vf:
+                got = strip_version_history(vf.read())
+        except Exception:
+            got = None
+        if got:
+            zi = zipfile.ZipInfo(arc, date_time=ZIP_EPOCH)
+            zi.compress_type = zipfile.ZIP_DEFLATED
+            zi.external_attr = 0o644 << 16
+            zf.writestr(zi, got)
+            # 不写入 report：report 是「tools 段已清空」名单，version.json 裁 history
+            # 另有独立结果行（见 build 里「包内 version.json 只带 latest」），混进来会串味。
+            return
     zi = zipfile.ZipInfo(arc, date_time=ZIP_EPOCH)
     zi.compress_type = zipfile.ZIP_DEFLATED
     zi.external_attr = 0o644 << 16
@@ -179,7 +216,8 @@ def _zip_write(zf, fp, arc, blank_tools=False, report=None):
         zf.writestr(zi, f.read())
 
 
-def add_tree(zf, base, relpath, recurse=True, prefix="", blank_tools=True, report=None):
+def add_tree(zf, base, relpath, recurse=True, prefix="", blank_tools=True,
+             strip_history=True, report=None):
     src = os.path.join(base, relpath)
     for root, dirs, files in os.walk(src):
         if recurse:
@@ -194,7 +232,7 @@ def add_tree(zf, base, relpath, recurse=True, prefix="", blank_tools=True, repor
             fp = os.path.join(root, f)
             arc = os.path.relpath(fp, base).replace("\\", "/")
             _zip_write(zf, fp, prefix + arc if prefix else arc,
-                       blank_tools=blank_tools, report=report)
+                       blank_tools=blank_tools, strip_history=strip_history, report=report)
 
 def verify_zip(zp):
     """出包自检：把上次被平台拒收的硬伤，做成**出包即拦**的守门（退码非 0 即视为打包失败）。
@@ -226,6 +264,24 @@ def verify_zip(zp):
     leaked = [n for n in names if n.startswith(SKILL_DIR + "/" + PRIVATE_DIR + "/")]
     if leaked:
         bad.append("private/ 混入了 %d 个文件（企业内控口径，不得外发）" % len(leaked))
+    # version.json：包内只许带 latest，history 不得随包（v3.25.8 起）。
+    # 双向判：history 漏裁即拦；latest 丢失同拦（否则使用者查不到最新版）。
+    vj = SKILL_DIR + "/" + VERSION_REL
+    if vj in names:
+        try:
+            with zipfile.ZipFile(zp) as zf2:
+                vd = json.loads(zf2.read(vj).decode("utf-8"))
+        except Exception as e:
+            bad.append("包内 %s 无法解析：%s" % (VERSION_REL, e))
+        else:
+            if "history" in vd:
+                bad.append("包内 %s 仍含 history（%d 条）——history 不随技能分发，"
+                           "沿革见 VERSION.md；strip_history 分支未生效"
+                           % (VERSION_REL, len(vd.get("history") or [])))
+            if not ((vd.get("latest") or {}).get("version") or "").strip():
+                bad.append("包内 %s 缺 latest.version——使用者将查不到最新版本" % VERSION_REL)
+    else:
+        bad.append("包内缺 %s（检查更新要靠它）" % VERSION_REL)
     return bad
 
 
@@ -461,11 +517,11 @@ def build(base, outdir, include_private=False, tag="v3.0.0", keep_tools=False, f
                 fp = os.path.join(base, f)
                 if os.path.exists(fp):
                     _zip_write(zf, fp, prefix + f, blank_tools=keep_tools is False,
-                               report=blanked)
+                               strip_history=True, report=blanked)
             for d in dirs:
                 if os.path.isdir(os.path.join(base, d)):
                     add_tree(zf, base, d, recurse=(d not in NONREC_DIRS), prefix=prefix,
-                             blank_tools=not keep_tools, report=blanked)
+                             blank_tools=not keep_tools, strip_history=True, report=blanked)
         with zipfile.ZipFile(zp) as zf:
             entries = zf.namelist()
         n_entry = len([n for n in entries if not n.endswith("/")])
@@ -490,6 +546,7 @@ def build(base, outdir, include_private=False, tag="v3.0.0", keep_tools=False, f
             return False
         print("  [OK] 出包自检通过：顶层／SKILL.md 计数／层级（≤%d 级）／体积（≤%d MB）／private 五项全过"
               % (PLATFORM_MAX_DEPTH, PLATFORM_MAX_MB))
+        print("  [OK] 包内 version.json 只带 latest（history 不随技能分发；沿革唯一载体是 VERSION.md）")
 
         # ---- 封装为 .skill（头部 ＋ 同一个 zip 负载）
         sp = os.path.join(outdir, "%s.%s" % (stem, FMT_EXT["skill"]))

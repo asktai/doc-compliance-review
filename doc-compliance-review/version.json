@@ -3,24 +3,42 @@
   "product": "文档合规审查助手AI合同",
   "skill_id": "doc-compliance-review",
   "latest": {
-    "version": "v3.25.7",
+    "version": "v3.25.8",
     "date": "2026-10-28",
-    "summary": "缺省出 WORD 从「无声」变「有声明」：--formats 哨兵化（None）＋出件尾注兜底，能区分「用户没指定」与「显式指定」；顺带把 skill-card 生成器并入 make-header 根治头图孤儿；冒烟 183→196",
+    "summary": "包内 version.json 只带 latest（history 不再随技能分发，沿革唯一载体是 VERSION.md）；新增 6 项冒烟（品牌头标 4 项·卡片孤儿防线 ＋ 出包裁剪 2 项）；顺手修掉 config.json 清空分支因路径前缀不匹配而从未生效的旧 bug",
     "changes": [
-      "--formats 默认值 docx → 哨兵 None（真值落 FORMAT_FALLBACK 常量），从此能区分「用户没指定」与「用户显式写 docx」：前者出件末尾自动提示「本次仅出 WORD，另有 MD／Excel／HTML／PDF 四种可勾选获得」，后者一字不多说",
-      "未知格式名过滤：--formats docx,zzz 忽略 zzz 并提示可用值，不再静默吞掉",
-      "行为三场景实测：A 不指定→带提示／B 显式→无提示／C 含未知格式名→忽略并出齐 5 种；首跑缺 PDF 复查为 soffice 冷启动偶发，失败路径本有告警，非静默",
-      "守卫 _check_format_default 适配哨兵并新增「哨兵丢失必须红」判据；冒烟新增 6 项（格式反向注入四组＋尾注行为两组含对照组），183→196，README／教程／SKILL 三处数字同步",
-      "头图孤儿根治：skill-card.png 的生成器 make-card.py 是临时脚本、从未入 git（头标守卫第二次抓到第 5 张图漏刷），卡片生成并入 make-header.py（render_card），一次出齐 5 张",
-      "门禁 0 错 0 警，全量冒烟 196 全绿"
+      "包内 version.json 裁掉 history、只留 latest：history 属发布侧演进记录，与 VERSION.md 重复维护必分家（上一版实测断档与旧说明）。入包时由 strip_version_history() 裁剪，出包自检双向断言「包内不得含 history、latest.version 不得缺」",
+      "修旧 bug：_zip_write 以「带技能目录前缀的条目路径」比对不带前缀的 CONFIG_REL／VERSION_REL，判断永不命中——config.json 的 tools 清空其实一直没生效（因作者本机 tools 本就为空，多年未暴露）；改为同时接受带与不带前缀两种形态",
+      "冒烟新增 6 项：品牌头标 4 项（--list 须 5 项且含 skill-card.png／实跑生成 PNG 810×1080 且版本戳＝当前版本／版本戳随 --version 变化证明烧的是参数非写死／卡片非空白防纯色图），出包裁剪 2 项（裁剪函数只去 history 保留 latest／自检函数须含「包内不得含 history」判据）",
+      "四组元验证全部按预期变红（卡片改纯色／版本戳写死／卡片摘出产出清单／裁剪函数不裁），对照组零误报",
+      "附带清理交付目录里 6 个孤儿单文件（3.8.2–3.8.7 只有 zip 无 skill，属早期残件）",
+      "门禁 0 错 0 警，全量冒烟 202 项全绿"
     ],
     "download_page": "https://github.com/asktai/doc-compliance-review/releases",
     "files": {
-      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.25.7/文档合规审查助手AI合同_v3.25.7_20261028_(doc-compliance-review).skill",
-      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.25.7/文档合规审查助手AI合同_v3.25.7_20261028_(doc-compliance-review).zip"
+      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.25.8/文档合规审查助手AI合同_v3.25.8_20261028_(doc-compliance-review).skill",
+      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.25.8/文档合规审查助手AI合同_v3.25.8_20261028_(doc-compliance-review).zip"
     }
   },
   "history": [
+    {
+      "version": "v3.25.8",
+      "date": "2026-10-28",
+      "summary": "包内 version.json 只带 latest（history 不再随技能分发，沿革唯一载体是 VERSION.md）；新增 6 项冒烟（品牌头标 4 项·卡片孤儿防线 ＋ 出包裁剪 2 项）；顺手修掉 config.json 清空分支因路径前缀不匹配而从未生效的旧 bug",
+      "changes": [
+        "包内 version.json 裁掉 history、只留 latest：history 属发布侧演进记录，与 VERSION.md 重复维护必分家（上一版实测断档与旧说明）。入包时由 strip_version_history() 裁剪，出包自检双向断言「包内不得含 history、latest.version 不得缺」",
+        "修旧 bug：_zip_write 以「带技能目录前缀的条目路径」比对不带前缀的 CONFIG_REL／VERSION_REL，判断永不命中——config.json 的 tools 清空其实一直没生效（因作者本机 tools 本就为空，多年未暴露）；改为同时接受带与不带前缀两种形态",
+        "冒烟新增 6 项：品牌头标 4 项（--list 须 5 项且含 skill-card.png／实跑生成 PNG 810×1080 且版本戳＝当前版本／版本戳随 --version 变化证明烧的是参数非写死／卡片非空白防纯色图），出包裁剪 2 项（裁剪函数只去 history 保留 latest／自检函数须含「包内不得含 history」判据）",
+        "四组元验证全部按预期变红（卡片改纯色／版本戳写死／卡片摘出产出清单／裁剪函数不裁），对照组零误报",
+        "附带清理交付目录里 6 个孤儿单文件（3.8.2–3.8.7 只有 zip 无 skill，属早期残件）",
+        "门禁 0 错 0 警，全量冒烟 202 项全绿"
+      ],
+      "download_page": "https://github.com/asktai/doc-compliance-review/releases",
+      "files": {
+        "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.25.8/文档合规审查助手AI合同_v3.25.8_20261028_(doc-compliance-review).skill",
+        "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.25.8/文档合规审查助手AI合同_v3.25.8_20261028_(doc-compliance-review).zip"
+      }
+    },
     {
       "version": "v3.25.7",
       "date": "2026-10-28",
@@ -54,8 +72,8 @@
       ],
       "download_page": "https://github.com/asktai/doc-compliance-review/releases",
       "files": {
-        "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.25.7/文档合规审查助手AI合同_v3.25.7_20261028_(doc-compliance-review).skill",
-        "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.25.7/文档合规审查助手AI合同_v3.25.7_20261028_(doc-compliance-review).zip"
+        "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.25.6/文档合规审查助手AI合同_v3.25.6_20261026_(doc-compliance-review).skill",
+        "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.25.6/文档合规审查助手AI合同_v3.25.6_20261026_(doc-compliance-review).zip"
       }
     },
     {
@@ -357,18 +375,6 @@
       }
     },
     {
-      "version": "v3.22.1",
-      "date": "2026-10-22",
-      "summary": "给联网边界与缓存防护两条门禁补上反向注入用例：证明改坏了会被拦住，不再是只在终端手工验过一次",
-      "changes": [
-        "冒烟 132 → 136 项：新增 4 项反向注入（联网越界／字节码开关／联网开关告警／未改坏时零误报的对照组）",
-        "注入跑法改为「只导入副本、只调那一个门禁函数」，不再跑整个 check.py：副本缺 SKILL.md 会让退出码为 1 而与门禁无关",
-        "判据收紧为「报错文本含该门禁专属措辞且点名被改的脚本」，不再以退出码代替理由",
-        "对照组的必要性：只验「改坏了会报」，见谁报谁的门禁同样能通过；必须同时证明「没改坏时不报」",
-        "README／安装使用教程／SKILL 的冒烟项数同步 136"
-      ]
-    },
-    {
       "version": "v3.22.0",
       "date": "2026-10-22",
       "summary": "把「零联网」从一句承诺改成一条可核验的事实，并修掉 5 个脚本的缓存泄漏",
@@ -381,7 +387,12 @@
         "check.py 新增缓存防护门禁：任一脚本未关闭字节码写入即报错",
         "冒烟 128 → 132 项：新增联网边界 3 项与缓存防护 1 项",
         "「脚本数」口径校验放宽：允许同时写「21 个脚本」与「处理文档的 20 个脚本」"
-      ]
+      ],
+      "download_page": "https://github.com/asktai/doc-compliance-review/releases",
+      "files": {
+        "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.22.0/文档合规审查助手AI合同_v3.22.0_20261022_(doc-compliance-review).skill",
+        "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.22.0/文档合规审查助手AI合同_v3.22.0_20261022_(doc-compliance-review).zip"
+      }
     },
     {
       "version": "v3.21.0",
@@ -393,100 +404,213 @@
         "判为系统性偏移时必须同时给出证据计数、最集中维度带条号、可打的反制点",
         "三条硬约束：不脱离立场谈偏向、样本不足就说不判、不外推成行业规律",
         "新增 scripts/imbalance.py：阈值写死为常量，判定可复现，不用心算"
-      ]
+      ],
+      "download_page": "https://github.com/asktai/doc-compliance-review/releases",
+      "files": {
+        "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.21.0/文档合规审查助手AI合同_v3.21.0_20261022_(doc-compliance-review).skill",
+        "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.21.0/文档合规审查助手AI合同_v3.21.0_20261022_(doc-compliance-review).zip"
+      }
     },
     {
       "version": "v3.20.0",
       "date": "2026-10-22",
-      "summary": "把「三库」讲透：内层改称「层」，停用重复的「三库」；能力串新增「能理解」「能分析」「能归纳」共十七项"
+      "summary": "把「三库」讲透：内层改称「层」，停用重复的「三库」；能力串新增「能理解」「能分析」「能归纳」共十七项",
+      "changes": null,
+      "download_page": "https://github.com/asktai/doc-compliance-review/releases",
+      "files": {
+        "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.20.0/文档合规审查助手AI合同_v3.20.0_20261022_(doc-compliance-review).skill",
+        "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.20.0/文档合规审查助手AI合同_v3.20.0_20261022_(doc-compliance-review).zip"
+      }
     },
     {
       "version": "v3.19.0",
       "date": "2026-10-22",
-      "summary": "新增第 11 个引擎「核验引擎」：产物出得去出不去的唯一裁判，四类核验＋三档出口＋必须给定位"
+      "summary": "新增第 11 个引擎「核验引擎」：产物出得去出不去的唯一裁判，四类核验＋三档出口＋必须给定位",
+      "changes": null,
+      "download_page": "https://github.com/asktai/doc-compliance-review/releases",
+      "files": {
+        "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.19.0/文档合规审查助手AI合同_v3.19.0_20261022_(doc-compliance-review).skill",
+        "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.19.0/文档合规审查助手AI合同_v3.19.0_20261022_(doc-compliance-review).zip"
+      }
     },
     {
       "version": "v3.18.0",
       "date": "2026-10-22",
-      "summary": "补正「三库」两层含义：产品级三库（规则／法规／模板）与规则库内三层（通用／行业／私有）分别成表"
+      "summary": "补正「三库」两层含义：产品级三库（规则／法规／模板）与规则库内三层（通用／行业／私有）分别成表",
+      "changes": null,
+      "download_page": "https://github.com/asktai/doc-compliance-review/releases",
+      "files": {
+        "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.18.0/文档合规审查助手AI合同_v3.18.0_20261022_(doc-compliance-review).skill",
+        "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.18.0/文档合规审查助手AI合同_v3.18.0_20261022_(doc-compliance-review).zip"
+      }
     },
     {
       "version": "v3.17.0",
       "date": "2026-10-22",
-      "summary": "立「三库十引擎」产品骨架与十三项能力表，标明在用／规划中"
+      "summary": "立「三库十引擎」产品骨架与十三项能力表，标明在用／规划中",
+      "changes": null,
+      "download_page": "https://github.com/asktai/doc-compliance-review/releases",
+      "files": {
+        "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.17.0/文档合规审查助手AI合同_v3.17.0_20261022_(doc-compliance-review).skill",
+        "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.17.0/文档合规审查助手AI合同_v3.17.0_20261022_(doc-compliance-review).zip"
+      }
     },
     {
       "version": "v3.16.0",
       "date": "2026-10-22",
-      "summary": "模板引擎加固：模板版出件前强制校验占位符必填／条件段定案／版本留痕"
+      "summary": "模板引擎加固：模板版出件前强制校验占位符必填／条件段定案／版本留痕",
+      "changes": null,
+      "download_page": "https://github.com/asktai/doc-compliance-review/releases",
+      "files": {
+        "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.16.0/文档合规审查助手AI合同_v3.16.0_20261022_(doc-compliance-review).skill",
+        "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.16.0/文档合规审查助手AI合同_v3.16.0_20261022_(doc-compliance-review).zip"
+      }
     },
     {
       "version": "v3.15.0",
       "date": "2026-10-22",
-      "summary": "法条库扩容 4 倍：11 部法 85 条 → 17 部法 704 条"
+      "summary": "法条库扩容 4 倍：11 部法 85 条 → 17 部法 704 条",
+      "changes": null,
+      "download_page": "https://github.com/asktai/doc-compliance-review/releases",
+      "files": {
+        "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.15.0/文档合规审查助手AI合同_v3.15.0_20261022_(doc-compliance-review).skill",
+        "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.15.0/文档合规审查助手AI合同_v3.15.0_20261022_(doc-compliance-review).zip"
+      }
     },
     {
       "version": "v3.14.0",
       "date": "2026-10-22",
-      "summary": "新增法条核验引擎：意见稿引的法条，出具前先用随包离线原文库逐条核一遍"
+      "summary": "新增法条核验引擎：意见稿引的法条，出具前先用随包离线原文库逐条核一遍",
+      "changes": null,
+      "download_page": "https://github.com/asktai/doc-compliance-review/releases",
+      "files": {
+        "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.14.0/文档合规审查助手AI合同_v3.14.0_20261022_(doc-compliance-review).skill",
+        "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.14.0/文档合规审查助手AI合同_v3.14.0_20261022_(doc-compliance-review).zip"
+      }
     },
     {
       "version": "v3.12.1",
       "date": "2026-10-21",
-      "summary": "产品更名为「文档合规审查助手AI合同」：全链更名（文档/脚本/头图/包名/提示词版文件名）"
+      "summary": "产品更名为「文档合规审查助手AI合同」：全链更名（文档/脚本/头图/包名/提示词版文件名）",
+      "changes": null,
+      "download_page": "https://github.com/asktai/doc-compliance-review/releases",
+      "files": {
+        "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.12.1/文档合规审查助手AI合同_v3.12.1_20261021_(doc-compliance-review).skill",
+        "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.12.1/文档合规审查助手AI合同_v3.12.1_20261021_(doc-compliance-review).zip"
+      }
     },
     {
       "version": "v3.12.0",
       "date": "2026-10-21",
-      "summary": "新增文档精要总结与思维导图（一页看懂）；审查修订硬性要求原稿上改，做不到显式降级"
+      "summary": "新增文档精要总结与思维导图（一页看懂）；审查修订硬性要求原稿上改，做不到显式降级",
+      "changes": null,
+      "download_page": "https://github.com/asktai/doc-compliance-review/releases",
+      "files": {
+        "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.12.0/文档合规审查助手AI合同_v3.12.0_20261021_(doc-compliance-review).skill",
+        "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.12.0/文档合规审查助手AI合同_v3.12.0_20261021_(doc-compliance-review).zip"
+      }
     },
     {
       "version": "v3.11.16",
       "date": "2026-10-21",
-      "summary": "提问全链路带编号与鼠标优先：每个提问有全局流水号 Qn，选项也带号，能点就不打字"
+      "summary": "提问全链路带编号与鼠标优先：每个提问有全局流水号 Qn，选项也带号，能点就不打字",
+      "changes": null,
+      "download_page": "https://github.com/asktai/doc-compliance-review/releases",
+      "files": {
+        "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.11.16/文档合规审查助手AI合同_v3.11.16_20261021_(doc-compliance-review).skill",
+        "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.11.16/文档合规审查助手AI合同_v3.11.16_20261021_(doc-compliance-review).zip"
+      }
     },
     {
       "version": "v3.11.15",
       "date": "2026-10-20",
-      "summary": "文本冗余清理：删重复命令块与整块复制的清单，顺带修正两处事实错误"
+      "summary": "文本冗余清理：删重复命令块与整块复制的清单，顺带修正两处事实错误",
+      "changes": null,
+      "download_page": "https://github.com/asktai/doc-compliance-review/releases",
+      "files": {
+        "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.11.15/文档合规审查助手AI合同_v3.11.15_20261020_(doc-compliance-review).skill",
+        "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.11.15/文档合规审查助手AI合同_v3.11.15_20261020_(doc-compliance-review).zip"
+      }
     },
     {
       "version": "v3.11.14",
       "date": "2026-10-20",
-      "summary": "全量质检修正：修复银行卡脱敏误吞、预处理假过等 13 处，新增输出成品样例"
+      "summary": "全量质检修正：修复银行卡脱敏误吞、预处理假过等 13 处，新增输出成品样例",
+      "changes": null,
+      "download_page": "https://github.com/asktai/doc-compliance-review/releases",
+      "files": {
+        "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.11.14/文档合规审查助手AI合同_v3.11.14_20261020_(doc-compliance-review).skill",
+        "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.11.14/文档合规审查助手AI合同_v3.11.14_20261020_(doc-compliance-review).zip"
+      }
     },
     {
       "version": "v3.11.13",
       "date": "2026-10-16",
-      "summary": "条号引用全面校正：开发规范章节对调后，脚本注释与文档里的旧条号引用一次搬到位"
+      "summary": "条号引用全面校正：开发规范章节对调后，脚本注释与文档里的旧条号引用一次搬到位",
+      "changes": null,
+      "download_page": "https://github.com/asktai/doc-compliance-review/releases",
+      "files": {
+        "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.11.13/文档合规审查助手AI合同_v3.11.13_20261016_(doc-compliance-review).skill",
+        "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.11.13/文档合规审查助手AI合同_v3.11.13_20261016_(doc-compliance-review).zip"
+      }
     },
     {
       "version": "v3.11.12",
       "date": "2026-10-16",
-      "summary": "更新源地址启用：占位地址换成正式仓库地址，在线检查更新自此真正可用"
+      "summary": "更新源地址启用：占位地址换成正式仓库地址，在线检查更新自此真正可用",
+      "changes": null,
+      "download_page": "https://github.com/asktai/doc-compliance-review/releases",
+      "files": {
+        "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.11.12/文档合规审查助手AI合同_v3.11.12_20261016_(doc-compliance-review).skill",
+        "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.11.12/文档合规审查助手AI合同_v3.11.12_20261016_(doc-compliance-review).zip"
+      }
     },
     {
       "version": "v3.11.11",
       "date": "2026-10-14",
-      "summary": "新增「在线检查更新」：一查就知道有没有新版、新版改了什么、去哪下载"
+      "summary": "新增「在线检查更新」：一查就知道有没有新版、新版改了什么、去哪下载",
+      "changes": null,
+      "download_page": "https://github.com/asktai/doc-compliance-review/releases",
+      "files": {
+        "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.11.11/文档合规审查助手AI合同_v3.11.11_20261014_(doc-compliance-review).skill",
+        "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.11.11/文档合规审查助手AI合同_v3.11.11_20261014_(doc-compliance-review).zip"
+      }
     },
     {
       "version": "v3.11.10",
       "date": "2026-10-14",
-      "summary": "版本号写法统一为小写 v"
+      "summary": "版本号写法统一为小写 v",
+      "changes": null,
+      "download_page": "https://github.com/asktai/doc-compliance-review/releases",
+      "files": {
+        "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.11.10/文档合规审查助手AI合同_v3.11.10_20261014_(doc-compliance-review).skill",
+        "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.11.10/文档合规审查助手AI合同_v3.11.10_20261014_(doc-compliance-review).zip"
+      }
     },
     {
       "version": "v3.11.9",
       "date": "2026-10-14",
-      "summary": "封装扩展名统一小写 .skill"
+      "summary": "封装扩展名统一小写 .skill",
+      "changes": null,
+      "download_page": "https://github.com/asktai/doc-compliance-review/releases",
+      "files": {
+        "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.11.9/文档合规审查助手AI合同_v3.11.9_20261014_(doc-compliance-review).skill",
+        "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.11.9/文档合规审查助手AI合同_v3.11.9_20261014_(doc-compliance-review).zip"
+      }
     },
     {
       "version": "v3.11.8",
       "date": "2026-10-13",
-      "summary": "可复现构建：同版本重跑产出字节一致的包"
+      "summary": "可复现构建：同版本重跑产出字节一致的包",
+      "changes": null,
+      "download_page": "https://github.com/asktai/doc-compliance-review/releases",
+      "files": {
+        "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.11.8/文档合规审查助手AI合同_v3.11.8_20261013_(doc-compliance-review).skill",
+        "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.11.8/文档合规审查助手AI合同_v3.11.8_20261013_(doc-compliance-review).zip"
+      }
     }
   ],
   "_维护说明": "出包后请同步更新本文件（latest 段与 history）。真源是 SKILL.md 的 version 与 VERSION.md 的沿革；本文件是'对外公布的清单'，须与真源一致，否则使用者会被引向旧版。",
   "schema": 1,
-  "version": "3.25.7"
+  "version": "3.25.8"
 }

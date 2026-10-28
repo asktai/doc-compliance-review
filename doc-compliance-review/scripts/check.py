@@ -2021,6 +2021,21 @@ def check_manifest_version():
     if top and top != truth:
         err("version.json 顶层 version=%r 与 SKILL.md 版本 %s 不一致"
             "（该字段按 _说明 定义为最新版本号）" % (d.get("version"), truth))
+    # history 每条自洽（v3.25.8）：① 版本号不得重复；② files 直链的文件名须含自身版本号。
+    # 真实事故：批量改版本串时把 history 里旧条目的链接一起替换了，历史条目指向别版包，
+    # 用户点「历史版本」下到的是错的包——字面看一切正常，只有把版本号和链接对上才看得见。
+    _seen = {}
+    for x in hist:
+        hv = str(x.get("version") or "")
+        if hv in _seen:
+            err("version.json 的 history 里版本号 %s 重复出现" % hv)
+        _seen[hv] = 1
+        for k, url in (x.get("files") or {}).items():
+            u = str(url or "")
+            if u and hv and ("_%s_" % hv) not in u:
+                err("version.json 的 history[%s] 的 %s 链接指向别版包（…%s）——"
+                    "历史条目必须指向自己那一版" % (hv, k, u[-46:]))
+                break
 
 
 def check_platform_limit():

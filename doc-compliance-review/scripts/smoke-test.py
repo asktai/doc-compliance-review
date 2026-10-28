@@ -1652,6 +1652,73 @@ def main():
     except Exception as e:
         check("法规汇编引擎自检", False, repr(e))
 
+    # --- 3.55 品牌头标（横幅／图标／技能卡片：一次出齐 5 张，卡片不许成孤儿）---
+    # 为什么单列一段：skill-card.png 的生成器曾是临时脚本 make-card.py（从未入 git、用完即丢），
+    # 升级后没人记得怎么重刷，头标守卫两次拦下「第 5 张图仍是旧版本」（v3.25.1、v3.25.7）。
+    # v3.25.7 把卡片并入 make-header.py，这里补上独立用例，防它再退化回孤儿。
+    print("\n[3.55] 品牌头标（5 张，含技能卡片）")
+    try:
+        import re as _re3
+        with open(os.path.join(HERE, "..", "SKILL.md"), encoding="utf-8-sig") as _sf:
+            _mv = _re3.search(r"(?m)^version:\s*([\d.]+)\s*$", _sf.read(4000))
+        _ver = _mv.group(1) if _mv else ""
+        _hd = os.path.join(work, "hdr")
+        _lst = run([PY, os.path.join(HERE, "make-header.py"), "--list"])
+        _items = [x.strip() for x in (_lst.stdout or "").splitlines() if x.strip().endswith(".png")]
+        check("品牌头标：--list 列出 5 个产物且含 skill-card.png（卡片不许从产出清单里消失）",
+              len(_items) == 5 and any("skill-card.png" in x for x in _items),
+              "%d 项：%s" % (len(_items), "、".join(os.path.basename(x) for x in _items)))
+        run([PY, os.path.join(HERE, "make-header.py"), "--out", _hd])
+        _card = os.path.join(_hd, "skill-card.png")
+        _ok, _detail, _spread = False, "卡片未生成", -1
+        if os.path.exists(_card):
+            from PIL import Image as _Im3
+            _im3 = _Im3.open(_card)
+            _gray = _im3.convert("L")
+            _lo, _hi = _gray.getextrema()
+            _spread = _hi - _lo
+            _ok = (_im3.format == "PNG" and _im3.size == (810, 1080)
+                   and _im3.info.get("Skill-Version") == "v" + _ver)
+            _detail = "%s %s 版本戳=%r（期望 v%s）" % (
+                _im3.format, _im3.size, _im3.info.get("Skill-Version"), _ver)
+        check("品牌头标：技能卡片实跑生成（PNG 810×1080 竖版，版本戳＝当前版本）", _ok, _detail)
+        # 版本戳必须是**真参数**而非写死：换一个版本串重出，元数据须跟着变
+        _hd2 = os.path.join(work, "hdr-v0")
+        run([PY, os.path.join(HERE, "make-header.py"), "--out", _hd2, "--version", "v0.0.0"])
+        _c2 = os.path.join(_hd2, "skill-card.png")
+        _v2 = None
+        if os.path.exists(_c2):
+            from PIL import Image as _Im4
+            _v2 = _Im4.open(_c2).info.get("Skill-Version")
+        check("品牌头标：卡片版本戳随 --version 变化（烧的是参数，不是写死值）",
+              _v2 == "v0.0.0", "实测 %r" % (_v2,))
+        # 非空白：卡片由多色区块与文字构成，灰度极差过小＝只出了一张底色
+        check("品牌头标：卡片非空白（灰度极差 > 60，防生成一张纯色图）",
+              _spread > 60, "灰度极差 %d" % _spread)
+    except Exception as e:
+        check("品牌头标自检", False, repr(e))
+
+    # --- 3.56 出包裁剪（version.json 只带 latest，history 不随技能分发）---
+    # 决策依据：history 是发布侧演进记录，与 VERSION.md 重复维护必分家（v3.25.7 实测断档）；
+    # 使用者只需 latest。这里钉住裁剪函数与出包自检两头，防有人「顺手把 history 加回来」。
+    print("\n[3.56] 出包裁剪（包内 version.json 只带 latest）")
+    try:
+        import importlib.util as _iu3
+        _sp3 = _iu3.spec_from_file_location("_pk3", os.path.join(HERE, "pack.py"))
+        _pk3 = _iu3.module_from_spec(_sp3)
+        _sp3.loader.exec_module(_pk3)
+        _raw = '{"latest":{"version":"v1.0.0"},"history":[{"version":"v0.9.0"}]}'
+        _cut = _pk3.strip_version_history(_raw)
+        _noop = _pk3.strip_version_history('{"latest":{"version":"v1.0.0"}}')
+        check("出包：version.json 裁掉 history 且保留 latest；无 history 时不动（返回 None）",
+              _cut is not None and "history" not in _cut and "v1.0.0" in _cut and _noop is None,
+              (_cut or "").replace("\n", " ")[:90])
+        _src = open(os.path.join(HERE, "pack.py"), encoding="utf-8").read()
+        check("出包：自检函数含「包内不得含 history」判据（裁剪失效能在出包时拦下）",
+              "仍含 history" in _src and "strip_history" in _src, "")
+    except Exception as e:
+        check("出包裁剪自检", False, repr(e))
+
     # --- 3.5 版本与依赖（分发与落地成本）---
     print("\n[3.5] 版本与依赖")
     try:
