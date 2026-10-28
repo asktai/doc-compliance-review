@@ -1989,6 +1989,39 @@ def check_manifest_version():
     else:
         info("对外版本清单 version.json：latest=%s 与 SKILL.md 一致；下载页已配置" % truth)
 
+    # ---- v3.25.7：只查版本号不够。v3.25.7 发版时实测踩到——版本号改对了，
+    # 而 latest.date／summary／changes 还是上一版的，发布页会显示「新版本号配旧更新说明」；
+    # 且 history 首条断档（v3.25.6 当初漏记）、文件末尾还留着更早的顶层 version。
+    # 这型「改了号没改话」门禁此前完全看不见，故四层咬合：
+    #   ① latest.date 须与 VERSION.md 当前版本行的日期一致（同一事实，两处不许分家）；
+    #   ② latest 的 summary＋changes 里不得出现别的版本号（出现即说明文案忘改）；
+    #   ③ history 首条须为本版（版本链从当前版起）；④ 顶层 version 字段须同步。
+    tv = "v" + truth
+    vd = str(lat.get("date") or "").strip()
+    if not re.match(r"^\d{4}-\d{2}-\d{2}$", vd):
+        err("version.json 的 latest.date 缺失或不是 YYYY-MM-DD：%r" % vd)
+    else:
+        vm = re.search(r"\|\s*\*\*v" + re.escape(truth) + r"\*\*\s*\|\s*(\d{4}-\d{2}-\d{2})",
+                       _read(os.path.join(ROOT, "VERSION.md")))
+        if vm and vm.group(1) != vd:
+            err("version.json 的 latest.date=%s 与 VERSION.md 当前版本行日期 %s 不一致——"
+                "对外清单与沿革各说各话" % (vd, vm.group(1)))
+    blob = str(lat.get("summary") or "") + "".join(str(x) for x in (lat.get("changes") or []))
+    others = sorted(set(o for o in re.findall(r"v\d+\.\d+\.\d+", blob) if o != tv))
+    if others:
+        err("version.json 的 latest 说明里出现其他版本号 %s——"
+            "发布页会显示「新版本号配旧更新说明」，请同步 latest.summary／changes" % (others,))
+    hist = (d or {}).get("history") or []
+    if not hist:
+        err("version.json 缺 history 数组——对外只留最新一版，用户看不到演进")
+    elif str(hist[0].get("version") or "") != tv:
+        err("version.json 的 history 首条为 %r，应为当前版本 %s（新版本发布时须把旧 latest 挪入 history）"
+            % (hist[0].get("version"), tv))
+    top = str((d or {}).get("version") or "").strip().lstrip("vV")
+    if top and top != truth:
+        err("version.json 顶层 version=%r 与 SKILL.md 版本 %s 不一致"
+            "（该字段按 _说明 定义为最新版本号）" % (d.get("version"), truth))
+
 
 def check_platform_limit():
     """平台上限口径：文档里写的 zip 体积上限，必须等于 `pack.py` 的 `PLATFORM_MAX_MB`。

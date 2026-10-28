@@ -4,16 +4,15 @@
   "skill_id": "doc-compliance-review",
   "latest": {
     "version": "v3.25.7",
-    "date": "2026-10-26",
-    "summary": "产出物只出一个格式的定位与修复：非缺陷而是静默默认值（--formats 默认 docx），改为清单跳过时产出前必须问格式，并加格式默认值守卫",
+    "date": "2026-10-28",
+    "summary": "缺省出 WORD 从「无声」变「有声明」：--formats 哨兵化（None）＋出件尾注兜底，能区分「用户没指定」与「显式指定」；顺带把 skill-card 生成器并入 make-header 根治头图孤儿；冒烟 183→196",
     "changes": [
-      "定位：不传 --formats 出 3 个文件全是 .docx，传全则 15 个（3 类 × 5 种）——5 种格式全部可用，非功能缺失；默认值 docx 自 v3.7.1 起如此，与文档「不选→仅 WORD」字面一致",
-      "真问题在路径：格式由开场清单第 9 项收集，清单被跳过时落到默认值且无任何提示；用户直接传文档审查即走此路径",
-      "采纳「不改默认值，改为强制询问」：SKILL 文件格式节新增产出前必收规则（与审查人名称同级），清单被跳过或未答时必须问一次，用户回默认即按 WORD；纯自动化免问但须如实说明只出 WORD 并列出其余 4 种",
-      "新增守卫 _check_format_default：守代码 default 与文档登记一致、缺省必须问，刻意不守措辞而守事实",
-      "守卫补反向漏洞：首版只判「默认窄文档没写」，注入「default 改 5 种、文档仍写仅 WORD」时全绿漏报；补为双向判",
-      "修文档时新写说明句含「实际 1 格式」被既有格式守卫抓为与「5 格式」打架（守卫正确、文案不当），已改为「到手只有 Word」；README 一句话流程同步补充",
-      "门禁 0 错 0 警，冒烟 183/0/7"
+      "--formats 默认值 docx → 哨兵 None（真值落 FORMAT_FALLBACK 常量），从此能区分「用户没指定」与「用户显式写 docx」：前者出件末尾自动提示「本次仅出 WORD，另有 MD／Excel／HTML／PDF 四种可勾选获得」，后者一字不多说",
+      "未知格式名过滤：--formats docx,zzz 忽略 zzz 并提示可用值，不再静默吞掉",
+      "行为三场景实测：A 不指定→带提示／B 显式→无提示／C 含未知格式名→忽略并出齐 5 种；首跑缺 PDF 复查为 soffice 冷启动偶发，失败路径本有告警，非静默",
+      "守卫 _check_format_default 适配哨兵并新增「哨兵丢失必须红」判据；冒烟新增 6 项（格式反向注入四组＋尾注行为两组含对照组），183→196，README／教程／SKILL 三处数字同步",
+      "头图孤儿根治：skill-card.png 的生成器 make-card.py 是临时脚本、从未入 git（头标守卫第二次抓到第 5 张图漏刷），卡片生成并入 make-header.py（render_card），一次出齐 5 张",
+      "门禁 0 错 0 警，全量冒烟 196 全绿"
     ],
     "download_page": "https://github.com/asktai/doc-compliance-review/releases",
     "files": {
@@ -22,6 +21,43 @@
     }
   },
   "history": [
+    {
+      "version": "v3.25.7",
+      "date": "2026-10-28",
+      "summary": "缺省出 WORD 从「无声」变「有声明」：--formats 哨兵化（None）＋出件尾注兜底，能区分「用户没指定」与「显式指定」；顺带把 skill-card 生成器并入 make-header 根治头图孤儿；冒烟 183→196",
+      "changes": [
+        "--formats 默认值 docx → 哨兵 None（真值落 FORMAT_FALLBACK 常量），从此能区分「用户没指定」与「用户显式写 docx」：前者出件末尾自动提示「本次仅出 WORD，另有 MD／Excel／HTML／PDF 四种可勾选获得」，后者一字不多说",
+        "未知格式名过滤：--formats docx,zzz 忽略 zzz 并提示可用值，不再静默吞掉",
+        "行为三场景实测：A 不指定→带提示／B 显式→无提示／C 含未知格式名→忽略并出齐 5 种；首跑缺 PDF 复查为 soffice 冷启动偶发，失败路径本有告警，非静默",
+        "守卫 _check_format_default 适配哨兵并新增「哨兵丢失必须红」判据；冒烟新增 6 项（格式反向注入四组＋尾注行为两组含对照组），183→196，README／教程／SKILL 三处数字同步",
+        "头图孤儿根治：skill-card.png 的生成器 make-card.py 是临时脚本、从未入 git（头标守卫第二次抓到第 5 张图漏刷），卡片生成并入 make-header.py（render_card），一次出齐 5 张",
+        "门禁 0 错 0 警，全量冒烟 196 全绿"
+      ],
+      "download_page": "https://github.com/asktai/doc-compliance-review/releases",
+      "files": {
+        "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.25.7/文档合规审查助手AI合同_v3.25.7_20261028_(doc-compliance-review).skill",
+        "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.25.7/文档合规审查助手AI合同_v3.25.7_20261028_(doc-compliance-review).zip"
+      }
+    },
+    {
+      "version": "v3.25.6",
+      "date": "2026-10-26",
+      "summary": "产出物只出一个格式的定位与修复：非缺陷而是静默默认值（--formats 默认 docx），改为清单跳过时产出前必须问格式，并加格式默认值守卫",
+      "changes": [
+        "定位：不传 --formats 出 3 个文件全是 .docx，传全则 15 个（3 类 × 5 种）——5 种格式全部可用，非功能缺失；默认值 docx 自 v3.7.1 起如此，与文档「不选→仅 WORD」字面一致",
+        "真问题在路径：格式由开场清单第 9 项收集，清单被跳过时落到默认值且无任何提示；用户直接传文档审查即走此路径",
+        "采纳「不改默认值，改为强制询问」：SKILL 文件格式节新增产出前必收规则（与审查人名称同级），清单被跳过或未答时必须问一次，用户回默认即按 WORD；纯自动化免问但须如实说明只出 WORD 并列出其余 4 种",
+        "新增守卫 _check_format_default：守代码 default 与文档登记一致、缺省必须问，刻意不守措辞而守事实",
+        "守卫补反向漏洞：首版只判「默认窄文档没写」，注入「default 改 5 种、文档仍写仅 WORD」时全绿漏报；补为双向判",
+        "修文档时新写说明句含「实际 1 格式」被既有格式守卫抓为与「5 格式」打架（守卫正确、文案不当），已改为「到手只有 Word」；README 一句话流程同步补充",
+        "门禁 0 错 0 警，冒烟 183/0/7"
+      ],
+      "download_page": "https://github.com/asktai/doc-compliance-review/releases",
+      "files": {
+        "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.25.7/文档合规审查助手AI合同_v3.25.7_20261028_(doc-compliance-review).skill",
+        "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.25.7/文档合规审查助手AI合同_v3.25.7_20261028_(doc-compliance-review).zip"
+      }
+    },
     {
       "version": "v3.25.5",
       "date": "2026-10-26",
@@ -452,5 +488,5 @@
   ],
   "_维护说明": "出包后请同步更新本文件（latest 段与 history）。真源是 SKILL.md 的 version 与 VERSION.md 的沿革；本文件是'对外公布的清单'，须与真源一致，否则使用者会被引向旧版。",
   "schema": 1,
-  "version": "3.24.0"
+  "version": "3.25.7"
 }
