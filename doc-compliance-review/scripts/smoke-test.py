@@ -2033,6 +2033,66 @@ def main():
         if _skbak is not None:
             open(_skp, "wb").write(_skbak)      # 无论成败按字节还原，正式文件不留污染
 
+    print("\n[3.63] frontmatter 平台必填字段（缺一个，平台就整包拒收）")
+    # 背景（这条守卫的来历，别删）：v3.26.5 因「两段中文长文重复」把 `description_zh`
+    # 整个删了，还在门禁里写了**负向断言**防回潮——结果是把包做成了平台必然拒收的包：
+    # 开放平台字段表里 `description_zh` 是必填，缺失时解析器报
+    # 「缺少 Skill 中文描述(description_zh)」。本地门禁全绿，因为它只认我们自己的断言。
+    # 真病是「两个字段写成同一份长文」，修法是各归其位，不是删掉一个。
+    _skp2 = os.path.join(os.path.dirname(HERE), "SKILL.md")
+    _bak2 = None
+    try:
+        _bak2 = open(_skp2, "rb").read()
+        _txt2 = _bak2.decode("utf-8")
+        _fm2 = re.search(r"^---\n(.*?)\n---", _txt2, re.S)
+        _fmb2 = _fm2.group(1) if _fm2 else ""
+
+        def _val(k):
+            m = re.search(r"^%s:\s*(.*)$" % re.escape(k), _fmb2, re.M)
+            if not m:
+                return None
+            v = m.group(1).strip()
+            if len(v) >= 2 and v[0] == v[-1] and v[0] in "\"'":
+                v = v[1:-1]
+            return v
+
+        # 平台字段表里的必填项（不含 allowed-tools / examples_* 这两组选填）
+        _must = ["name", "display_name", "display_name_en", "description",
+                 "description_zh", "description_en", "version", "author"]
+        _gone = [k for k in _must if _val(k) is None]
+        check("frontmatter 平台必填 8 字段齐备（name/两个展示名/三个描述/version/author）",
+              not _gone, "缺：%s" % "、".join(_gone) if _gone else "八项齐备")
+
+        _zh2, _en2 = _val("description_zh") or "", _val("description_en") or ""
+        check("description_zh 是简短介绍（≤200 字），不是触发长文的复制品",
+              _zh2 and len(_zh2) <= 200, "当前 %d 字" % len(_zh2))
+        check("description_en 是英文简介（≤700 字符），不是 description 的译本",
+              _en2 and len(_en2) <= 700, "当前 %d 字符" % len(_en2))
+
+        # 区分度注入一：删掉 description_zh，门禁必须报
+        open(_skp2, "wb").write(re.sub(r"(?m)^description_zh:.*\n", "", _txt2).encode("utf-8"))
+        _r63 = run([PY, os.path.join(HERE, "check.py")])
+        open(_skp2, "wb").write(_bak2)
+        check("注入[删 description_zh] 门禁须报「缺 description_zh」——"
+              "这正是 v3.26.5 犯过的错，不能再静默通过",
+              _r63.returncode != 0 and "description_zh" in (_r63.stdout or ""),
+              tail_line(_r63.stdout))
+
+        # 区分度注入二：把 description_zh 抄成 description 的长文，门禁必须报超长
+        _d2 = _val("description") or ""
+        open(_skp2, "wb").write(
+            re.sub(r"(?m)^description_zh:.*$", "description_zh: " + _d2, _txt2).encode("utf-8"))
+        _r63b = run([PY, os.path.join(HERE, "check.py")])
+        open(_skp2, "wb").write(_bak2)
+        check("注入[description_zh 抄成长文] 门禁须报超 200 字——防「各归其位」退回「各写一遍」",
+              _r63b.returncode != 0 and "200" in (_r63b.stdout or ""),
+              tail_line(_r63b.stdout))
+    except Exception as e:
+        check("frontmatter 平台必填字段", False, repr(e))
+    finally:
+        if _bak2 is not None:
+            open(_skp2, "wb").write(_bak2)
+
     # --- 3.5 版本与依赖（分发与落地成本）---
     print("\n[3.5] 版本与依赖")
     try:

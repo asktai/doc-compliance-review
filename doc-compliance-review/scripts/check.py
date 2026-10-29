@@ -1464,29 +1464,68 @@ def _check_doc_consistency():
     if bad:
         err("文档含禁止的陈旧/错误表述（与现行模型冲突）：%s" % "；".join(bad))
 
-    # ---- frontmatter：中文描述只留一处 + 尺度描述须含「侧重可多选」（v3.26.5 收口）----
-    # 为什么删掉第二个中文字段（`description_zh`）而不去「把两段写得不重复」：
-    #   · 两段都是五百字上下的中文长文，读者是**同一个人群**，信息重合九成以上；
-    #     平台会把 frontmatter 里的 description 类字段逐个渲染出来，使用者看到的是
-    #     「同一件事说了两遍」，长文连着两屏——这本身就是缺陷，不是文体问题。
-    #   · 更要命的是它会漂：v3.25.3、v3.25.4 两轮改描述，每轮都只同步了其中一个，
-    #     另一份带着旧口径继续分发。一份描述有两处真源，迟早对不上。
-    # 故收敛为单字段：中文只认 `description`（含触发语），英文版另存 `description_en`。
-    # 这里写成**负向断言**——字段可以删，但删完要防回潮：谁再加回来，门禁当场报错。
+    # ---- frontmatter：三个 description 字段各司其职（v3.26.7 重定）----
+    # 演变交代（不删历史，因为下一次想"再删一个"的人会踩同一坑）：
+    #   v3.26.5 曾因「两段中文长文重复」**删掉 `description_zh`**，并把门禁写成负向断言。
+    #   该判断在平台规范面前是错的——开放平台字段表里 `description_zh` 是**必填**，
+    #   缺失时解析器直接报「缺少 Skill 中文描述(description_zh)」。删掉它等于把包变成
+    #   一个平台必然拒收的包，而本地跑门禁一切正常（门禁只认我们自己的断言）。
+    # 真正的病不是"有两个中文字段"，而是**两个字段都写成了同一份长文**。平台对二者的
+    #   职责分得很清：`description` 给模型判触发（要写全用途与触发词），`description_zh`
+    #   是**详情页给人看的简短介绍**。故修法是"各归其位"，不是"删掉一个"：
+    #     · `description`      长文，判触发用（须含触发词与尺度口径）
+    #     · `description_zh`   简短中文介绍，≤200 字（超了就是把触发长文抄了第二遍）
+    #     · `description_en`   对应英文，≤700 字符
     sk = _read(os.path.join(ROOT, "SKILL.md"))
     fm = re.search(r"^---\n(.*?)\n---", sk, re.S)
     if not fm:
         err("SKILL.md 找不到 frontmatter 段，无法核对 description 尺度表述")
     else:
         fmb = fm.group(1)
-        mm = re.search(r"^description:\s*(.*)$", fmb, re.M)
-        if not mm:
-            err("SKILL.md frontmatter 缺 description 字段")
-        elif "侧重可多选" not in mm.group(1):
-            err("SKILL.md frontmatter 的 description 未含「侧重可多选」——尺度模型已变，触发描述须同步")
-        if re.search(r"^description_zh\s*:", fmb, re.M):
-            err("SKILL.md frontmatter 又出现 description_zh——中文描述只留 description 一处，"
-                "再放一份中文长文会被平台渲染两遍，且两份必然漂移")
+
+        def _fmval(key):
+            m = re.search(r"^%s:\s*(.*)$" % re.escape(key), fmb, re.M)
+            if not m:
+                return None
+            v = m.group(1).strip()
+            if len(v) >= 2 and v[0] == v[-1] and v[0] in "\"'":
+                v = v[1:-1]
+            return v
+
+        # ① 三个字段都必须在（开放平台 frontmatter 必填项，缺一个即「解析失败」）
+        for key in ("description", "description_zh", "description_en"):
+            if _fmval(key) is None:
+                err("SKILL.md frontmatter 缺 %s——开放平台字段表中该项为**必填**，"
+                    "缺失时平台报「缺少 Skill …描述」直接拒收" % key)
+
+        # ② description 须含触发口径（模型靠它判该不该触发）
+        d = _fmval("description")
+        if d is not None and "侧重可多选" not in d:
+            err("SKILL.md frontmatter 的 description 未含「侧重可多选」——"
+                "尺度模型已变，触发描述须同步")
+
+        # ③ description_zh 须**简短**：上限 200 字。
+        #    这条是"防回潮"的主体——v3.26.5 前的 501 字就是触发长文的复制品，
+        #    平台详情页会把两屏长文连着渲染，使用者看到的是同一件事说了两遍。
+        zh = _fmval("description_zh")
+        if zh is not None and len(zh) > 200:
+            err("SKILL.md frontmatter 的 description_zh 有 %d 字，超过 200 字上限——"
+                "该字段是详情页的**简短**中文介绍，写长了就是把 description 复制第二遍"
+                % len(zh))
+
+        # ④ description_en 同理（限 700 字符）。v3.25.4 曾涨到 1861 字符，
+        #    理由是"补能力不是冗余"——补能力对，但补错了字段：那四项能力在
+        #    description 里已经写了，英文详情页不需要再来一遍。
+        en = _fmval("description_en")
+        if en is not None and len(en) > 700:
+            err("SKILL.md frontmatter 的 description_en 有 %d 字符，超过 700 上限——"
+                "该字段是英文详情页简介，不是 description 的译本" % len(en))
+
+        # ⑤ 区分度守卫：description_zh 不得是 description 的开头一段
+        #    （直接复制粘贴的典型形态；⑥ 的长度上限已能拦，但这一条给出更准的话术）。
+        if zh and d and len(zh) > 40 and zh[:40] in d:
+            err("SKILL.md 的 description_zh 前 40 字与 description 完全重合——"
+                "两个字段读者不同（模型判触发／人看详情页），不是同一段话的两种长度")
 
     # ---- README 侧重清单须含「自定义」（与开场清单第 6 题「侧重 4–8」逐处对齐）----
     # 只在真正列举侧重项的行上查（以「合规底线加严」为标记），不误伤仅提及「侧重可多选」的简写行。

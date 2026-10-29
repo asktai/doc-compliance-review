@@ -3,23 +3,38 @@
   "product": "文档合规审查助手AI合同",
   "skill_id": "doc-compliance-review",
   "latest": {
-    "version": "v3.26.6",
+    "version": "v3.26.7",
     "date": "2026-10-29",
-    "summary": "功能菜单补全到 20 项并重排：法规检索／法规汇编／引用核验／OCR／结构化／格式转换此前有引擎没入口",
+    "summary": "修 H-01 的可确认缺陷：description_zh 是平台必填字段，此前被删导致整包必被拒收",
     "changes": [
-      "**功能菜单从 13 项补到 20 项**，按「读进来 → 审与处置 → 写出来 → 查法条 → 沉淀维护」五段重排（0–19，分组标题不占编号）。补的是**引擎早就在用、菜单里却一个入口都没有**的那几项：法规检索（`legal-search.py`）、法规汇编（`legal-compile.py`）、文档 OCR（`preprocess.py`）、文档结构化（`structure.py`）、文档格式转换（`preprocess` 入向 ＋ `make-docx --formats` 出向）、引用核验（`legal-verify.py`）。`description` 一直在宣传「查法条、编法规汇编」，用户按「向导」却看不到——**做了没人用得上，比没做更冤**",
-      "新增**第二十二节 公文写作与格式体检**。此前 `gb9704.py` 只在引擎表里挂着，全文没有一处讲怎么用、能测什么、测不了什么。现写清两件事的分界：写作＝文种先定（上行／下行／平行，请示要批复、报告不要批复）＋要素（发文字号、主送、成文日期**一律不得编造**）＋层次序号（一、→（一）→1.→（1））；体检＝只报可测项、不符合必给偏差值、**体检全过不等于这份公文能发**。**如实标注本版边界：没有逐文种向导**",
-      "`check.py` 新增 `_check_menu_entries`：菜单编号须 0..N-1 连续、正文「一次性列出 N 项」须等于实数、**20 类能力关键词缺一即报错**、每一项都要在「去向」段找得到落点。冒烟补 3 项（含一次注入：删掉菜单里「法规检索」那行，门禁必须报错），防的就是这次修好的东西日后悄悄退回",
-      "**提示词版（无脚本）改为只列真做得到的 11 项**，并新增「本版没有的」八项明示清单（法规检索／汇编／引用核验／OCR／结构化／格式转换／库维护／手册全文）——**不列做不到的项**：列了就等于承诺做得到。同时新增「公文写作」一节（文种结语表、要素、层次序号、版式要点、两条红线）",
-      "同步引用：撰写向导 5／6 → 8／9、转模板 7／8 → 15／16、精要总结 12 → 11、审查 1／2 → 4／5（`drafting-guide.md`／`template-guide.md`／SKILL 三处侧引一并改口，不留旧号）"
+      "**`description_zh` 恢复，但改成「简短中文介绍」（150 字）**。上一轮判断「两个中文 description 重复」时把它整个删了，并在门禁里写了负向断言防回潮——判断的**现象**没错（两段都是五百字上下的中文长文），但**处置错了**：WorkBuddy 开放平台字段表中 `description_zh` 是**必填**，缺失时解析器直接报「缺少 Skill 中文描述(description_zh)」，整包拒收。本地门禁全绿，因为它只认我们自己的断言。**删掉一个必填字段，等于把包做成平台必然拒收的包，而本地一切正常。**",
+      "真正的病是「两个字段写成同一份长文」，不是「有两个中文字段」。平台对二者职责分得很清：`description` 给模型判触发（要写全用途与触发词，现 723 字保留不动），`description_zh` 是**详情页给人看的简短介绍**。故修法是各归其位——`description_zh` 150 字简介、`description_en` 由 1863 字符压到 553 字符（英文详情页简介，不是 `description` 的译本）",
+      "门禁判据随之重定（`check.py`）：从「**禁止** `description_zh` 存在」改为「**必须**存在且 ≤200 字、`description_en` ≤700 字符、且 `description_zh` 前 40 字不得与 `description` 重合」。四条注入全部实测命中（删字段／抄长文／英文膨胀／复制开头），还原后字节一致。docstring 里保留上一轮的判断与它的错法，因为下一个想「再删一个」的人会踩同一坑",
+      "冒烟 226 → **231 项**，新增 5 项：平台必填 8 字段齐备、`description_zh` 简短、`description_en` 简短、注入删字段须报错、注入抄长文须报错"
     ],
     "download_page": "https://github.com/asktai/doc-compliance-review/releases",
     "files": {
-      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.26.6/文档合规审查助手AI合同_v3.26.6_20261029_(doc-compliance-review).skill",
-      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.26.6/文档合规审查助手AI合同_v3.26.6_20261029_(doc-compliance-review).zip"
+      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.26.7/文档合规审查助手AI合同_v3.26.7_20261029_(doc-compliance-review).skill",
+      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.26.7/文档合规审查助手AI合同_v3.26.7_20261029_(doc-compliance-review).zip"
     }
   },
   "history": [
+    {
+      "version": "v3.26.7",
+      "date": "2026-10-29",
+      "summary": "修 H-01 的可确认缺陷：description_zh 是平台必填字段，此前被删导致整包必被拒收",
+      "changes": [
+        "**`description_zh` 恢复，但改成「简短中文介绍」（150 字）**。v3.26.5 判断「两个中文 description 重复」时把它整个删了，并在门禁里写了负向断言防回潮——判断的**现象**没错（两段都是五百字上下的中文长文），但**处置错了**：WorkBuddy 开放平台字段表中 `description_zh` 是**必填**，缺失时解析器直接报「缺少 Skill 中文描述(description_zh)」，整包拒收。本地门禁全绿，因为它只认我们自己的断言。**删掉一个必填字段，等于把包做成平台必然拒收的包，而本地一切正常。**",
+        "真正的病是「两个字段写成同一份长文」，不是「有两个中文字段」。平台对二者职责分得很清：`description` 给模型判触发（要写全用途与触发词，现 723 字保留不动），`description_zh` 是**详情页给人看的简短介绍**。故修法是各归其位——`description_zh` 150 字简介、`description_en` 由 1863 字符压到 553 字符（英文详情页简介，不是 `description` 的译本）",
+        "门禁判据随之重定（`check.py`）：从「**禁止** `description_zh` 存在」改为「**必须**存在且 ≤200 字、`description_en` ≤700 字符、且 `description_zh` 前 40 字不得与 `description` 重合」。四条注入全部实测命中（删字段／抄长文／英文膨胀／复制开头），还原后字节一致。docstring 里保留 v3.26.5 的判断与它的错法，因为下一个想「再删一个」的人会踩同一坑",
+        "冒烟 226 → **231 项**，新增 5 项：平台必填 8 字段齐备、`description_zh` 简短、`description_en` 简短、注入删字段须报错、注入抄长文须报错"
+      ],
+      "download_page": "https://github.com/asktai/doc-compliance-review/releases",
+      "files": {
+        "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.26.7/文档合规审查助手AI合同_v3.26.7_20261029_(doc-compliance-review).skill",
+        "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.26.7/文档合规审查助手AI合同_v3.26.7_20261029_(doc-compliance-review).zip"
+      }
+    },
     {
       "version": "v3.26.6",
       "date": "2026-10-29",
@@ -749,5 +764,5 @@
   ],
   "_维护说明": "出包后请同步更新本文件（latest 段与 history）。真源是 SKILL.md 的 version 与 VERSION.md 的沿革；本文件是'对外公布的清单'，须与真源一致，否则使用者会被引向旧版。",
   "schema": 1,
-  "version": "3.26.6"
+  "version": "3.26.7"
 }

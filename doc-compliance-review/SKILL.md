@@ -3,10 +3,11 @@ name: doc-compliance-review
 display_name: "文档合规审查助手AI合同"
 display_name_en: "Document Compliance Review Assistant · AI Contract Audit"
 description: 文档合规审查助手AI合同（作者：胡皓）——给每天要看合同的人。可信是本技能与其他「AI 审合同」的分界线：法条逐条比对本地原文、不靠模型记忆；云端双源巡检，法条修订失效不会被用过期的；文档正文、脱敏映射表与私有规则在任何档位都不得进入请求，涉密件整条链路不出本机；文档里的数字由门禁实扫核对，装机后可自跑校验与指纹。处理合同、协议及授权书、承诺函、告知书、声明、委托书、制度、通知、NDA、SLA、DPA 等商务/业务文档：脱敏、逐条审查、风险三色分级、红线修订、比对台账、审查意见；审查覆盖付款与违约金、交付验收、知识产权、保密与竞业、管辖、仲裁、争议解决、诉讼时效、合同效力、格式条款、个人信息保护、主体适格与签章等核心风险维度；可先录背景资料再审查；审查尺度（基准 严苛/中性/宽松 ＋ 侧重可多选：合规底线加严/商务可行优先/格式与体例降级/涉外跨境）与谈判地位（强势方/均衡/弱势方）两轴；精要总结与思维导图；多份文档归纳共性规律（连样本量说、不外推）；起草合同与模板、文档或合同转模板；维护私有库与行业库（备份/回溯/导入导出）；法规检索给原文＋出处＋适用要件（只讲要件不下结论、库外明说未收录）；法规汇编把条文编成册（带目录与索引、每部法带版本与施行日，只搬运不撰写）；公文格式按 GB/T 9704 体检、不符合给偏差值；检测版本更新（不强制）。当用户上传或提及上述法律文书，或说「帮我看看这份合同有没有坑」「这条款有什么风险」「对方回稿改了什么」时；或要求审查、起草、修订、红线、比对、脱敏、做模板、转模板、查法条、编法规汇编、体检公文格式、精要总结、思维导图时触发。给的是辅助，不是意见——产出须经执业律师复核后方可据此决策。
-description_en: "Trustworthy by construction, which separates this skill from other AI contract review tools: every cited provision is compared verbatim against locally stored statutory text rather than recalled by the model; the library is re-verified against dual public sources so amended or repealed articles are flagged, not silently reused; document text, the desensitisation map and private rule sets never enter any request, and classified material is processed entirely on the local machine; every published figure is checked by a gate script and can be re-verified after install. Desensitises, reviews clause by clause, grades risks in three colours and produces redline revisions, comparison ledgers and opinion reports for contracts, agreements, authorisation and commitment letters, notices, policies, NDAs, SLAs and DPAs, covering payment and liquidated damages, delivery and acceptance, IP, confidentiality and non-compete, jurisdiction, arbitration, dispute resolution, limitation of action, contract validity, standard terms and personal information protection. Accepts background materials, adapts the review to a strong, balanced or weak bargaining position, summarises documents into key points and a mind map, and drafts contracts, reusable templates and converted templates. Also returns statutory text by question or article number with its source and an element-by-element breakdown (elements only, never a conclusion); compiles selected articles into a bound volume with contents and index, each statute carrying its version and effective date, transcribed verbatim rather than paraphrased; and checks documents against the GB/T 9704 official-document format standard, reporting the actual deviation. Nine industry rule sets included; handles Word, PDF, images and scanned files. Advisory only, not legal advice; review by a licensed lawyer is required."
+description_zh: "给每天要看合同的人。合同、协议、授权书、承诺函、制度、通知等商务文档的逐条审查、风险三色分级、红线修订、脱敏、比对台账与审查意见；引用的法条逐条比对本地原文、不靠模型记忆，文档正文与私有规则不出本机；另含起草合同与模板、精要总结与思维导图、法规检索与法规汇编、公文格式体检。给的是辅助，不是意见。"
+description_en: "Clause-by-clause review of contracts, agreements, authorisation letters, notices and policies, with three-colour risk grading, redlines, desensitisation, comparison ledgers and opinion reports. Every cited provision is compared verbatim against locally stored statutory text rather than recalled by the model, and document text never leaves the machine. Also drafts contracts and templates, summarises into key points and a mind map, searches and compiles statutory text, and checks GB/T 9704 official-document format. Advisory only, not legal advice."
 category: writing
 argument-hint: "<文档路径或文本> [版本/角色/尺度] | 审查 | 起草 | 比对 | 背景资料 | 脱敏 | 精要总结 | 思维导图 | 向导 | 撰写合同 | 撰写模板 | 文档转模板 | 合同转模板 | 技能版本 | 技能更新 | 技能升级 | 立查得 | 小查 | 帮助|help|? | 教程 | 私有库维护/备份/回溯/导入/导出 | 行业库维护/备份/回溯/导入/导出"
-version: 3.26.6
+version: 3.26.7
 license: 个人使用授权 · 商业使用须取得书面授权（见 `LICENSE.md`）
 author: 胡皓
 examples_zh:
@@ -25,7 +26,7 @@ examples_en:
 
 ![文档合规审查助手AI合同 · 合同与商务文档逐条审查 · 风险三色分级](assets/banner-dark.png)
 
-**v3.26.6** ｜ 作者：胡皓 ｜ 许可：个人使用授权 · 商业使用须取得书面授权（详见 `LICENSE.md`）
+**v3.26.7** ｜ 作者：胡皓 ｜ 许可：个人使用授权 · 商业使用须取得书面授权（详见 `LICENSE.md`）
 
 > **免责声明**：本技能仅作辅助法律工作，**不构成法律意见**，输出内容须经**执业律师复核**；**同一对话内首次使用时由技能先输出全文**（同一对话只此一次）——见**步骤 0.0**，全文亦见 `LICENSE.md`。
 
@@ -119,7 +120,7 @@ examples_en:
 
 **三条对外口径（不得违反）**：
 1. **「规划中」必须说成规划中；做完了也须及时改口**。v3.23.6 及以前结构化引擎、公文格式引擎确未实现，如实标规划中；**v3.24.0 起两者已实现**（`structure.py`／`gb9704.py`），对外可按在用能力介绍。**两个方向都是编造**：把没做的说成做了，与编造法条同性质；做完了仍写"规划中"，同样是说假话。
-2. **数字只报实测值**：159 条、内置 9 个行业库（可自建）、20 部法 724 条（724 条均已多源交叉验证）、10 类 × 5 格式、226 项冒烟、十七个引擎、二十项能力、29 个脚本；这些数字不是手填的，改完代码忘了同步文档，门禁会当场报错——**别靠记忆报数**。
+2. **数字只报实测值**：159 条、内置 9 个行业库（可自建）、20 部法 724 条（724 条均已多源交叉验证）、10 类 × 5 格式、231 项冒烟、十七个引擎、二十项能力、29 个脚本；这些数字不是手填的，改完代码忘了同步文档，门禁会当场报错——**别靠记忆报数**。
 3. **"能"都有边界**：能审不等于审对（须执业律师复核）、能查不等于查全（库里没有的标待核验）、能写不等于能签（占位符填实后即为具体合同）、**能检索不等于给法律意见**（只讲要件不下结论，具体适用须律师认定）、能检只能兜住机械错误（格式/占位符/条文原文），**兜不住判断错误**。
 
 ### 核验引擎（第 15 引擎）：产物出得去出不去的唯一裁判
