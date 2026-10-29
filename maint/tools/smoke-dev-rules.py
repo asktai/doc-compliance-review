@@ -393,7 +393,12 @@ CASES = [
 
 # 第 (8) 维比对的是「开发侧技能目录 ↔ 运行实例」，改铁律副本碰不到，
 # 单列一档：临时改运行实例一个文件 → 须报错 → 立即还原并校验哈希。
-CROSS_SIDE_PROBE = "VERSION.md"
+# 探针文件：**必须是两种形态下都存在的应镜像文件**。
+# 原先用 `VERSION.md`——但 `publish.py` 出包后把实例转**分发形态**时**删掉** VERSION.md，
+# 于是探针整段跳过（还写成"未装机"），而元自测立刻发现「(8) 打瘸后冒烟仍通过」：
+# **守卫在、验不了**。2026-10-29 由元自测暴露（此前一直以为第 8 维有注入保护）。
+# 改用 `SKILL.md`：两侧都有、内容确在比对范围内，注入尾巴不影响其语义。
+CROSS_SIDE_PROBE = "SKILL.md"
 
 # 自检脚本应输出的**最少**维度数。**用于防"自检没跑起来"被当成"全过"**——
 # 见 main() 里 A 段的那道防线。
@@ -467,9 +472,9 @@ def main():
     print("  [OK] 基线通过；自检共 %d 维：%s" % (len(covered), covered))
 
     # 覆盖性自检：脚本声称的每一维，用例表里都得有对应注入
-    # 第 8 维（跨侧）、第 14 维（在线版）都要**改磁盘文件**才能注入，
-    # 无法用 CASES 的"只改字符串"机制表达，各自单列一档，故在此登记为已覆盖。
-    STANDALONE_DIMS = {8, 14}
+    # 第 8 维（跨侧）、第 14 维（在线版）、第 16 维（结转清单）都要**改磁盘文件**
+    # 才能注入，无法用 CASES 的"只改字符串"机制表达，各自单列一档，故在此登记为已覆盖。
+    STANDALONE_DIMS = {8, 14, 16}
     cased = sorted({c[0] for c in CASES} | STANDALONE_DIMS)
     absent = sorted(set(range(1, EXPECTED_DIMS + 1)) - set(covered))
     if absent:
@@ -479,7 +484,7 @@ def main():
     if missing:
         print("  [E] 以下维度**无注入用例**（守卫未被验证）：%s" % missing)
         return 1
-    print("  [OK] 每一维都有注入用例（第 8、14 维各单列一档）")
+    print("  [OK] 每一维都有注入用例（第 8、14、16 维各单列一档）")
 
     # ── B 注入 ──
     print("\n[B] 注入：逐维断言「必须拦住」")
@@ -527,7 +532,13 @@ def main():
         print("  [--] (8) 跨侧一致性（开发侧 ↔ 运行实例）单独一档")
         rp = os.path.join(RUN, CROSS_SIDE_PROBE)
         if not os.path.exists(rp):
-            print("      跳过：运行实例不存在（未装机）")
+            # 两种成因要说清，别混：① 真没装机；② 装了但已转**分发形态**
+            # （`publish.py` 出包后删掉 VERSION.md 与 history，这是发布后的正常态）。
+            # 原先一律写"未装机"，把正常态说成异常，读日志的人会去查根本不存在的故障。
+            print("      跳过：实例缺探针文件 %s——%s"
+                  % (CROSS_SIDE_PROBE,
+                     "已转分发形态但探针不在（探针选错了文件）" if os.path.isdir(RUN)
+                     else "未装机"))
         else:
             bak = open(rp, "rb").read()
             try:
@@ -536,7 +547,7 @@ def main():
                 rc8, out8 = run_check()
                 d8 = parse_dims(out8)
                 # 报错文本只写"两侧不一致：<文件>"，不含内容差异——故**不能靠文本区分**。
-                # 判据：注入后第 8 维**报错里含 VERSION.md**，且**条数不少于基线态**。
+                # 判据：注入后第 8 维**报错里含探针文件名**，且**条数不少于基线态**。
                 # （基线态若已含它——发布中间态——条数持平；若不含，则 +1。两种都算拦住。）
                 hit8 = d8.get(8, [])
                 n8, n8b = len(hit8), len(base_dim8)
@@ -639,6 +650,64 @@ def main():
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
+    # ── 第 (16) 档：结转遗留清单（OPEN-ISSUES.md）──
+    # 本维读的是**独立文件**，改铁律副本碰不到它 → 与其他单列档同法：
+    # **造真坏形态 → 断言拦住 → 立即还原**。
+    # 两个病征都取自 18.2 明写、却一直没东西盯着的两件事：
+    #   ① 「态」写成三态之外的值（如"进行中"）——写明"不算登记"，可没人拦；
+    #   ② 标了「转下轮」却把「再见条件」清成「无」——没有再见条件就永远闭不了。
+    # 注意：**不测"内容是否属实"**，那个机器判不了（见第 (16) 维 docstring 的边界）。
+    print("  [--] (16) 结转遗留清单格式与态　单独一档")
+    OI = os.path.join(DEV, "maint", "OPEN-ISSUES.md")
+    if not os.path.exists(OI):
+        fails.append((16, "结转清单", "文件不存在"))
+        print("  [E] (16) 结转清单不存在（%s）" % OI)
+    else:
+        obak16 = open(OI, "rb").read()
+        try:
+            txt16 = obak16.decode("utf-8")
+
+            # 病征一：「态」换成三态之外的值
+            if "| 转下轮 |" not in txt16:
+                fails.append((16, "态非法", "注入点未命中（找不到「| 转下轮 |」）"))
+                print("  [E] (16) %-22s 注入点未命中" % "态非法")
+            else:
+                with open(OI, "w", encoding="utf-8") as f:
+                    f.write(txt16.replace("| 转下轮 |", "| 进行中 |", 1))
+                rc16, out16 = run_check()
+                hit16 = [h for h in parse_dims(out16).get(16, []) if "只许取" in h]
+                if rc16 != 0 and hit16:
+                    standalone_n[0] += 1
+                    print("  [OK] (16) %-22s 拦住（报「只许取」）" % "态非法")
+                else:
+                    fails.append((16, "态非法", "未报「只许取」（守卫失效）"))
+                    print("  [E] (16) %-22s 未拦住（守卫失效）" % "态非法")
+
+            # 病征二：转下轮行把「再见条件」清成「无」
+            bad2 = re.sub(r"\|[^|]*最迟下次出包前[^|]*\|", "| 无 |", txt16, count=1)
+            if bad2 == txt16:
+                fails.append((16, "缺再见条件", "注入点未命中（H-01 行已改形）"))
+                print("  [E] (16) %-22s 注入点未命中" % "缺再见条件")
+            else:
+                with open(OI, "w", encoding="utf-8") as f:
+                    f.write(bad2)
+                rc16b, out16b = run_check()
+                hit16b = [h for h in parse_dims(out16b).get(16, []) if "再见条件" in h]
+                if rc16b != 0 and hit16b:
+                    standalone_n[0] += 1
+                    print("  [OK] (16) %-22s 拦住（报「没有再见条件」）" % "缺再见条件")
+                else:
+                    fails.append((16, "缺再见条件", "未报「再见条件」（守卫失效）"))
+                    print("  [E] (16) %-22s 未拦住（守卫失效）" % "缺再见条件")
+        finally:
+            with open(OI, "wb") as f:
+                f.write(obak16)
+        if digest(OI) != hashlib.sha256(obak16).hexdigest():
+            fails.append((16, "结转清单", "还原失败：哈希未复原"))
+            print("  [E] (16) 还原失败——**结转清单被污染**，请立即检查 %s" % OI)
+        else:
+            print("  [OK] (16) 结转清单已逐字节还原")
+
     # ── 第 (3b) 档：外部文件里的铁律条号引用（2026-10-20 新增）──
     # 12.5.1.1 承认的盲区：条号被脚本注释、随包文档写死引用，真源改号后全部悬空，
     # 而 (3) 维只扫 DEV-RULES.md 自身。这道守卫要读别处的文件，故单列一档：
@@ -682,7 +751,7 @@ def main():
             print("  [OK] (3b) check-separation.py 已逐字节还原")
 
     # ── 第 (12) 档：分离守卫（铁律第 9 条）──
-    # 分离守卫查的是"技能目录里有没有不该在那的东西"，与铁律正文的十四维不同源，
+    # 分离守卫查的是"技能目录里有没有不该在那的东西"，与铁律正文的十六维不同源，
     # 故与第 (8) 维同法：**造真违规 → 断言拦住 → 立即还原**。
     # 三个用例覆盖三条判定（白名单混入／未登记素材／开发资料越界）。
     print("  [--] (12) 分离守卫（开发侧／技能侧分离）单独一档")

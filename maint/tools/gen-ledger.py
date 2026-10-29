@@ -286,7 +286,7 @@ def build(no_files=False):
         ("dev/CHANGELOG.md", "技能版本沿革（面向交付）"),
         ("dev/maint/DEVLOG.md", "开发日志（开发侧，含事故复盘）"),
         ("dev/publish.py", "发布链脚本（sync → 分离守卫 → 校验 → 打包）"),
-        ("dev/maint/tools/check-dev-rules.py", "铁律自检守卫（十四维）"),
+        ("dev/maint/tools/check-dev-rules.py", "铁律自检守卫（十六维）"),
         ("dev/maint/tools/smoke-dev-rules.py", "铁律全量冒烟（注入测试，证明守卫拦得住）"),
         ("dev/maint/tools/check-separation.py", "分离守卫（开发侧／技能侧分离，铁律第 9 条）"),
         ("dev/maint/samples-manifest.json", "素材准入清单（samples/ 逐条许可登记）"),

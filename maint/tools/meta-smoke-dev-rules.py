@@ -53,6 +53,7 @@ TAG = "元自测"
 CRIPPLES_FN = [
     (8, "跨侧一致性", "def check_cross_side(s_ignored=None):"),
     (14, "在线版同步", "def check_online_md(s):"),
+    (16, "结转清单", "def check_open_issues(s_ignored=None):"),
 ]
 
 

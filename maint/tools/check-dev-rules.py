@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-开发规范（铁律）· 全文自检（十四维）
+开发规范（铁律）· 全文自检（十六维；**维数以实际输出为准**，本行不写死份数——
+第 12 条：同一事实两处写必漂）
 ==============================================================================
-对 `dev/DEV-RULES.md` 做机械自检，覆盖十四个维度：
+对 `dev/DEV-RULES.md` 做机械自检，覆盖十六个维度：
 
   (1) 结构        条号连续、**条标题格式统一**、章序号连续、章区间声明与覆盖
   (2) 导读表      文首"三条铁律"导读表的条号与名称，须与正文标题一致（双源比对）
@@ -34,7 +35,7 @@
     保持零依赖、写法保守（凡拿不准一律不报），并以注入式负向测试验证过"真拦得住"。
 
 用法
-    python3 maint/tools/check-dev-rules.py                  # 十四维检查
+    python3 maint/tools/check-dev-rules.py                  # 十六维检查
     python3 maint/tools/check-dev-rules.py --refs           # 另打印条号引用上下文（供人工复核指向）
     python3 maint/tools/check-dev-rules.py --install-hook   # 安装 pre-commit 钩子（只警告、不阻断）
     python3 maint/tools/check-dev-rules.py --quiet          # 只输出结论行
@@ -1171,13 +1172,113 @@ def install_hook():
     shutil.copyfile(HOOK_SRC, HOOK_DST)
     os.chmod(HOOK_DST, 0o755)
     print("[OK] 已安装 pre-commit 钩子 → %s（只警告、不阻断）" % HOOK_DST)
-    print("     一档：提交涉及 DEV-RULES.md → 自动跑本脚本（十四维自检）。")
+    print("     一档：提交涉及 DEV-RULES.md → 自动跑本脚本（十六维自检）。")
     print("     二档：提交涉及守卫本体（check-dev-rules.py／smoke-dev-rules.py）")
     print("          → 自动跑 maint/tools/smoke-dev-rules.py 全量冒烟，")
     print("            用注入测试证明守卫**仍然拦得住**（铁律 16.2）。")
     print("     均不阻止提交；要强制门禁请手动运行并看退出码。")
     print("     卸载：删除该文件即可。换机器：重跑本命令一装即可。")
     return 0
+
+
+# ──────────────── (16) 结转遗留清单格式与态（OPEN-ISSUES.md） ────────────────
+
+OPEN_ISSUES = os.path.join(DEV, "maint", "OPEN-ISSUES.md")
+
+
+def check_open_issues(s_ignored=None):
+    """(16) 结转遗留清单须在、六字段齐、编号唯一、态合法、「转下轮」须有再见条件。
+
+    **本维的来历（2026-10-29）**：遗留清单原先寄居 `DEVLOG.md` 顶部，并在表头自注
+    「**本表无守卫**」——靠每轮开工人工读。人工读得住格式，读不住的两件事：
+    ① 新登记的行**漏了「态」或「再见条件」**（18.2 明写"缺一不算登记"，可当时没有任何东西盯着）；
+    ② 把已办的项**直接删行**（而不是划号保留），于是"这坑踩过"的教训一并消失。
+    故迁出为独立文件的同时补本维——**只补机械可判的那部分**。
+
+    判什么：
+      A. 文件在（铁律 7.2 的闭环入口，缺了 18.2 的回收环就断在这里）；
+      B. 表头六列、每行六列（六字段缺一不算登记）；
+      C. 编号 `H-NN` 唯一（**允许 `~~H-02~~` 划号形态**——已解决项保留不删）；
+      D. 「态」只许取 转下轮／已解决／明确关闭；
+      E. 标「转下轮」的行，「在等什么」与「再见条件」不得为空、不得写「无」。
+
+    **不判什么（写明边界，免得被当成"清单没问题"的证明）**：
+    内容是否属实、是否真回收——机器读不懂「包侧已排除」是不是真的排除过。
+    这条**只能人工**（16.4 独立复核）。**不得为它写假守卫**（24.3.5）。
+    """
+    head("(16) 结转遗留清单格式与态")
+    e0 = len(ERRS)          # 只判"本维有没有新增错"，不用全局 ERRS——
+                            # 前面维度的错会让本维的 ok 被吞掉，看着像"这维没跑"
+    if not os.path.exists(OPEN_ISSUES):
+        err("结转遗留清单不存在：%s —— 这是铁律 7.2 的闭环入口，缺了它 18.2 的回收环就断在这里"
+            % os.path.relpath(OPEN_ISSUES, DEV))
+        return
+    try:
+        src = open(OPEN_ISSUES, encoding="utf-8").read()
+    except Exception as e:                                  # noqa: BLE001
+        err("结转遗留清单读取失败：%r" % (e,))
+        return
+
+    lines = src.splitlines()
+    hi = None
+    for i, l in enumerate(lines):
+        if re.match(r"^\|\s*编号\s*\|", l):
+            hi = i
+            break
+    if hi is None:
+        err("结转遗留清单找不到表头（应形如「| 编号 | 问题 | 现状与卡点 | 在等什么 | 再见条件 | 态 |」）"
+            "——表被删或表头被改，本维无从核对")
+        return
+    hdr = [c.strip() for c in lines[hi].strip().strip("|").split("|")]
+    if len(hdr) != 6:
+        err("结转清单表头应 6 列（编号／问题／现状与卡点／在等什么／再见条件／态），"
+            "实为 %d 列：%s" % (len(hdr), "｜".join(hdr)))
+
+    rows, i = [], hi + 2
+    while i < len(lines) and lines[i].lstrip().startswith("|"):
+        rows.append((i + 1, lines[i]))
+        i += 1
+    if not rows:
+        err("结转清单表体为空——只留表头等于清单没了，比不登记更坏（看着像查过了）")
+        return
+
+    OK_STATES = ("转下轮", "已解决", "明确关闭")
+    seen = {}
+    for ln, l in rows:
+        cells = [c.strip() for c in l.strip().strip("|").split("|")]
+        if len(cells) != 6:
+            err("结转清单第 %d 行有 %d 列（应 6 列）——六字段缺一不算登记；"
+                "若单元格里写了裸 `|` 也会破列，同理" % (ln, len(cells)))
+            continue
+        no = re.sub(r"[~*\s]", "", cells[0])
+        if not re.match(r"^H-\d{2}$", no):
+            err("结转清单第 %d 行编号「%s」不是 H-NN 形态（已解决项写 ~~H-02~~ 亦可）"
+                % (ln, cells[0]))
+            continue
+        if no in seen:
+            err("结转清单编号 %s 重复（另见第 %d 行）——同一事项挂两个号，回收时必漏一个"
+                % (no, seen[no][0]))
+        seen[no] = (ln, None)
+        # 态列允许带加粗／删除线强调（原表就写 `**已解决**`、`~~H-02~~`）：
+        # **剥掉强调标记后仍须精确等于三值之一**，不是模糊匹配——区分度不受影响。
+        state = re.sub(r"[~*\s]", "", cells[5])
+        seen[no] = (ln, state)
+        if state not in OK_STATES:
+            err("结转清单第 %d 行（%s）「态」写的是「%s」，只许取 %s —— "
+                "「待决定」「进行中」「处理中」这类都不算三态（18.2）"
+                % (ln, no, state, "／".join(OK_STATES)))
+            continue
+        if state == "转下轮":
+            wait, cond = cells[3], cells[4]
+            if not wait or wait in ("无", "—", "-", "／"):
+                err("%s 标了「转下轮」，但「在等什么」没写——不知道在等谁，下轮没人会去推" % no)
+            if not cond or cond in ("无", "—", "-", "／"):
+                err("%s 标了「转下轮」，但「再见条件」没写——没有再见条件就永远闭不了" % no)
+    if len(ERRS) == e0:
+        open_n = sum(1 for _, st in seen.values() if st == "转下轮")
+        ok("结转清单 %d 条（%d 条转下轮）：%s"
+           % (len(seen), open_n, "、".join(sorted(seen))))
+
 
 
 # ────────────────────────────── 主流程 ──────────────────────────────
@@ -1499,6 +1600,7 @@ def main():
     check_closure_table(s)
     check_online_md(s)
     check_promise(s)
+    check_open_issues(s)
     print("=" * 62)
     if ERRS:
         print("结果：错误 %d 项，警告 %d 项 —— **未通过**" % (len(ERRS), len(WARNS)))
