@@ -7,7 +7,7 @@ description_zh: "给每天要看合同的人。可信是本技能与其他「AI 
 description_en: "Trustworthy by construction, which separates this skill from other AI contract review tools: every cited provision is compared verbatim against locally stored statutory text rather than recalled by the model; the library is re-verified against dual public sources so amended or repealed articles are flagged, not silently reused; document text, the desensitisation map and private rule sets never enter any request, and classified material is processed entirely on the local machine; every published figure is checked by a gate script and can be re-verified after install. Desensitises, reviews clause by clause, grades risks in three colours and produces redline revisions, comparison ledgers and opinion reports for contracts, agreements, authorisation and commitment letters, notices, policies, NDAs, SLAs and DPAs, covering payment and liquidated damages, delivery and acceptance, IP, confidentiality and non-compete, jurisdiction, arbitration, dispute resolution, limitation of action, contract validity, standard terms and personal information protection. Accepts background materials, adapts the review to a strong, balanced or weak bargaining position, summarises documents into key points and a mind map, and drafts contracts, reusable templates and converted templates. Also returns statutory text by question or article number with its source and an element-by-element breakdown (elements only, never a conclusion); compiles selected articles into a bound volume with contents and index, each statute carrying its version and effective date, transcribed verbatim rather than paraphrased; and checks documents against the GB/T 9704 official-document format standard, reporting the actual deviation. Nine industry rule sets included; handles Word, PDF, images and scanned files. Advisory only, not legal advice; review by a licensed lawyer is required."
 category: writing
 argument-hint: "<文档路径或文本> [版本/角色/尺度] | 审查 | 起草 | 比对 | 背景资料 | 脱敏 | 精要总结 | 思维导图 | 向导 | 撰写合同 | 撰写模板 | 文档转模板 | 合同转模板 | 技能版本 | 技能更新 | 技能升级 | 立查得 | 小查 | 帮助|help|? | 教程 | 私有库维护/备份/回溯/导入/导出 | 行业库维护/备份/回溯/导入/导出"
-version: 3.26.1
+version: 3.26.2
 license: 个人使用授权 · 商业使用须取得书面授权（见 `LICENSE.md`）
 author: 胡皓
 examples_zh:
@@ -26,7 +26,7 @@ examples_en:
 
 ![文档合规审查助手AI合同 · 合同与商务文档逐条审查 · 风险三色分级](assets/banner-dark.png)
 
-**v3.26.1** ｜ 作者：胡皓 ｜ 许可：个人使用授权 · 商业使用须取得书面授权（详见 `LICENSE.md`）
+**v3.26.2** ｜ 作者：胡皓 ｜ 许可：个人使用授权 · 商业使用须取得书面授权（详见 `LICENSE.md`）
 
 > **免责声明**：本技能仅作辅助法律工作，**不构成法律意见**，输出内容须经**执业律师复核**；**同一对话内首次使用时由技能先输出全文**（同一对话只此一次）——见**步骤 0.0**，全文亦见 `LICENSE.md`。
 
@@ -120,7 +120,7 @@ examples_en:
 
 **三条对外口径（不得违反）**：
 1. **「规划中」必须说成规划中；做完了也须及时改口**。v3.23.6 及以前结构化引擎、公文格式引擎确未实现，如实标规划中；**v3.24.0 起两者已实现**（`structure.py`／`gb9704.py`），对外可按在用能力介绍。**两个方向都是编造**：把没做的说成做了，与编造法条同性质；做完了仍写"规划中"，同样是说假话。
-2. **数字只报实测值**：159 条、内置 9 个行业库（可自建）、17 部法 712 条（712 条均已多源交叉验证）、10 类 × 5 格式、210 项冒烟、十七个引擎、二十项能力、28 个脚本；这些数字不是手填的，改完代码忘了同步文档，门禁会当场报错——**别靠记忆报数**。
+2. **数字只报实测值**：159 条、内置 9 个行业库（可自建）、17 部法 712 条（712 条均已多源交叉验证）、10 类 × 5 格式、213 项冒烟、十七个引擎、二十项能力、29 个脚本；这些数字不是手填的，改完代码忘了同步文档，门禁会当场报错——**别靠记忆报数**。
 3. **"能"都有边界**：能审不等于审对（须执业律师复核）、能查不等于查全（库里没有的标待核验）、能写不等于能签（占位符填实后即为具体合同）、**能检索不等于给法律意见**（只讲要件不下结论，具体适用须律师认定）、能检只能兜住机械错误（格式/占位符/条文原文），**兜不住判断错误**。
 
 ### 核验引擎（第 15 引擎）：产物出得去出不去的唯一裁判
@@ -867,7 +867,7 @@ python scripts/freshness-patrol.py --self-test     # 离线自检（不联网，
 > **一句话原则**：**能不出去就不出去；必须出去的，只出去必要的那一部分。**除"审查判断"一步外，**提取 / 清洗 / 脱敏 / 生成交付物全部可离线完成**。
 > **本节只留常驻要点，完整口径按需读取 `SECURITY.md`**（承诺七条／流转四路径／操作红线八不／内置措施／使用前自检都在其中）——只在下列情形读它：(1) 使用者问到数据安全、能否外发、文档会不会进模型；(2) 涉密门（1.0.1）判定前后；(3) 走纯本地链路或对外出域之前；(4) 批处理前的自检。**日常审查不读。**
 
-**常驻要点四条**：(1) **文档数据不进模型的训练／微调／评测，也不进任何网络请求**——联网按「**数据出域**」分四档，**不按"联不联网"一刀切**（`scripts/` 下 **28 个脚本**逐个定档，档位写在各脚本文件头，自检命令见 `SECURITY.md` 第五章）：**L0 绝对离线 23 个**——凡接触文档正文／映射表／私有规则的，零网络库、零出网路径；**L1 在线只读 1 个**（`version.py` 查更新，只 GET 公开版本清单，**默认关闭**）；**L2 不联网就用不成 2 个**（`legal-parse.py` 抓公开法规页、`freshness-patrol.py` 用它做时效巡检，**须显式调用、不在审查链路**）；**L3 门禁自检 2 个**（`check.py`、`smoke-test.py`，持有关键字清单查别人、自身不联网）。**四档同一条红线：任何请求里都不含文档内容、文件名、映射表或私有规则**——联网本身不是风险，**带着文档出去才是**；(2) **审查模式必须把全文读入模型上下文**（架构决定），涉密的改走 `local-only.py` **纯本地链路、不读全文**；该层是否用于训练取决于平台策略，提交前先确认平台处于"不用于训练"状态；(3) **交付物按文档名自动建子目录隔离**，映射表只落本机 `~/.dcr-maps/`，**映射表与 `.clean.txt` 清洗稿绝不随交付物外发**；(4) **操作红线"八不"**（含：原文不直传公有云、不用客户文档做训练/微调/评测/案例库/公开演示、不跳过涉密门、不平铺混放多客户文档）→ 见 `SECURITY.md` 第四章。
+**常驻要点四条**：(1) **文档数据不进模型的训练／微调／评测，也不进任何网络请求**——联网按「**数据出域**」分四档，**不按"联不联网"一刀切**（`scripts/` 下 **29 个脚本**逐个定档，档位写在各脚本文件头，自检命令见 `SECURITY.md` 第五章）：**L0 绝对离线 24 个**——凡接触文档正文／映射表／私有规则的，零网络库、零出网路径；**L1 在线只读 1 个**（`version.py` 查更新，只 GET 公开版本清单，**默认关闭**）；**L2 不联网就用不成 2 个**（`legal-parse.py` 抓公开法规页、`freshness-patrol.py` 用它做时效巡检，**须显式调用、不在审查链路**）；**L3 门禁自检 2 个**（`check.py`、`smoke-test.py`，持有关键字清单查别人、自身不联网）。**四档同一条红线：任何请求里都不含文档内容、文件名、映射表或私有规则**——联网本身不是风险，**带着文档出去才是**；(2) **审查模式必须把全文读入模型上下文**（架构决定），涉密的改走 `local-only.py` **纯本地链路、不读全文**；该层是否用于训练取决于平台策略，提交前先确认平台处于"不用于训练"状态；(3) **交付物按文档名自动建子目录隔离**，映射表只落本机 `~/.dcr-maps/`，**映射表与 `.clean.txt` 清洗稿绝不随交付物外发**；(4) **操作红线"八不"**（含：原文不直传公有云、不用客户文档做训练/微调/评测/案例库/公开演示、不跳过涉密门、不平铺混放多客户文档）→ 见 `SECURITY.md` 第四章。
 
 ### 12.1 脱敏（口径 + 操作，易踩坑，务必区分）
 

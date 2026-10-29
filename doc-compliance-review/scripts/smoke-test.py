@@ -1737,9 +1737,21 @@ def main():
               _cut2.get("_分发副本") is True and "history" not in _cut2,
               json.dumps(_cut2, ensure_ascii=False)[:90])
         _root4 = os.path.dirname(HERE)
+        # 本目录的形态决定期望方向：**开发源**（有 history）→ 源侧断言须放行；
+        # **分发副本**（实例已按发布链转形态，无 history）→ 源侧断言须拒。
+        # 两个方向都验，才证明这条断言真在拦，而不是恒返回空表（12.5.4 假绿）。
+        try:
+            _is_dist4 = (json.load(open(os.path.join(_root4, "version.json"),
+                                        encoding="utf-8")).get("_分发副本") is True)
+        except Exception:
+            _is_dist4 = False
         _srcbad = _pk4.verify_source_manifest(_root4)
-        check("出包：源侧断言认「源里有 history」为通过（包内仍会自动剥离）",
-              _srcbad == [], str(_srcbad)[:90])
+        if _is_dist4:
+            check("出包：分发副本（无 history）当出包源时源侧断言须拒——证明它真在拦",
+                  _srcbad != [], "未拦（假绿）：%s" % (str(_srcbad)[:80]))
+        else:
+            check("出包：源侧断言认「源里有 history」为通过（包内仍会自动剥离）",
+                  _srcbad == [], str(_srcbad)[:90])
         check("出包：FULL_FILES 不含 VERSION.md（沿革不随包）",
               "VERSION.md" not in _pk4.FULL_FILES, str(_pk4.FULL_FILES)[:70])
         _tmp4 = _tf4.mkdtemp(prefix="dcr_dist_")
@@ -1762,14 +1774,18 @@ def main():
               "——千问办公「装完即红」的回归",
               _r4.returncode == 0,
               tail_line(_r4.stdout) + " " + tail_line(_r4.stderr))
-        # 反向：把沿革塞回分发包 → 必须报错（「沿革不给看」不能只靠出包时自觉）
+        # 反向：把沿革塞回分发包 → 必须报错（「沿革不给看」不能只靠出包时自觉）。
+        # 分发副本里没有 VERSION.md 可拷，就写一个最简的顶上——判据是「包里不许出现这个文件名」，
+        # 与内容无关。**不得因"没有源文件"就跳过本项**，那会让两档项数不守恒。
         if _had_vm:
             _sh4.copyfile(os.path.join(_root4, "VERSION.md"), _vm4)
-            _r6 = run([PY, os.path.join(_dst4, "scripts", "check.py")])
-            check("分发包里塞回 VERSION.md 须报错——沿革不随包不能只靠自觉",
-                  _r6.returncode != 0 and "VERSION.md（版本沿革）" in (_r6.stdout or ""),
-                  tail_line(_r6.stdout))
-            os.remove(_vm4)
+        else:
+            open(_vm4, "w", encoding="utf-8").write("# 版本沿革（测试用空壳）\n")
+        _r6 = run([PY, os.path.join(_dst4, "scripts", "check.py")])
+        check("分发包里塞回 VERSION.md 须报错——沿革不随包不能只靠自觉",
+              _r6.returncode != 0 and "VERSION.md（版本沿革）" in (_r6.stdout or ""),
+              tail_line(_r6.stdout))
+        os.remove(_vm4)
         _d4.pop("_分发副本", None)
         open(_vj4, "w", encoding="utf-8").write(
             json.dumps(_d4, ensure_ascii=False, indent=2) + "\n")
@@ -1816,6 +1832,62 @@ def main():
               not _nopin, "、".join(_nopin))
     except Exception as e:
         check("编码链", False, repr(e))
+
+    # --- 3.59 产物验收（验交付物，不验产地）---
+    # 背景：发布链此前只验开发源与运行实例，两者都是"自家的地盘"，产物只是被**假定**与源一致。
+    # 这个假定一直成立到它不成立为止——「装好的副本跑门禁必红」连存四个版本无人知，正是因为
+    # **从没人在产物上跑过**。这一节改真出包、真解包、真跑，不再用"拷目录模拟产物"。
+    print("\n[3.59] 产物验收（解包即验，不用目录模拟）")
+    _tmp6 = None
+    try:
+        import importlib.util as _iu6, tempfile as _tf6, contextlib as _ctx6, io as _io6
+        _root6 = os.path.dirname(HERE)
+        # 出包只能从**开发源**出：分发副本没有 history（沿革不外泄），源侧断言会正当地拒包。
+        # 故在实例（分发态）里跑冒烟时这两项记 SKIP 而非 FAIL——这不是缺陷，是设计。
+        _is_dist6 = False
+        try:
+            _is_dist6 = (json.load(open(os.path.join(_root6, "version.json"),
+                                        encoding="utf-8")).get("_分发副本") is True)
+        except Exception:
+            pass
+        if _is_dist6:
+            skip("产物验收：真出包（分发副本无沿革，不能当出包源——出包只在开发源做）")
+            skip("产物验收：源有沿革而产物没有（同上，需出包源）")
+        else:
+            _tmp6 = _tf6.mkdtemp(prefix="dcr_packopt_")
+            _sp6 = _iu6.spec_from_file_location("_pk6", os.path.join(HERE, "pack.py"))
+            _pk6 = _iu6.module_from_spec(_sp6)
+            _sp6.loader.exec_module(_pk6)
+            _log6 = _io6.StringIO()
+            with _ctx6.redirect_stdout(_log6):      # 出包日志不进冒烟输出，失败时再取尾行
+                # tag 显式传（不靠默认值）：默认值写死过一次 "v3.0.0"，打出错版本的包是静默的
+                _ok6 = _pk6.build(_root6, _tmp6, tag=_pk6.read_skill_version(_root6), fmt="zip")
+            _z6 = [os.path.join(_tmp6, f) for f in sorted(os.listdir(_tmp6))
+                   if f.endswith(".zip")]
+            _tail6 = (_log6.getvalue().strip().splitlines() or [""])[-1]
+            check("产物验收：真出包须通过（出包末尾自动解包、在副本里跑门禁）",
+                  bool(_ok6) and len(_z6) == 1, _tail6[:110])
+            if _z6:
+                _sp7 = _iu6.spec_from_file_location("_vd6", os.path.join(HERE, "verify-dist.py"))
+                _vd6 = _iu6.module_from_spec(_sp7)
+                _sp7.loader.exec_module(_vd6)
+                _e6 = _vd6.verify_artifact(_z6[0], gate=False, quiet=True)
+                _srcvm = os.path.exists(os.path.join(_root6, "VERSION.md"))
+                check("产物验收：源里有 VERSION.md／history，产物里都没有（剥离在产物上可验）",
+                      not _e6 and _srcvm, "源有 VERSION.md=%s；产物问题 %s" % (_srcvm, _e6[:2]))
+    except Exception as e:
+        check("产物验收", False, repr(e))
+    finally:
+        if _tmp6:
+            shutil.rmtree(_tmp6, ignore_errors=True)
+
+    print("\n[3.59b] 产物验收判据自测（变异注入）")
+    try:
+        _r7 = run([PY, os.path.join(HERE, "verify-dist.py"), "--selftest"])
+        check("产物验收判据有区分度：七类注入逐项命中、对照组零误报（不是「跑了就绿」）",
+              _r7.returncode == 0 and "全部通过" in (_r7.stdout or ""), tail_line(_r7.stdout))
+    except Exception as e:
+        check("产物验收判据自测", False, repr(e))
 
     # --- 3.5 版本与依赖（分发与落地成本）---
     print("\n[3.5] 版本与依赖")

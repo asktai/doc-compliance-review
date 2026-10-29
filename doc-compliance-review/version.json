@@ -3,23 +3,38 @@
   "product": "文档合规审查助手AI合同",
   "skill_id": "doc-compliance-review",
   "latest": {
-    "version": "v3.26.1",
+    "version": "v3.26.2",
     "date": "2026-10-29",
-    "summary": "文档质量六处修复＋文档一致性防御守卫（根治守卫假绿）",
+    "summary": "产物验收：出包即解包跑门禁，补上「只验源、不验交付物」的盲区",
     "changes": [
-      "文档六处修复：① 能检/能核术语自相矛盾（能检＝机械自检、能核＝产物裁决，原文把二者互换）；② 向导菜单「12 项全列」与全文 13 项矛盾 → 13；③ 撰写合同要素「13 项」实为 15 项（第 15＝审查人）→ 15；④ 尺度两轴陈旧表述（把「强弱」错挂到尺度、漏掉「侧重可多选」）→ 改为「基准＋侧重可多选」与谈判地位两轴；⑤ 删题号冗余条；⑥ 补小遗漏（作答语法表缺语音行／README 侧重漏「自定义」／四能力无正文出处）",
-      "新增文档一致性防御守卫（check.py）：_check_doc_consistency —— FORBID 陈旧表述注册表（集中登记「现行模型下绝不该出现」的写法，命中即报错）＋正向断言（frontmatter 须含「侧重可多选」、README 侧重须含「自定义」）；修复「数字口径守卫」失明（真源解析失败一律告警，菜单 13 项／要素 15 项／内置库 9 个从真源实算比对）；新增要素数量守卫（「N 项要素」必须＝真源）",
-      "守卫用注入式负向测试验证：注入 12 项全列／尺度旧两轴／13 项要素／Qn…Qn+12 四类回归，全拦；过程中修掉新代码一处 %d 喂字符串的潜伏崩溃",
-      "配套铁律 DEV-RULES 同步新增 12.5.8「七类文档病害防治闭环」：把逻辑不自洽／自我矛盾／数字冲突／陈旧表述／冗余／啰嗦／遗漏统一登记为「真源＋检测手段＋状态」，根因归结为「多处重写」与「改了号没改话」两类治法（维护侧，不随技能包分发）",
-      "同步 README／drafting-guide／SKILL 口径；门禁 0 错。全量冒烟 202 全绿"
+      "新增产物验收关卡（pack.py 出包末尾强制）：把刚打好的包解开，在**解出来的副本**上跑 check.py（UTF-8 与 GBK 双环境），不过即删包并退非零；此前发布链只验开发源与运行实例，两者都是「自家的地盘」，产物只是被假定与源一致",
+      "新增 scripts/verify-dist.py：使用者拿到包也能自验——头部与负载指纹自洽、顶层与层级体积合平台上限、沿革不随包（无 VERSION.md／无 history／带分发副本标记）、作者本机工具路径已清空、版本三处（包名／SKILL.md／version.json）自洽、解包后门禁与入口脚本可跑；带 --selftest 变异注入自测（七类注入逐项命中、对照组零误报）",
+      "修「装好的副本跑门禁必红」的根因回归：分包副本（无 history／无 VERSION.md／带标记）跑 check.py 须 0 错，反向塞回沿革须报错；此缺陷此前只在装机后暴露，产物验收缺失是它连存四个版本仍无人知的直接原因",
+      "同步脚本数 29（L0 24）；门禁 0 错 0 警，全量冒烟全绿"
     ],
     "download_page": "https://github.com/asktai/doc-compliance-review/releases",
     "files": {
-      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.26.1/文档合规审查助手AI合同_v3.26.1_20261029_(doc-compliance-review).skill",
-      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.26.1/文档合规审查助手AI合同_v3.26.1_20261029_(doc-compliance-review).zip"
+      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.26.2/文档合规审查助手AI合同_v3.26.2_20261029_(doc-compliance-review).skill",
+      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.26.2/文档合规审查助手AI合同_v3.26.2_20261029_(doc-compliance-review).zip"
     }
   },
   "history": [
+    {
+      "version": "v3.26.2",
+      "date": "2026-10-29",
+      "summary": "产物验收：出包即解包跑门禁，补上「只验源、不验交付物」的盲区",
+      "changes": [
+        "新增产物验收关卡（pack.py 出包末尾强制）：把刚打好的包解开，在**解出来的副本**上跑 check.py（UTF-8 与 GBK 双环境），不过即删包并退非零；此前发布链只验开发源与运行实例，两者都是「自家的地盘」，产物只是被假定与源一致",
+        "新增 scripts/verify-dist.py：使用者拿到包也能自验——头部与负载指纹自洽、顶层与层级体积合平台上限、沿革不随包（无 VERSION.md／无 history／带分发副本标记）、作者本机工具路径已清空、版本三处（包名／SKILL.md／version.json）自洽、解包后门禁与入口脚本可跑；带 --selftest 变异注入自测（七类注入逐项命中、对照组零误报）",
+        "修「装好的副本跑门禁必红」的根因回归：分包副本（无 history／无 VERSION.md／带标记）跑 check.py 须 0 错，反向塞回沿革须报错；此缺陷此前只在装机后暴露，产物验收缺失是它连存四个版本仍无人知的直接原因",
+        "同步脚本数 29（L0 24）；门禁 0 错 0 警，全量冒烟全绿"
+      ],
+      "download_page": "https://github.com/asktai/doc-compliance-review/releases",
+      "files": {
+        "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.26.2/文档合规审查助手AI合同_v3.26.2_20261029_(doc-compliance-review).skill",
+        "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.26.2/文档合规审查助手AI合同_v3.26.2_20261029_(doc-compliance-review).zip"
+      }
+    },
     {
       "version": "v3.26.1",
       "date": "2026-10-29",
@@ -666,5 +681,5 @@
   ],
   "_维护说明": "出包后请同步更新本文件（latest 段与 history）。真源是 SKILL.md 的 version 与 VERSION.md 的沿革；本文件是'对外公布的清单'，须与真源一致，否则使用者会被引向旧版。",
   "schema": 1,
-  "version": "3.26.1"
+  "version": "3.26.2"
 }

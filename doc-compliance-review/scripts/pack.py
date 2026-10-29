@@ -333,6 +333,39 @@ def verify_zip(zp):
     return bad
 
 
+def verify_artifacts(paths):
+    """**产物验收**（铁律 13.2）：解真实产物、在解出来的副本上跑门禁，跑不过即删包。
+
+    为什么非此不可：本脚本对源目录做了**有损变换**（剥 history、删 VERSION.md、清空 tools、
+    按清单裁剪条目）。源侧一切正常证明不了"变换没出错"——少拷一个文件、清空后 JSON 坏了、
+    剥离分支没进，源目录里都看不出来。唯一能证明的是：把产物解开，在解出来的东西上跑。
+    本项目实证：v3.25.8–v3.26.1 四个版本的包，**装完跑 check.py 必红**（history 被剥而门禁
+    要求它有），而发布链一路绿——因为它只验源与运行实例，**从没验过产物**。
+
+    只对第一个产物跑完整门禁（含 GBK 环境）；其余（.skill）只验形态与头部自洽——
+    其负载与 zip 字节一致已由头部 sha256 证明，重复跑一遍门禁只是耗时，不增证据。
+    """
+    p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "verify-dist.py")
+    if not os.path.exists(p):
+        return ["缺 scripts/verify-dist.py——产物验收无从执行（不许绕过：补回脚本再出包）"]
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("_dcr_verify_dist", p)
+    mod = importlib.util.module_from_spec(spec)
+    try:
+        spec.loader.exec_module(mod)
+    except Exception as e:
+        return ["scripts/verify-dist.py 无法加载：%r" % (e,)]
+    bad = []
+    for i, path in enumerate(paths):
+        if not os.path.exists(path):
+            continue
+        print("  [i] 产物验收：%s（%s）" % (os.path.basename(path),
+                                          "解包后跑门禁" if i == 0 else "只验形态，负载已证同源"))
+        for e in mod.verify_artifact(path, gate=(i == 0), quiet=True):
+            bad.append("%s：%s" % (os.path.basename(path), e))
+    return bad
+
+
 # ------------------------------------------------------------------ 封装格式与四段式命名
 # `.skill`＝自定义头部 ＋ zip 负载（**自描述格式**，非平台公开规范）。
 # 头部布局（小端）：
@@ -520,8 +553,12 @@ def verify_admission_manifest(base):
     return bad, warns
 
 
-def build(base, outdir, include_private=False, tag="v3.0.0", keep_tools=False, fmt="both",
+def build(base, outdir, include_private=False, tag=None, keep_tools=False, fmt="both",
           date=None):
+    # tag 默认 None ＝ 现读 SKILL.md 的版本。**不再默认写死 "v3.0.0"**：写死的失败方式是
+    # 静默的——程序化调用（不走 CLI）会打出一个版本号错误的包，而版本号恰恰是使用者判断
+    # "该不该更新"的唯一依据（v3.25.3 记过同类事故：默认 v0.0.0 的包真出过）。
+    tag = tag or read_skill_version(base)
     os.makedirs(outdir, exist_ok=True)
     priv_path = os.path.join(base, PRIVATE_DIR)
     prefix = SKILL_DIR + "/"   # 上架版结构：所有条目都套一层技能目录
@@ -628,6 +665,20 @@ def build(base, outdir, include_private=False, tag="v3.0.0", keep_tools=False, f
             os.remove(zp)   # 只要 .skill 时，中间的 zip 不留
         if fmt == "zip" and os.path.exists(sp):
             os.remove(sp)
+        # ---- 产物验收（铁律 13.2）：**必须验交付物本身，不验产地**
+        # 上面所有自检都只看"包里的字节对不对"，只有这一步是"把包解开、在解出来的东西上真跑"。
+        # 失败即删产物：留着半个坏包，早晚被人当成能用的发出去。
+        _arts = [x for x in (zp, sp) if os.path.exists(x)]
+        _vd_bad = verify_artifacts(_arts)
+        if _vd_bad:
+            for b in _vd_bad:
+                print("  [FAIL] " + b)
+            for _x in _arts:
+                if os.path.exists(_x):
+                    os.remove(_x)
+            print("  [x] 产物验收未通过：已删除本次产物，请勿发布（修完重打）。")
+            return False
+        print("  [OK] 产物验收通过：包解开后在副本里跑 check.py，UTF-8 与 GBK 双环境均 0 错 0 警")
     return True
 
 def read_skill_version(base):
