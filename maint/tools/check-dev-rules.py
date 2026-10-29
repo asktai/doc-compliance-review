@@ -68,7 +68,11 @@ EXCLUDE = {".git", "__pycache__", ".DS_Store",
 # 实测（2026-10-22）：出包后本维必报 2 项、跑过法条交叉验证后再多 1 项，与代码改动无关，
 # 属**检查口径缺陷**而非漂移；长期如此会让人习惯性忽略本维输出（狼来了）。
 # 判据：与 `.gitignore` 已声明"运行期产物、不入档"的路径保持同一口径，两处须同步。
-DEV_ONLY = {"_发布包", "report"}
+DEV_ONLY = {"_发布包", "report",
+            # `VERSION.md`（版本沿革）：v3.26.2 起**不随包、也不入运行实例**——
+            # 沿革属发布侧记录，历史版本信息不对外提供。开发侧保留它是维护真源，
+            # 运行实例不该有；故按「开发侧存在但按设计不入实例」处理，不报缺文件。
+            "VERSION.md"}
 DIST = "/workspace/dist"
 HOOK_SRC = os.path.join(HERE, "hooks", "pre-commit")
 HOOK_DST = os.path.join(DEV, ".git", "hooks", "pre-commit")
@@ -810,14 +814,40 @@ def check_cross_side(s_ignored=None):
     for root, dirs, files in os.walk(SKILL):
         dirs[:] = [d for d in dirs if d not in EXCLUDE and d not in DEV_ONLY]
         for fn in files:
-            if fn in EXCLUDE:
+            # 文件层也要认 DEV_ONLY：它此前只用于目录过滤，导致「开发侧有、按设计
+            # 不入实例」的单文件（如 VERSION.md）被误报「运行实例缺此文件」。
+            if fn in EXCLUDE or fn in DEV_ONLY:
                 continue
             fp = os.path.join(root, fn)
             dev_files[os.path.relpath(fp, SKILL)] = fp
+    def _norm_version_json(path):
+        """两侧归一后再比 version.json。
+
+        开发侧带 history、运行实例按设计被 `dist-mode.py` 剥离并加 `_分发副本` 标记——
+        这是**分发形态**的正常差异，不是漂移。故只比「去掉 history 与 _分发副本 之后」
+        的其余内容：latest 版本号／日期／说明／直链变了照样抓得住，不会因归一而失守。
+        """
+        import json as _json      # 本模块未在顶层 import json，函数内局部导入更稳
+        try:
+            with open(path, encoding="utf-8") as f:
+                d = _json.load(f)
+        except Exception as e:
+            # 解析失败**必须判为不一致**，不能返回 None：两侧都 None 时 `None == None`
+            # 会被当成"一致"而静默放行——这正是 12.5.9「输入不可信不得默认相等」的反例。
+            # 带路径的差异串保证两侧永不相等，从而必然触发一条错误。
+            return "__PARSE_ERROR__:%s:%r" % (path, e)
+        if isinstance(d, dict):
+            d.pop("history", None)
+            d.pop("_分发副本", None)
+        return _json.dumps(d, ensure_ascii=False, sort_keys=True, indent=2)
+
     for rel, fp in sorted(dev_files.items()):
         rp = os.path.join(RUN, rel)
         if not os.path.exists(rp):
             drift.append("运行实例缺此文件：%s" % rel)
+        elif rel == "version.json":
+            if _norm_version_json(fp) != _norm_version_json(rp):
+                drift.append("两侧不一致：version.json（latest 段；history 差异按分发形态忽略）")
         elif digest(fp) != digest(rp):
             drift.append("两侧不一致：%s" % rel)
     if drift:
