@@ -106,9 +106,12 @@ def refresh_generated():
     ok = True
     for where, base in (("实例", RUN), ("出包源", DEV)):
         for label, args in steps:
-            # 出包源只重签指纹台账：源侧的规则基线是长期维护的开发资产，不由发布链改写
-            if base == DEV and label != "脚本指纹台账":
-                continue
+            # 出包源**两个生成物都要刷**（v3.26.5 改）。
+            # 原先只刷指纹台账，理由是「源侧规则基线是长期维护的开发资产，不由发布链改写」——
+            # 这话在「规则真改了就跑一次 --update」时成立，但规则基线**也随包分发**：
+            # 改了规则忘了刷，包里带的仍是旧基线，包内 check.py 当场报「规则库有 N 处差异」，
+            # 于是产物验收把它拦下（v3.26.5 出包时正是这么被拦的）。两类生成物同构，
+            # 一个刷一个不刷，等于把同一处坑留一半。
             r = subprocess.run([sys.executable, os.path.join(base, "scripts", args[0])] + args[1:],
                                capture_output=True, text=True)
             tail = (r.stdout or r.stderr).strip().splitlines()[-1:] or ["(无输出)"]
