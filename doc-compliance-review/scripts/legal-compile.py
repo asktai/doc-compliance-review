@@ -98,7 +98,13 @@ def parse_articles(spec_str):
             n = n.strip()
             if not n:
                 continue
-            no = int(n) if n.isdigit() else lv.cn2int(n)
+            # 「205之一」「205.1」都要能写：增设条与主条是两个罪名，写成 205 会指错条
+            _m = re.match(r"^(\d+)\s*(?:\.\s*(\d+)|条?\s*之\s*([一二三四五六七八九十]{1,3}))?$", n)
+            if _m:
+                no = lv.parse_no(_m.group(1),
+                                 _m.group(3) or _m.group(2))
+            else:
+                no = lv.parse_no(n)
             if no:
                 out.append((law, no))
     return out, missing
@@ -117,11 +123,11 @@ def collect(db, ask=None, law=None, articles=None, limit=40):
         for law_name, no in articles:
             # 法名可简写（"民法典" vs "中华人民共和国民法典"），走 legal-verify 的归一化
             real = lv.pick_law(law_name) or law_name
-            ent = (laws.get(real) or {}).get(str(no))
+            ent = (laws.get(real) or {}).get(lv.art_key(no))
             if not ent:
                 # 再退一步：全库找同条号且法名互相包含的（避免简写/全称不一致误判未收录）
                 for k, v in laws.items():
-                    if (real in k or k in real) and str(no) in v:
+                    if (real in k or k in real) and lv.art_key(no) in v:
                         real, ent = k, v[str(no)]
                         break
             if ent:
@@ -158,7 +164,7 @@ def group_by_law(picked):
             order.append(r["law"])
         bucket[r["law"]].append(r)
     for k in bucket:
-        bucket[k].sort(key=lambda x: x["no"])
+        bucket[k].sort(key=lambda x: (lv.art_base(x["no"]), lv.art_key(x["no"])))
     return [(k, bucket[k]) for k in order]
 
 
@@ -179,19 +185,29 @@ def _kw(anchor):
 
 
 def _compact_nos(rows):
-    """条号紧凑写法：连续区间写「23—25」，断开处用、分隔。"""
-    nos = [r["no"] for r in rows]
-    if not nos:
+    """条号紧凑写法：连续区间写「23—25」，断开处用、分隔。
+
+    「第X条之一」不能并进区间：区间是**主条号**的压缩写法，把 205 之一 压成
+    「205」会让人以为收录的只是第 205 条本身——而那正是两个不同罪名。
+    故主号走区间，增设条另用括注点名。
+    """
+    keys = [lv.art_key(r["no"]) for r in rows]
+    if not keys:
         return "—"
-    out, start, prev = [], nos[0], nos[0]
-    for n in nos[1:]:
+    bases = sorted({lv.art_base(k) for k in keys})
+    subs = sorted((k for k in keys if "." in k), key=lv.art_base)
+    out, start, prev = [], bases[0], bases[0]
+    for n in bases[1:]:
         if n == prev + 1:
             prev = n
             continue
         out.append(str(start) if start == prev else "%d—%d" % (start, prev))
         start = prev = n
     out.append(str(start) if start == prev else "%d—%d" % (start, prev))
-    return "、".join(out)
+    txt = "、".join(out)
+    if subs:
+        txt += "（另含 %s）" % "、".join(lv.art_label(s) for s in subs)
+    return txt
 
 
 def build(db, picked, absent, title, ask=None, law=None,
@@ -277,7 +293,7 @@ def build(db, picked, absent, title, ask=None, law=None,
             mark = "✓ %s" % conf
             if not r.get("verified"):
                 mark += "　⚠ 未通过多源验证"
-            A("#### 第%d条　%s" % (r["no"], _kw(r.get("anchor"))))
+            A("#### 第%s　%s" % (lv.art_label(r["no"]), _kw(r.get("anchor"))))
             A("")
             A("`%s`" % mark)
             A("")
@@ -311,7 +327,8 @@ def build(db, picked, absent, title, ask=None, law=None,
     A("|---|---:|---|")
     for law_name, rows in groups:
         for r in rows:
-            A("| %s | %d | %s |" % (law_name, r["no"], _kw(r.get("anchor")) or "—"))
+            A("| %s | %s | %s |" % (law_name, lv.art_label(r["no"]),
+                                    _kw(r.get("anchor")) or "—"))
     A("")
 
     # ── 五、附录 ──
@@ -334,7 +351,7 @@ def build(db, picked, absent, title, ask=None, law=None,
           "如需收录，请先经法规库更新流程核验入库。")
         A("")
         for law_name, no in absent:
-            A("- 《%s》第%d条" % (law_name, no))
+            A("- 《%s》第%s" % (law_name, lv.art_label(no)))
         A("")
 
     A("### 5.%d 校验口径" % (3 if absent else 2))
@@ -505,7 +522,8 @@ def main():
               "可先用 legal-search.py --coverage 看覆盖面，或 --online 扩充。",
               file=sys.stderr)
         for law_name, no in (absent or []):
-            print("                 未收录：《%s》第%d条" % (law_name, no), file=sys.stderr)
+            print("                 未收录：《%s》第%s" % (law_name, lv.art_label(no)),
+                  file=sys.stderr)
         return 1
 
     title = a.title

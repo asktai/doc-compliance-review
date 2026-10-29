@@ -35,6 +35,7 @@ except Exception:
     pass
 
 import html
+import os
 import re
 import ssl
 import time
@@ -128,7 +129,8 @@ def cn2int(s):
     return total + cur
 
 
-ART_RE = re.compile(r"第([一二三四五六七八九十百千零〇\d]{1,8})条[　 ]*")
+ART_RE = re.compile(r"第([一二三四五六七八九十百千零〇\d]{1,8})条"
+                    r"(?:之([一二三四五六七八九十]{1,3}))?[　 ]*")
 
 # 条号必须出现在「行首」或紧跟在句末标点/右括号/冒号之后——否则是正文里的交叉引用
 # （如「违反本法第四十六条规定」「不适用本法第十七条、第十八条」），把它当成条头会整体错位。
@@ -137,6 +139,26 @@ _HEAD_OK = set("。；：！？\n\r）)》”」")
 # 序号式章节标题（「三、合同的效力」）的词表：只认这些，避免误伤正文列举项
 _SECTION_TAIL = ("(?:总\s*则|附\s*则|合同的订立|合同的效力|合同的履行|合同的保全|"
                  "合同的变更和转让|合同的权利义务终止|违约责任|其他规定|一般规定)")
+
+
+def _load_verify():
+    """加载条号工具（来自 legal-verify.py）。
+
+    为什么不在这里自己写一份：条号表示法（「205」/「205.1」）的解析规则只允许有一处实现。
+    建库侧与核验侧各写一套，迟早出现「建库认得出 205 之一、核验认不出」的分叉——
+    那正是本文件开头记的那次教训（巡检另写一套解析，误报「疑似换版」）。
+    legal-verify.py 是 L0 纯标准库模块，本脚本（L2）依赖它不违反离线口径。
+    """
+    import importlib.util as _ilu
+    here = os.path.dirname(os.path.abspath(__file__))
+    spec = _ilu.spec_from_file_location("_lv_no", os.path.join(here, "legal-verify.py"))
+    m = _ilu.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m
+
+
+_LV = _load_verify()
+art_key, art_base, art_label = _LV.art_key, _LV.art_base, _LV.art_label
 
 
 def _line_start_heads(text):
@@ -150,9 +172,17 @@ def _line_start_heads(text):
         if j >= 0 and text[j] not in _HEAD_OK:
             continue
         no = cn2int(m.group(1))
-        if no:
-            out.append((i, m.end(), no))
+        if not no:
+            continue
+        sub = m.group(2)
+        if sub:
+            n_sub = cn2int(sub)
+            if n_sub:
+                out.append((i, m.end(), "%d.%d" % (no, n_sub)))
+                continue
+        out.append((i, m.end(), str(no)))
     return out
+
 
 
 def parse_articles(text):
@@ -166,6 +196,13 @@ def parse_articles(text):
         body = re.split(r"\n\s*(?:第[一二三四五六七八九十]+[编章节]|附\s*则)", body)[0]
         body = re.sub(r"\s*\n\s*", "", body).strip()
         body = re.sub(r"（责任编辑：[^）]*）.*$", "", body).strip()
+        # 条首「【罪名】」注记：整合版页面常把编者加的罪名提要紧贴条号后
+        # （如四川省公安厅版《刑法》「第二百零五条 【虚开增值税专用发票…罪】虚开…」）。
+        # **那不是条文内容**——正式条文没有这对方括号，罪名是编者按修正案梳理出来的。
+        # 不剥的后果有二：① 库里存的「原文」多了一段本不存在的话，引述核对会把
+        # 正确引文判成对不上；② 干净源与带注记的源比对时必然判冲突，白丢一个源。
+        # 只剥**紧贴条首、40 字以内**的一处，不做泛化（正文中间的【】可能真是原文）。
+        body = re.sub(r"^【[^】]{1,40}】\s*", "", body)
         body = strip_tail_noise(body)
         # 部分来源（如最高法司法解释）用「三、合同的效力」这种序号式章节标题分隔，
         # 会被并进上一条正文尾，须砍掉。只认**已知章节标题词**，不做泛化缩写，
@@ -313,6 +350,13 @@ def strip_line_title(body, law=None, no=None):
     """剥离条文小标题。先查人工核对过的对照表；不命中就原样返回（不猜）。"""
     titles = LINE_TITLES.get(law or "")
     t = titles.get(no) if titles else None
+    # 条号自 v3.26.5 起统一为字符串（「205」「205.1」），对照表的键仍是整数：
+    # 「之一」条按主条号回查，命中与否都安全（不命中即不剥，保守方向）。
+    if not t and titles:
+        try:
+            t = titles.get(art_base(no))
+        except (TypeError, ValueError):
+            t = None
     if not (t and body.startswith(t)):
         return body
     rest = body[len(t):]

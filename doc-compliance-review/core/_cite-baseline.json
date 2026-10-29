@@ -1,195 +1,210 @@
 {
  "_说明": "规则库条号引用基线（legal-verify.py --audit-rules 生成）。键＝「文件::法名::条号」，值＝该引用所对应条文的 sha256 与当时版本。换版或改条号后须人工确认每条引用仍对得上，再 --update 刷新。",
- "generated": "2026-10-22 16:31:23",
- "total": 38,
+ "generated": "2026-10-29 12:06:16",
+ "total": 41,
  "cites": {
+  "core/01-general-risk-rules.md::刑法::205": {
+   "no": "205",
+   "sha256": "969903b2eeeceddc",
+   "version": "1997-03-14 修订；经十二个修正案修改，最近为 2023-12-29 修正案（十二）"
+  },
   "core/01-general-risk-rules.md::劳动合同法::4": {
-   "no": 4,
+   "no": "4",
    "sha256": "fb2166b979df600a",
    "version": "2012-12-28 修正"
   },
   "core/01-general-risk-rules.md::反不正当竞争法::10": {
-   "no": 10,
+   "no": "10",
    "sha256": "75a47afa41e47b58",
    "version": "2025-06-27 第二次修订"
   },
+  "core/01-general-risk-rules.md::发票管理办法::21": {
+   "no": "21",
+   "sha256": "13621904c211b096",
+   "version": "2023-07-20 第三次修订（国务院令第 764 号）"
+  },
   "core/01-general-risk-rules.md::合同编通则解释::65": {
-   "no": 65,
+   "no": "65",
    "sha256": "f8942873b8b057ab",
    "version": "法释〔2023〕13 号"
   },
   "core/01-general-risk-rules.md::商标法::43": {
-   "no": 43,
+   "no": "43",
    "sha256": "efca7b290f92db67",
    "version": "2019-04-23 修正"
   },
   "core/01-general-risk-rules.md::民事诉讼法::35": {
-   "no": 35,
+   "no": "35",
    "sha256": "221e807c65e07255",
    "version": "2023-09-01 修正"
   },
   "core/01-general-risk-rules.md::民法典::172": {
-   "no": 172,
+   "no": "172",
    "sha256": "8418499d0443cef1",
    "version": "2020-05-28 通过"
   },
   "core/01-general-risk-rules.md::民法典::501": {
-   "no": 501,
+   "no": "501",
    "sha256": "15ada69a3e96ceca",
    "version": "2020-05-28 通过"
   },
   "core/01-general-risk-rules.md::民法典::526": {
-   "no": 526,
+   "no": "526",
    "sha256": "248da42a6a548b38",
    "version": "2020-05-28 通过"
   },
   "core/01-general-risk-rules.md::民法典::584": {
-   "no": 584,
+   "no": "584",
    "sha256": "222cb57fb84a88eb",
    "version": "2020-05-28 通过"
   },
   "core/01-general-risk-rules.md::民法典::585": {
-   "no": 585,
+   "no": "585",
    "sha256": "52d12251e72d5f7a",
    "version": "2020-05-28 通过"
   },
   "core/01-general-risk-rules.md::民法典::586": {
-   "no": 586,
+   "no": "586",
    "sha256": "8aa70d4c2745a20b",
    "version": "2020-05-28 通过"
   },
   "core/01-general-risk-rules.md::民法典::588": {
-   "no": 588,
+   "no": "588",
    "sha256": "2fa18dc6c9c3f886",
    "version": "2020-05-28 通过"
   },
   "core/01-general-risk-rules.md::民法典::596": {
-   "no": 596,
+   "no": "596",
    "sha256": "1e291b4275b0f75a",
    "version": "2020-05-28 通过"
   },
   "core/01-general-risk-rules.md::民法典::682": {
-   "no": 682,
+   "no": "682",
    "sha256": "19ebd5c03e68085e",
    "version": "2020-05-28 通过"
   },
   "core/01-general-risk-rules.md::民法典::686": {
-   "no": 686,
+   "no": "686",
    "sha256": "4e604e8a7191c06d",
    "version": "2020-05-28 通过"
   },
   "core/01-general-risk-rules.md::民法典::691": {
-   "no": 691,
+   "no": "691",
    "sha256": "447b08a9b19d01f6",
    "version": "2020-05-28 通过"
   },
   "core/01-general-risk-rules.md::民法典::692": {
-   "no": 692,
+   "no": "692",
    "sha256": "1331db4e6331666c",
    "version": "2020-05-28 通过"
   },
   "industries/food-rules.md::广告法::17": {
-   "no": 17,
+   "no": "17",
    "sha256": "31bda051bf80ffc1",
    "version": "2021-04-29 修正"
   },
   "industries/food-rules.md::广告法::46": {
-   "no": 46,
+   "no": "46",
    "sha256": "83301f0de9bcb505",
    "version": "2021-04-29 修正"
   },
   "industries/food-rules.md::食品安全法::148": {
-   "no": 148,
+   "no": "148",
    "sha256": "0d651add42e57279",
    "version": "2025-09-12 修正"
   },
   "industries/hr-rules.md::劳动合同法::17": {
-   "no": 17,
+   "no": "17",
    "sha256": "ba02540fc801afb4",
    "version": "2012-12-28 修正"
   },
   "industries/hr-rules.md::劳动合同法::47": {
-   "no": 47,
+   "no": "47",
    "sha256": "5638480c99670064",
    "version": "2012-12-28 修正"
   },
   "industries/hr-rules.md::劳动合同法::66": {
-   "no": 66,
+   "no": "66",
    "sha256": "e31393ae35b41f09",
    "version": "2012-12-28 修正"
   },
   "industries/hr-rules.md::劳动合同法::92": {
-   "no": 92,
+   "no": "92",
    "sha256": "bb0ecfad37b56aa2",
    "version": "2012-12-28 修正"
   },
   "industries/medical-rules.md::反不正当竞争法::8": {
-   "no": 8,
+   "no": "8",
    "sha256": "11bf37a9a49bc2c7",
    "version": "2025-06-27 第二次修订"
   },
   "industries/medical-rules.md::广告法::46": {
-   "no": 46,
+   "no": "46",
    "sha256": "83301f0de9bcb505",
    "version": "2021-04-29 修正"
   },
+  "industries/medical-rules.md::药品管理法::89": {
+   "no": "89",
+   "sha256": "cb59441f8f6f3380",
+   "version": "2019-08-26 修订"
+  },
   "industries/newmedia-rules.md::广告法::29": {
-   "no": 29,
+   "no": "29",
    "sha256": "58ebbb74a2c026d5",
    "version": "2021-04-29 修正"
   },
   "industries/newmedia-rules.md::广告法::38": {
-   "no": 38,
+   "no": "38",
    "sha256": "8f0c839de1e3cb44",
    "version": "2021-04-29 修正"
   },
   "industries/newmedia-rules.md::广告法::4": {
-   "no": 4,
+   "no": "4",
    "sha256": "055dfebf5b5f1a1d",
    "version": "2021-04-29 修正"
   },
   "industries/newmedia-rules.md::广告法::44": {
-   "no": 44,
+   "no": "44",
    "sha256": "4716314f13b3f7a2",
    "version": "2021-04-29 修正"
   },
   "industries/newmedia-rules.md::广告法::46": {
-   "no": 46,
+   "no": "46",
    "sha256": "83301f0de9bcb505",
    "version": "2021-04-29 修正"
   },
   "industries/newretail-rules.md::反不正当竞争法::8": {
-   "no": 8,
+   "no": "8",
    "sha256": "11bf37a9a49bc2c7",
    "version": "2025-06-27 第二次修订"
   },
   "industries/newretail-rules.md::反垄断法::18": {
-   "no": 18,
+   "no": "18",
    "sha256": "d9c8fc0303a1a859",
    "version": "2022-06-24 修正"
   },
   "industries/newretail-rules.md::广告法::38": {
-   "no": 38,
+   "no": "38",
    "sha256": "8f0c839de1e3cb44",
    "version": "2021-04-29 修正"
   },
   "industries/newretail-rules.md::广告法::9": {
-   "no": 9,
+   "no": "9",
    "sha256": "0011d957942b4420",
    "version": "2021-04-29 修正"
   },
   "industries/pharma-rules.md::反不正当竞争法::8": {
-   "no": 8,
+   "no": "8",
    "sha256": "11bf37a9a49bc2c7",
    "version": "2025-06-27 第二次修订"
   },
   "industries/pharma-rules.md::广告法::15": {
-   "no": 15,
+   "no": "15",
    "sha256": "83ec77adc65a2977",
    "version": "2021-04-29 修正"
   },
   "industries/pharma-rules.md::广告法::46": {
-   "no": 46,
+   "no": "46",
    "sha256": "83301f0de9bcb505",
    "version": "2021-04-29 修正"
   }

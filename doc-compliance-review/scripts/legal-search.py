@@ -176,13 +176,15 @@ def search_in_db(q, db, law_filter=None, limit=8, min_score=0.28):
     out = []
 
     # (1) 显式条号：问题里带了「第X条」
-    m = re.search(r"第\s*([一二三四五六七八九十百千零〇\d]{1,8})\s*条", q)
+    m = re.search(r"第\s*([一二三四五六七八九十百千零〇\d]{1,8})\s*条"
+                  r"(?:\s*之([一二三四五六七八九十]{1,3}))?", q)
     if m:
-        no = lv.cn2int(m.group(1))
+        # 「第205条之一」必须与「第205条」分开查：两个不同罪名，条文完全不同
+        no = lv.parse_no(m.group(1), m.group(2))
         name_hint = lv.pick_law(q) or law_filter
         targets = [name_hint] if name_hint else list(laws)
         for law in targets:
-            ent = (laws.get(law) or {}).get(str(no))
+            ent = (laws.get(law) or {}).get(no)
             if ent:
                 out.append(_row(law, no, ent, 1.0, "条号精确"))
         if out:
@@ -209,16 +211,16 @@ def search_in_db(q, db, law_filter=None, limit=8, min_score=0.28):
                 if cnt == 0:
                     continue
                 score = min(0.30 + 0.12 * (cnt - 1), 0.78)
-                out.append(_row(law, int(no_s), ent, score, "关键词命中"))
+                out.append(_row(law, no_s, ent, score, "关键词命中"))
                 continue
             cov = lv.coverage(q, txt)
             anc_cov = lv.coverage(q, anc) if anc else 0.0
             score = max(cov, anc_cov * 0.9)
             if score >= min_score:
-                out.append(_row(law, int(no_s), ent, score,
+                out.append(_row(law, no_s, ent, score,
                                 "主题命中" if cov >= anc_cov else "摘要命中"))
 
-    out.sort(key=lambda r: (-r["score"], r["law"], r["no"]))
+    out.sort(key=lambda r: (-r["score"], r["law"], lv.art_base(r["no"]), lv.art_key(r["no"])))
     return out[:limit]
 
 
@@ -260,7 +262,7 @@ def render(results, q, db):
     for r in results:
         conf = CONF_LABEL.get(r["status"], r["status"] or "未标")
         flag = "" if r["verified"] else "　⚠ 未通过多源验证"
-        out.append("### 《%s》第%d条" % (r["law"], r["no"]))
+        out.append("### 《%s》第%s" % (r["law"], lv.art_label(r["no"])))
         out.append("")
         out.append("`%s` ｜ %s ｜ 匹配度 %.2f（%s）%s" % (conf, r["hit"], r["score"], r["hit"], flag))
         out.append("")
@@ -325,11 +327,13 @@ def main():
     if a.article:
         law_raw, no_raw = a.article
         law = lv.pick_law(law_raw) or law_raw
-        no = lv.cn2int(no_raw)
+        _m = re.match(r"^\s*([一二三四五六七八九十百千零〇\d]{1,8})\s*"
+                      r"(?:条)?(?:\s*之([一二三四五六七八九十]{1,3}))?\s*$", no_raw or "")
+        no = lv.parse_no(_m.group(1), _m.group(2)) if _m else None
         if not no:
-            print("条号无法解析：%s" % no_raw, file=sys.stderr)
+            print("条号无法解析：%s（可写 205 或 205之一）" % no_raw, file=sys.stderr)
             return 2
-        q = "《%s》第%d条" % (law, no)
+        q = "《%s》第%s" % (law, lv.art_label(no))
         results = search_in_db(q, db, law_filter=law, limit=1)
     elif a.ask:
         q = a.ask

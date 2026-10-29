@@ -1464,19 +1464,29 @@ def _check_doc_consistency():
     if bad:
         err("文档含禁止的陈旧/错误表述（与现行模型冲突）：%s" % "；".join(bad))
 
-    # ---- frontmatter 的尺度描述须含「侧重可多选」（尺度模型已变，触发描述须同步）----
+    # ---- frontmatter：中文描述只留一处 + 尺度描述须含「侧重可多选」（v3.26.5 收口）----
+    # 为什么删掉第二个中文字段（`description_zh`）而不去「把两段写得不重复」：
+    #   · 两段都是五百字上下的中文长文，读者是**同一个人群**，信息重合九成以上；
+    #     平台会把 frontmatter 里的 description 类字段逐个渲染出来，使用者看到的是
+    #     「同一件事说了两遍」，长文连着两屏——这本身就是缺陷，不是文体问题。
+    #   · 更要命的是它会漂：v3.25.3、v3.25.4 两轮改描述，每轮都只同步了其中一个，
+    #     另一份带着旧口径继续分发。一份描述有两处真源，迟早对不上。
+    # 故收敛为单字段：中文只认 `description`（含触发语），英文版另存 `description_en`。
+    # 这里写成**负向断言**——字段可以删，但删完要防回潮：谁再加回来，门禁当场报错。
     sk = _read(os.path.join(ROOT, "SKILL.md"))
     fm = re.search(r"^---\n(.*?)\n---", sk, re.S)
     if not fm:
         err("SKILL.md 找不到 frontmatter 段，无法核对 description 尺度表述")
     else:
         fmb = fm.group(1)
-        for key in ("description:", "description_zh:"):
-            mm = re.search(r"^%s\s*(.*)$" % re.escape(key), fmb, re.M)
-            if not mm:
-                err("SKILL.md frontmatter 缺 %s 字段" % key)
-            elif "侧重可多选" not in mm.group(1):
-                err("SKILL.md frontmatter 的 %s 未含「侧重可多选」——尺度模型已变，触发描述须同步" % key)
+        mm = re.search(r"^description:\s*(.*)$", fmb, re.M)
+        if not mm:
+            err("SKILL.md frontmatter 缺 description 字段")
+        elif "侧重可多选" not in mm.group(1):
+            err("SKILL.md frontmatter 的 description 未含「侧重可多选」——尺度模型已变，触发描述须同步")
+        if re.search(r"^description_zh\s*:", fmb, re.M):
+            err("SKILL.md frontmatter 又出现 description_zh——中文描述只留 description 一处，"
+                "再放一份中文长文会被平台渲染两遍，且两份必然漂移")
 
     # ---- README 侧重清单须含「自定义」（与开场清单第 6 题「侧重 4–8」逐处对齐）----
     # 只在真正列举侧重项的行上查（以「合规底线加严」为标记），不误伤仅提及「侧重可多选」的简写行。

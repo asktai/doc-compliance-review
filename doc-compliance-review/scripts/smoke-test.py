@@ -1118,6 +1118,41 @@ def main():
             check("法条核验：新增法（公司法／数据安全法／消保法）可识别并核到原文",
                   r_new.returncode == 0 and (r_new.stdout or "").count("通过") >= 3,
                   head_lines(r_new.stdout))
+
+            # --- v3.26.5：三部新法 + 「之一」条 ---
+            # 这三部是「规则正文引了、库里查不到」的那几部（发票条款、虚开发票两罪、
+            # 药品广告），闭掉它们才算真能核。
+            _three = ("《刑法》第二百零五条之一规定，虚开本法第二百零五条规定以外的其他发票，情节严重的，"
+                      "处二年以下有期徒刑、拘役或者管制，并处罚金。\n"
+                      "《药品管理法》第八十九条规定，药品广告应当经广告主所在地省、自治区、直辖市人民政府"
+                      "确定的广告审查机关批准；未经批准的，不得发布。\n"
+                      "《发票管理办法》第二十一条规定，开具发票应当按照规定的时限、顺序、栏目，"
+                      "全部联次一次性如实开具。\n")
+            _threef = os.path.join(work, "lv-three.md")
+            with open(_threef, "w", encoding="utf-8") as f:
+                f.write(_three)
+            r_three = run([PY, lv, "--file", _threef])
+            check("法条核验：新增三部（刑法／药品管理法／发票办法）可识别并核到原文",
+                  r_three.returncode == 0 and (r_three.stdout or "").count("通过") >= 3,
+                  head_lines(r_three.stdout))
+            # 增设条必须与主条分开存：合并即「两个罪名一条文」，且查得到 205、
+            # 查不到 205 之一而看不出少了（v3.26.5 修的就是这个）
+            _xj = (_dbj.get("laws") or {}).get("刑法") or {}
+            check("法规库：增设条独立成条（205 与 205.1 并存）",
+                  "205" in _xj and "205.1" in _xj,
+                  "刑法条号：%s" % ",".join(sorted(_xj, key=lambda k: float(k))))
+            # 版本关：1997 年原文第 205 条含「处无期徒刑或者死刑」，
+            # 该档已由修正案八（2011-05-01）删除。库里若还有，就是把废条文当真值源。
+            _t205 = (_xj.get("205") or {}).get("text") or "未收录"
+            check("法规库：刑法 205 为现行文本（不含修正案八已删的死刑档）",
+                  _t205 != "未收录" and "死刑" not in _t205, _t205[:40])
+            # 检索侧：条号标签要把「之一」放在「条」后（第205条之一），写成
+            # 「第205 之一条」既不成话、也会让条号解析匹配不到
+            r_one = run([PY, os.path.join(HERE, "legal-search.py"),
+                         "--article", "刑法", "205之一"])
+            check("法规检索：按「205之一」精确命中增设条",
+                  r_one.returncode == 0 and "第205条之一" in (r_one.stdout or ""),
+                  head_lines(r_one.stdout))
     except Exception as e:
         check("法条核验自检", False, repr(e))
 

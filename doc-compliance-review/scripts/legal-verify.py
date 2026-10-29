@@ -66,6 +66,12 @@ LAW_NAMES = [
     ("最高人民法院关于适用《中华人民共和国民法典》合同编通则若干问题的解释",
      "合同编通则解释",
      ("合同编通则解释", "合同编通则司法解释", "民法典合同编通则解释")),
+    # v3.26.5 新增三部（随离线库一起入册）。刑法名短，须靠「最长匹配」压住
+    # 「…刑法」以外的误配；发票管理办法与药品管理法是行政法规/法律，别号各一。
+    ("中华人民共和国刑法", "刑法", ("刑法", "中华人民共和国刑法")),
+    ("中华人民共和国发票管理办法", "发票管理办法",
+     ("发票管理办法", "中华人民共和国发票管理办法")),
+    ("中华人民共和国药品管理法", "药品管理法", ("药品管理法", "中华人民共和国药品管理法")),
 ]
 
 CN = {"零": 0, "〇": 0, "一": 1, "二": 2, "两": 2, "三": 3, "四": 4, "五": 5,
@@ -90,8 +96,67 @@ def cn2int(s):
 
 
 NUM = r"[一二三四五六七八九十百千零〇\d]{1,8}"
+_SUB = r"[一二三四五六七八九十]{1,3}"
 # 「《民法典》第五百八十五条」「《民法典》第 585 条」「民法典585条」
-CITE_RE = re.compile(r"(《?[^》，。；：、\s（）()]{2,20}?》?)\s*第\s*(" + NUM + r")\s*条")
+# 「《刑法》第二百零五条之一」——增设条必须一起吃掉，否则 205 之一会被当成 205，
+# 核验时拿 205 条的原文去比「虚开发票罪」的引述，判「引述与原文不符」——错怪用户。
+CITE_RE = re.compile(r"(《?[^》，。；：、\s（）()]{2,20}?》?)\s*第\s*(" + NUM + r")\s*条"
+                     r"(?:\s*之(" + _SUB + r"))?")
+
+
+def art_key(no):
+    """条号归一为字符串键：「205」「205.1」（＝第二百零五条之一）。
+
+    为什么必须区分「之一」（v3.26.5）
+    ------------------------------------------------------------------
+    收《刑法》入离线库时撞上的硬问题：第 205 条（虚开增值税专用发票罪）与
+    第 205 条之一（虚开发票罪）是**两个独立罪名、两套刑罚**，用同一个条号会互相覆盖
+    （解析侧「同号取正文更长者」，205 之一 直接被 205 吞掉）。
+    《刑法》里「之X」条有 53 处，不区分就全都查不到，而且看不出少了。
+    故条号统一为字符串：主条 "205"，增设条 "205.1"。其余法的键本来就是 "205" 这种字符串，
+    不受影响。
+    """
+    if isinstance(no, str):
+        return no
+    return str(no)
+
+
+def art_base(no):
+    """取主条号（"205.1" → 205），供排序、区间压缩、位移比对使用。"""
+    try:
+        return int(float(art_key(no)))
+    except (TypeError, ValueError):
+        return 0
+
+
+def art_label(no):
+    """条号标签（自带「条」字）：「205」→「205条」，「205.1」→「205条之一」。
+
+    调用处一律写「第%s」而不是「第%s条」——「之一」两个字的正确位置在「条」之后，
+    写成「第205 之一条」既不成话，也会让条号解析正则匹配不到。
+    """
+    s = art_key(no)
+    if "." not in s:
+        return s + "条"
+    a, b = s.split(".", 1)
+    cn = "一二三四五六七八九十"
+    try:
+        k = int(b)
+    except ValueError:
+        return s + "条"
+    return "%s条之%s" % (a, cn[k - 1] if 1 <= k <= 10 else b)
+
+
+def parse_no(num, sub=None):
+    """把「条号 ＋ 可选之X」转成库键：("二百零五", None) → "205"；("205", "一") → "205.1"。"""
+    n = cn2int(num)
+    if not n:
+        return None
+    if sub:
+        k = cn2int(sub)
+        if k:
+            return "%d.%d" % (n, k)
+    return str(n)
 
 
 def norm(s):
@@ -192,7 +257,7 @@ def extract_cites(text):
     for m in CITE_RE.finditer(text):
         raw, num = m.group(1), m.group(2)
         law = pick_law(raw)
-        no = cn2int(num)
+        no = parse_no(num, m.group(3))
         if not law or not no:
             continue
         tail = text[m.end():m.end() + 160]
@@ -244,7 +309,7 @@ def verify(cites, db, strict=0.72):
     for c in cites:
         law, no = c["law"], c["no"]
         ents = laws.get(law) or {}
-        ent = ents.get(str(no))
+        ent = ents.get(art_key(no))
         m = meta.get(law) or {}
         row = {
             "law": law, "no": no, "quote": c["quote"],
@@ -331,8 +396,8 @@ def render_md(rows, src="", note=""):
     L += ["", "| # | 法律 | 条号 | 判定 | 库内置信 | 匹配度 | 片段覆盖 | 所据版本 | 库里原文（节选） |",
           "|---|---|---|---|---|---|---|---|"]
     for i, r in enumerate(rows, 1):
-        L.append("| %d | 《%s》 | 第%s条 | %s | %s | %s | %s | %s | %s |" % (
-            i, r["law"], r["no"], r["status"],
+        L.append("| %d | 《%s》 | 第%s | %s | %s | %s | %s | %s | %s |" % (
+            i, r["law"], art_label(r["no"]), r["status"],
             CONF_LABEL.get(r.get("vs") or "", "库外"),
             ("%.0f%%" % (r["score"] * 100)) if r["score"] is not None else "—",
             ("%.0f%%" % (r["cov"] * 100)) if r.get("cov") is not None else "—",
@@ -343,7 +408,7 @@ def render_md(rows, src="", note=""):
     if notes:
         L += ["", "**逐条说明**", ""]
         for r in notes:
-            L.append("- 《%s》第%s条：%s" % (r["law"], r["no"], r["note"]))
+            L.append("- 《%s》第%s：%s" % (r["law"], art_label(r["no"]), r["note"]))
     n_multi = sum(1 for r in rows if (r.get("vs") == "multi-ok"))
     n_single = sum(1 for r in rows if (r.get("vs") == "single"))
     n_conf = sum(1 for r in rows if (r.get("vs") == "conflict"))
@@ -388,7 +453,10 @@ def _audit_rules(db, root, update=False):
     # 「《中华人民共和国XX法》」与「《XX法》」都要认；法名以库内 key 为准
     names = sorted(laws, key=len, reverse=True)
     alt = "|".join(re.escape(n) for n in names)
-    pat = re.compile(r"《(?:中华人民共和国)?(" + alt + r")》\s*第?\s*(\d+)\s*条")
+    # 增设条（「第 205 条之一」）也要抓：它和主条是两个罪名，漏掉「之一」就会把
+    # 虚开发票罪的引用记到虚开增值税专用发票罪名下，基线从此记错。
+    pat = re.compile(r"《(?:中华人民共和国)?(" + alt + r")》\s*第?\s*(\d+)\s*条"
+                     r"(?:\s*之([一二三四五六七八九十]{1,3}))?")
 
     cur, missing = {}, []
     for rel in ("core/01-general-risk-rules.md", "core/02-legal-verification-checklist.md"):
@@ -433,7 +501,7 @@ def _audit_rules(db, root, update=False):
         g = {}
         for key, ent in cites.items():
             rel, law, no = key.split("::")
-            g.setdefault((rel, law), {})[int(no)] = ent
+            g.setdefault((rel, law), {})[art_key(no)] = ent
         return g
 
     og, ng = group(old), group(cur)
@@ -441,7 +509,7 @@ def _audit_rules(db, root, update=False):
     for (rel, law), omap in sorted(og.items()):
         nmap = ng.get((rel, law), {})
         if not nmap:
-            gone.append((rel, law, sorted(omap)))
+            gone.append((rel, law, sorted(omap, key=art_base)))
             continue
         os_, ns_ = set(omap), set(nmap)
         if os_ != ns_:
@@ -488,7 +556,7 @@ def _audit_rules(db, root, update=False):
         print()
         print("**库内未收录**（无从核对，须人工核现行原文）：")
         for rel, law, no in missing:
-            print("- `%s` 《%s》第%s条" % (rel, law, no))
+            print("- `%s` 《%s》第%s" % (rel, law, art_label(no)))
 
     if gone:
         print()
@@ -512,12 +580,14 @@ def _scan_file(path, rel, pat, laws, meta, cur, missing):
     with io.open(path, encoding="utf-8", errors="ignore") as f:
         text = f.read()
     for m in pat.finditer(text):
-        law, no = m.group(1), int(m.group(2))
-        ent = (laws.get(law) or {}).get(str(no))
+        law, no = m.group(1), parse_no(m.group(2), m.group(3))
+        if not law or not no:
+            continue
+        ent = (laws.get(law) or {}).get(no)
         if ent is None:
             missing.append((rel, law, no))
             continue
-        cur["%s::%s::%d" % (rel, law, no)] = {
+        cur["%s::%s::%s" % (rel, law, no)] = {
             "no": no, "sha256": ent.get("sha256", ""),
             "version": (meta.get(law) or {}).get("version", ""),
         }

@@ -187,7 +187,10 @@ def main():
                 print("[WARN] " + msg)
                 time.sleep(a.sleep)
                 continue
-            shared = sorted(set(int(k) for k in got) & set(int(k) for k in lib))
+            # 条号一律走字符串键（「205」/「205.1」＝第二百零五条之一）：
+            # 转 int 会把「205 之一」直接抛 ValueError，巡检整部法中断。
+            shared = sorted({PARSE.art_key(k) for k in got} & {PARSE.art_key(k) for k in lib},
+                            key=PARSE.art_base)
             # 库是按 WANTED 选条收录的（如食品安全法仅收第 148 条、商标法 3 条），
             # 阈值必须相对库内条数，用绝对数会让选条少的法永远报警
             if len(shared) < max(1, int(0.5 * len(lib))):
@@ -199,7 +202,7 @@ def main():
                 print("[WARN] " + msg)
                 time.sleep(a.sleep)
                 continue
-            bad = [(no, CROSS.compare(lib[str(no)]["text"], got[no])["ratio"])
+            bad = [(no, CROSS.compare(lib[no]["text"], got[no])["ratio"])
                    for no in shared]
             bad = [(no, r) for no, r in bad if r < 0.985]
             frac = len(bad) / float(len(shared))
