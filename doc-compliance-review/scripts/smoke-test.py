@@ -2214,6 +2214,51 @@ def main():
         if _bak2 is not None:
             open(_skp2, "wb").write(_bak2)
 
+    print("\n[3.64] 提问结构：一个提问只装一个答案维度（v3.26.9）")
+    # 背景（别删）：实测出现过把「审查尺度（粗细）」与「谈判地位（强弱）」合成一张卡片，
+    # 只给「中性·强势方／中性·均衡／严苛·强势方／宽松·弱势方」四个组合选项——
+    # 3 档 × 4 档 = 12 种组合只给 4 个，用户想选的「严苛·均衡」根本没得选，
+    # 还被迫在一个动作里同时决定两件事。文本早就分成两问（清单第 6、7 项），
+    # 是**举例写法**「组合皆合法」被照抄成了选项清单。三项判据各自独立，缺一即留缺口。
+    _sk64 = os.path.join(os.path.dirname(HERE), "SKILL.md")
+    _b64 = None
+    try:
+        _b64 = open(_sk64, "rb").read()
+        _t64 = _b64.decode("utf-8")
+        _lack = [n for n, k in (("总纲通则", "一个提问只装一个答案维度"),
+                                ("1.6 禁令", "不得合并成一题"),
+                                ("举例声明", "不是候选项")) if k not in _t64]
+        check("两轴分两问：总纲通则 ＋ 1.6 禁令 ＋ 举例已声明非选项（三项齐备）",
+              not _lack, ("缺：%s" % "、".join(_lack)) if _lack else "三项齐备")
+
+        def _inj64(name, needle, repl, want):
+            """改坏 SKILL.md → 跑门禁 → 按字节还原；替换未命中判「锚点漂移」，不判据失效。"""
+            _mut = _t64.replace(needle, repl, 1)
+            if _mut == _t64:
+                check("注入[%s] 锚点" % name, False, "锚点漂移，注入无效（先修锚点再谈判据）")
+                return
+            open(_sk64, "wb").write(_mut.encode("utf-8"))
+            try:
+                _r = run([PY, os.path.join(HERE, "check.py")])
+            finally:
+                open(_sk64, "wb").write(_b64)
+            check("注入[%s] 门禁须报错——证明判据有区分度" % name,
+                  _r.returncode != 0 and want in (_r.stdout or ""), tail_line(_r.stdout))
+
+        _inj64("删总纲通则", "一个提问只装一个答案维度（禁止把两个正交维度合成一题）",
+               "（已删）", "一个提问只装一个答案维度")
+        _inj64("删 1.6 禁令", "**两问必须分开出——不得合并成一题、一屏或一组组合选项。**",
+               "**两问尽量分开出。**", "不得合并成一题")
+        _inj64("塞组合选项行", "**轴一 · 审查尺度（粗细：基准单选 ＋ 侧重多选）**",
+               "1. 中性·强势方\n**轴一 · 审查尺度（粗细：基准单选 ＋ 侧重多选）**",
+               "组合选项")
+        _inj64("删举例声明", "不是候选项清单，不得照抄成选项", "可以照抄成选项", "不是候选项")
+    except Exception as e:
+        check("提问结构：一屏一维度", False, repr(e))
+    finally:
+        if _b64 is not None:
+            open(_sk64, "wb").write(_b64)      # 无论成败按字节还原，正式文件不留污染
+
     # --- 3.5 版本与依赖（分发与落地成本）---
     print("\n[3.5] 版本与依赖")
     try:
