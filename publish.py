@@ -18,9 +18,12 @@ doc-compliance-review · 云端开发侧发布脚本
     - 分发包产出   /workspace/dist/                         （pack.py 自动排除 private/）
 
 发布链（顺序固定，勿调整）：
-    sync → **重建生成物** → **实例测试** → verify → （--pack 时）pack
+    sync → **转分发形态** → **重建生成物** → **实例测试** → verify → （--pack 时）pack
 
   (1) sync            rmtree 清干净后镜像重建运行实例
+  (1b) 转分发形态      剥 version.json 的 history、删 VERSION.md、写 `_分发副本` 标记——
+                     **实例该长成使用者看到的样子**，不是开发源的样子（整目录同步会把
+                     维护侧的沿革一起搬过去）。此前靠人手动跑，忘一次就多给一份沿革。
   (2) 重建生成物      规则基线、脚本指纹台账（rmtree 已把旧实例连同生成物一起删掉）
   (3) **实例测试**    在运行实例侧**端到端实跑**冒烟——这是唯一"真的跑一遍"的关卡，
                     验的是"装到实例后能不能真跑"（结构校验验不出这个）。**失败即阻断发布**。
@@ -66,6 +69,23 @@ def sync():
     n = sum(len(f) for _, _, f in os.walk(RUN))
     print("[publish] 已同步 %d 个文件 → %s" % (n, RUN))
     return 0
+
+
+def to_dist_mode():
+    """把运行实例转成**分发形态**（剥 version.json 的 history、删 VERSION.md、写 `_分发副本` 标记）。
+
+    为什么写进链子而不是靠人手动跑：这个形态此前是手工命令，**忘了的后果是实例里带着
+    完整沿革**——使用者能看到比该给的更多的东西。凡"靠人记得"的步骤，最终都会有一次不记得
+    （铁律 13.2 第 2 条：挂在绕不过的位置）。脚本幂等，可反复跑。
+    """
+    p = os.path.join(RUN, "scripts", "dist-mode.py")
+    if not os.path.exists(p):
+        print("[publish] ✗ 缺 scripts/dist-mode.py，实例无法转分发形态")
+        return 1
+    r = subprocess.run([sys.executable, p, RUN], capture_output=True, text=True)
+    tail = (r.stdout or r.stderr).strip().splitlines()[-1:] or ["(无输出)"]
+    print("[publish] %-14s → %s" % ("实例转分发形态", tail[0]))
+    return r.returncode
 
 
 def refresh_generated():
@@ -143,9 +163,12 @@ def separation():
 
 def pack():
     os.makedirs(DIST, exist_ok=True)
-    # pack.py 契约：位置参数是技能根目录，输出目录用 --out 指定
+    # **从开发源出包，不从运行实例**：实例已按 (1b) 转成分发形态（无 history、无 VERSION.md），
+    # 而 pack.py 会**正当地**拒收"源里没有沿革"的目录——拿它当出包源只会得到一份自己都不认的包。
+    # 内容不会因此走样：sync 是 rmtree ＋ 镜像重建，两边除"分发形态那三处差异"外逐字节相同，
+    # 而那三处本来就由 pack.py 在出包时剥掉。
     r = subprocess.run([sys.executable, os.path.join(RUN, "scripts", "pack.py"),
-                        RUN, "--out", DIST], capture_output=True, text=True)
+                        DEV, "--out", DIST], capture_output=True, text=True)
     print((r.stdout or r.stderr).strip())
     return r.returncode
 
@@ -155,6 +178,10 @@ def main():
     if "--check" in a:
         return verify()
     if sync() != 0:
+        return 2
+    # 实例必须长成「分发副本」的样子（剥沿革、删 VERSION.md、写标记）：
+    # 整目录同步会把源的沿革一并搬进实例，等于把维护侧的东西摆给使用者看。
+    if to_dist_mode() != 0:
         return 2
     if refresh_generated() != 0:
         return 2
