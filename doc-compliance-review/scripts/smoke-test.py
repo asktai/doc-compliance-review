@@ -1933,6 +1933,35 @@ def main():
         if _skbak is not None:
             open(_skp, "wb").write(_skbak)      # 无论成败都按字节还原，正式文件不留污染
 
+    print("\n[3.61] 提示词版正向断言（默认项不得含做不出的类型 · 行业须 9 个）")
+    _pvp = os.path.join(os.path.dirname(HERE), "文档合规审查助手AI合同提示词版.md")
+    _pvbak = None
+    try:
+        _pvbak = open(_pvp, "rb").read()
+        _pvt = _pvbak.decode("utf-8")
+        # 逐条注入、逐条还原：两次注入不叠加，且**只读门禁输出**，不自己重写判据（13.2 边界）。
+        # 这两条正好对应两类病害：①「默认要求做一件做不到的事」（逻辑不自洽）；
+        # ②「库数少了一个」（数字口径漂移）——都是文案改一半就复发的。
+        for _tag, _old, _new, _kw in [
+            ("默认交付物含本版做不出的第 2 类", "不选则默认出 1、3", "不选则默认出 1、2、3",
+             "默认交付物含本版做不出的"),
+            ("行业清单缺「建筑地产」", "建筑地产", "其他行业", "缺「建筑地产」"),
+        ]:
+            if _old not in _pvt:
+                check("提示词版注入锚点仍在（%s）" % _tag, False, "锚点丢失，注入无效")
+                continue
+            open(_pvp, "wb").write(_pvt.replace(_old, _new).encode("utf-8"))
+            _r9 = run([PY, os.path.join(HERE, "check.py")])
+            open(_pvp, "wb").write(_pvbak)
+            check("注入[%s] 门禁须报错——证明这条正向断言有区分度（不是恒绿）" % _tag,
+                  _r9.returncode != 0 and _kw in (_r9.stdout or ""),
+                  tail_line(_r9.stdout))
+    except Exception as e:
+        check("提示词版正向断言", False, repr(e))
+    finally:
+        if _pvbak is not None:
+            open(_pvp, "wb").write(_pvbak)      # 无论成败都按字节还原，正式文件不留污染
+
     # --- 3.5 版本与依赖（分发与落地成本）---
     print("\n[3.5] 版本与依赖")
     try:
