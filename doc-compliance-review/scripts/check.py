@@ -1488,6 +1488,45 @@ def _check_doc_consistency():
         info("术语一致性：尺度/能检表述与现行模型一致（FORBID 注册表无命中）")
 
 
+def _check_pseudo_controls():
+    """伪控件守卫：纯文本清单不得用 ☐／☑／○ 冒充勾选框（2026-10-29 加）。
+
+    事实依据（不是审美偏好）：这些字符在聊天界面**只是普通文字，没有任何点击行为**。
+    用户看到方框会去点，点了没反应，然后才怀疑是自己不会用——**省不下一次点击，只多一次困惑**。
+    真能点的是平台自带控件（radio／checkbox），不靠字符模拟。
+
+    判据两条：
+      （1）负向——各文档出现这三个字符即报错；含「禁用／不得用」的说明行豁免
+           （禁令自身要引用这些字符，不放行的话守卫会拦自己）。
+      （2）正向——SKILL.md 必须存在「交互失败降级」条款：字符清干净了，但用户回报
+           「选不中」时若无处可去，等于把人卡在原地。两条缺一不可。
+
+    边界（不假装全覆盖）：``[ ]`` **不纳入机器判据**——它在 Markdown 里是合法的任务列表写法，
+    机器分不清「冒充控件」与「真清单」，误伤面太大，留人工复核；此边界写在 SKILL 禁令段里。
+    """
+    PSEUDO = ("☐", "☑", "○")
+    bad = []
+    for rel in ("SKILL.md", "README.md", "安装使用教程.md",
+                "文档合规审查助手AI合同提示词版.md", "drafting-guide.md",
+                "permissions-and-libraries.md"):
+        p = os.path.join(ROOT, rel)
+        if not os.path.exists(p):
+            continue
+        for i, line in enumerate(_read(p).split("\n"), 1):
+            if "禁用" in line or "不得用" in line:
+                continue
+            hit = "".join(c for c in PSEUDO if c in line)
+            if hit:
+                bad.append("%s:%d 含「%s」" % (rel, i, hit))
+    if bad:
+        err("纯文本清单用了伪控件符号（看着能点、点不了），改用「编号 名称 ｜ 编号 名称」：%s"
+            % "；".join(bad[:6]))
+    if "交互失败降级" not in _read(os.path.join(ROOT, "SKILL.md")):
+        err("SKILL.md 缺「交互失败降级·逐条提问」条款——用户回报「选不中」时无路可走")
+    else:
+        info("交互：清单一律无伪控件符号；整块选不中时有逐条降级条款")
+
+
 def check_package_fields():
     """出包必填字段守卫：`pack.py` 组装文件名所依赖的 frontmatter 字段，必须齐且非空。
 
@@ -3037,6 +3076,7 @@ def main():
         check_smoke_count()
         check_doc_number_caliber()
         _check_doc_consistency()
+        _check_pseudo_controls()
         check_package_fields()
         check_platform_limit()
         check_sample_baseline()

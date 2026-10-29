@@ -1901,6 +1901,33 @@ def main():
     except Exception as e:
         check("产物验收判据自测", False, repr(e))
 
+    print("\n[3.60] 交互降级（清单一律无伪控件符号 · 选不中即逐条问）")
+    _skp = os.path.join(os.path.dirname(HERE), "SKILL.md")
+    _skbak = None
+    try:
+        _skbak = open(_skp, "rb").read()
+        _skt = _skbak.decode("utf-8")
+        check("SKILL.md 有「交互失败降级·逐条提问」条款，且给了可直接照做的版式",
+              "交互失败降级" in _skt and "逐条" in _skt and "（共 11 题）" in _skt, "")
+        # 负向注入：把伪控件符号塞回清单 → **不自己造判据**，直接看门禁输不输出。
+        # 这一项验的是「那条判据有区分度」，不是重写一遍判据（13.2 边界：不与通用门禁重复造判据）。
+        _skbad = _skt.replace("基础层（默认 1，不可取消）：1 通用版 ｜ 2 私有库",
+                              "基础层（默认 1，不可取消）：☐1 通用版  ☐2 私有库", 1)
+        if _skbad == _skt:
+            check("负向注入的锚点仍在（清单基础层那一行未被改写过）", False,
+                  "锚点丢失，注入无效")
+        else:
+            open(_skp, "wb").write(_skbad.encode("utf-8"))
+            _r8 = run([PY, os.path.join(HERE, "check.py")])
+            check("把 ☐ 塞回清单，门禁须报错——证明「无伪控件符号」是真在查（不是恒绿）",
+                  _r8.returncode != 0 and "伪控件" in (_r8.stdout or ""),
+                  tail_line(_r8.stdout))
+    except Exception as e:
+        check("交互降级", False, repr(e))
+    finally:
+        if _skbak is not None:
+            open(_skp, "wb").write(_skbak)      # 无论成败都按字节还原，正式文件不留污染
+
     # --- 3.5 版本与依赖（分发与落地成本）---
     print("\n[3.5] 版本与依赖")
     try:
