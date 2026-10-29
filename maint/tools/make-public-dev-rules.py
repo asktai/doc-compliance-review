@@ -10,7 +10,7 @@ import re
 import sys
 
 SRC = "/workspace/dev/DEV-RULES.md"
-OUT = "/workspace/开发规范（铁律）-v1.0.0.md"
+OUT = "/workspace/开发规范（铁律）-v1.0.2.md"
 
 # (原文, 替换, 说明)  —— 顺序敏感，长串在前
 RULES = [
@@ -20,7 +20,7 @@ RULES = [
      "标题去掉英文副名（发布版单语）"),
     # 版本行改为正则匹配：内部维护版每次升版都会改这行字面量，写死必漏（2026-10-21 教训）
     (re.compile(r"\*\*版本 v[\d.]+\*\* ｜ 首次成文：[\d-]+ ｜ 最近修订：[\d-]+ ｜ \*\*适用范围：全部开发工作\*\*"),
-     "**版本 v1.0.0** ｜ 首次成文：2026-10-20 ｜ **适用范围：全部开发工作**",
+     "**版本 v1.0.2** ｜ 首次成文：2026-10-20 ｜ **适用范围：全部开发工作**",
      "版本号重新起算：发布版是独立产品，版本体系不与内部维护版混编"),
     ("> 本文件规定 AI 在全部开发工作中**必须怎样做**（红线与流程），属**开发侧**文件，\n"
      "> 不进技能包、不随分发包外流。术语释义见文末**附录 A**；本文件版本沿革见 `maint/DEVLOG.md`，\n"
@@ -261,6 +261,99 @@ RULES = [
 ]
 
 
+# ── 实现名 → 角色称谓（v1.0.1 加，用户定「全部改写成角色称谓」）──────────────
+# 为什么不写成一条条整段 RULES：25 行里同一批实现名反复出现（`check.py` 10 次、
+# `version.py` 5 次、`check_doc_number_caliber` 5 次），整段替换要抄 25 段原文，
+# 抄错一个字就「未命中」，而且下次正文微调又全失效。**声明式词表是收口**：
+# 词表一处可审，正文怎么改都不影响覆盖率。
+#
+# 三条口径：
+#   1. **长串在前**——「技能包内 `check.py` 的 `SEC_MATRIX`」这样整段先换，
+#      否则拆开后读出「技能包内包内门禁脚本的…」这种叠词。
+#   2. **一律连反引号一起换**——带反引号的 `` `version.py` `` 只换脚本名，不碰
+#      `` `version.json` ``（后者是通用清单名，对外读者认得）。
+#   3. **通用文件名不动**——`SKILL.md`／`README.md`／`SECURITY.md`／`VERSION.md`／
+#      `version.json` 是任何技能包都有的名字，对外读者看得懂，留着不算空指；
+#      要清的是**只在本项目存在**的脚本名、函数名、常量名、命令行参数名。
+ROLE_TERMS = [
+    ("技能包内 `check.py` 的 `SEC_MATRIX`", "技能包内门禁脚本的安全机制矩阵常量",
+     "文件名＋常量名 → 一处角色称谓（长串在前）"),
+    ("`check.py` 的 `SEC_MATRIX`", "门禁脚本的安全机制矩阵常量", "同上"),
+    # 叠词预防：「技能包内 `check.py`」若先换 `check.py`，会读出「技能包内 包内门禁脚本」。
+    # 故这一串整段换，把它收成「技能包内的门禁脚本」。
+    ("技能包内 `check.py`", "技能包内门禁脚本",
+     "防「技能包内包内」叠词；不带「的」——否则接上后文成「技能包内的门禁脚本的联网分级检查」，两个「的」绕口"),
+    ("`scripts/check.py`", "包内门禁脚本", "带目录的写法先换，否则留下 `scripts/` 前缀"),
+    # 代码块里的实测输出（25.2 实证）：带路径的写法先换，剩下「版本脚本 => urllib,urlopen」
+    # 读得通——它本就是「哪个脚本 => 碰了哪些网络模块」的对照行，角色称谓正好接得上前文
+    # 注意原文在代码块里，**没有内联反引号**——照抄正文写法时容易顺手加反引号，
+    # 加了就零命中（本次即如此），而零命中不报错，只印一行提示。
+    ("scripts/version.py => urllib,urlopen", "版本脚本 => urllib,urlopen",
+     "实测输出示例里带目录路径 → 角色称谓（不对着具体文件也能看懂这行在说什么）"),
+    ("`check.py`", "包内门禁脚本", "本机门禁脚本名 → 角色称谓"),
+    # 叠词预防（同「技能包内 `check.py`」的道理）：原文「包内 `smoke-test.py`」若先换
+    # `smoke-test.py`，会读出「包内包内冒烟脚本」——实测 26 号落实总表那行就是如此。
+    ("包内 `smoke-test.py`", "包内的冒烟脚本", "防「包内包内」叠词（长串在前）"),
+    ("包内 `check.py`", "包内的门禁脚本", "同上"),
+    ("`smoke-test.py`", "包内冒烟脚本", "本机冒烟脚本名 → 角色称谓"),
+    ("`make-docx.py`", "文档生成脚本", "本机文档生成脚本名 → 角色称谓"),
+    ("`guard.py`", "内容守卫脚本", "本机内容守卫脚本名 → 角色称谓"),
+    ("`version.py`", "版本脚本", "只换带反引号的脚本名，不碰 `version.json`"),
+    ("`drafting-guide.md`", "起草指南", "该文件的内容就是起草指南，直接换称谓"),
+    ("`SEC_MATRIX`", "安全机制矩阵常量", "常量名 → 角色称谓"),
+    ("`SEED_INDUSTRIES`", "行业种子表", "同上"),
+    # 这一串先换：裸换会读出「格式清单参数帮助排版变动」，读者会把「帮助」当动词。
+    # 原文意思是「该参数的 help 文本排版变了，导致取不到数」。
+    ("`--formats` 帮助排版变动", "格式清单参数的帮助文本排版变动",
+     "消歧：「帮助」是名词（help 文本），不是动词"),
+    ("`--formats`", "格式清单参数", "命令行参数名 → 角色称谓"),
+    ("`_utf8_env()`", "UTF-8 输出环境", "私有函数名 → 角色称谓"),
+    ("`_script_files()`", "脚本清点函数", "同上"),
+    ("`_net_tiers()`", "联网分级判定", "同上"),
+    ("`_check_no_bytecode()`", "字节码防护检查", "同上"),
+    ("`check_security_matrix()`", "安全机制逐条检查", "同上（长串在 `check_security()` 前）"),
+    ("`check_security()`", "安全机制检查", "同上"),
+    ("`check_online_gate()`", "联网边界检查", "同上"),
+    ("`check_net_tiers()`", "联网分级检查", "同上"),
+    ("`check_doc_number_caliber`", "数字口径检查", "本机检查函数名 → 角色称谓"),
+    ("`check_version_consistency`", "版本串一致性检查", "同上"),
+    ("`check_manifest_version`", "清单版本检查", "同上"),
+    # 裸词 DEVLOG 收口：RULES 已按上下文换掉十几处（多为「记入 DEVLOG」），
+    # 但总有漏的（本次是 12.5.5.1「移出 DEVLOG 防治缺口表」）。裸词只剩本机文件名，
+    # 全局换「开发日志」不会误伤——没有任何别的东西叫这个名字。
+    ("DEVLOG", "开发日志", "本机日志文件名 → 角色称谓（全局兜底）"),
+    ("`_check_doc_consistency`", "文档一致性检查", "同上"),
+    ("`_check_subprocess_encoding`", "子进程编码检查", "同上"),
+]
+
+
+def _rewrite_as_roles(out):
+    """把实现名换成角色称谓；返回 (新文本, 命中统计表)。命中 0 次的项也报出来。
+
+    换完还要**收紧空格**：原文是「`make-docx.py` 的 `--formats`」——反引号与中文之间
+    那个空格是为「中文混排代码片段」加的，片段换成纯中文后就成了「文档生成脚本 的 格式
+    清单参数」，读起来卡。但**不能全局清中文间空格**：目录锚点行「[第一章 总则与文档
+    结构]」本来就带空格，删了锚点全断（实测 143 处，绝大多数是目录）。
+    故判据收窄为：**只处理含替换目标词的行**——只有这些行是本次动过的，其余零接触。
+    """
+    stats = []
+    for old, new, why in ROLE_TERMS:
+        n = out.count(old)
+        if n:
+            out = out.replace(old, new)
+        stats.append((n, old, new))
+
+    targets = tuple({new for _, new, _ in ROLE_TERMS})
+    pat = re.compile(r"(?<=[\u4e00-\u9fff]) (?=[\u4e00-\u9fff])")
+    lines = out.split("\n")
+    tightened = 0
+    for i, ln in enumerate(lines):
+        if any(t in ln for t in targets) and pat.search(ln):
+            lines[i] = pat.sub("", ln)
+            tightened += 1
+    return "\n".join(lines), stats, tightened
+
+
 def main():
     src = open(SRC, encoding="utf-8").read()
     out = src
@@ -281,9 +374,32 @@ def main():
         for m in missed:
             print("  - " + m)
         return 1
-    post = audit(out)
+
+    out, role_stats, tightened = _rewrite_as_roles(out)
+    post, fatal = audit(out)
+
+    # **先判后写**：fatal 非空时一律不落盘。
+    # 原先是先写文件再打印结果——报错了产物也已经写出去，下次谁打开就是那份坏文件，
+    # 而"报过错"只留在当时的终端里。守卫的意义在于**不合规就不产出**，不是事后说一声。
+    if fatal:
+        print("未写出 %s——派生结果未通过自检（%d 项）：" % (OUT, len(fatal)))
+        for e in fatal:
+            print("  [E] " + e)
+        print("（旧文件保持原样，未被覆盖）")
+        return 1
     open(OUT, "w", encoding="utf-8").write(out)
-    print("已写出 %s（%d 条替换）" % (OUT, len(RULES)))
+
+    zero = [(o, n) for cnt, o, n in role_stats if cnt == 0]
+    print("已写出 %s（%d 条整段替换 ＋ %d 条角色称谓词，命中 %d 处实现名，"
+          "收紧 %d 行中英混排空格）"
+          % (OUT, len(RULES), len(ROLE_TERMS),
+             sum(c for c, _, _ in role_stats), tightened))
+    # 命中 0 的词表项不报错：实现名可能本就不出现在正文里（如某函数只在代码中）。
+    # 但要**印出来**——词表项长期零命中，说明该词已不适用，是该退役还是该补场景，得有人看。
+    if zero:
+        print("  [i] 以下词表项本次零命中（正文未出现，供复核是否退役）：")
+        for o, n in zero:
+            print("      %s → %s" % (o, n))
     for w in post:
         print("  [W] " + w)
     return 1 if post else 0
@@ -297,7 +413,7 @@ def audit(out):
     上下文就断了。这类副作用在逐条替换时看不见，只有跑完看整篇才暴露，
     故必须在写盘前再做一次**整篇级**扫描。
     """
-    warn = []
+    warn, fatal = [], []
     # (1) 空代码块：上一行说"必做/如下/命令"，下一行却是空壳 → 读者无从照做
     lines = out.splitlines()
     open_at = None
@@ -319,9 +435,24 @@ def audit(out):
                  "DEVLOG", "doc-compliance-review",
                  "/CHANGELOG", "renumber-clauses", "sync-clause-refs")
     hit = [w for w in leftovers if w in out]
+
+    # (3) 残留实现名——v1.0.1 起升为**硬失败**（原先只 warn，所以残留长期无人处理）。
+    #     为什么该硬：对外版读者手上没有那些脚本，"`check.py` 的 SEC_MATRIX" 这种句子
+    #     对他们**等于空指**——不是措辞不好，是这句话没法照做、没法核对。留一条就是
+    #     一条断掉的引用，而 warn 不进退出码，等于永远不修。
+    # 判据取实现名全部（脚本名／函数名／常量名／命令行参数），与 ROLE_TERMS 对齐：
+    # 词表换掉的写法和没进词表的写法，在这里都要被抓到，否则「换干净了」只是词表的自述。
+    impl = ("SEC_MATRIX", "SEED_INDUSTRIES", "smoke-test", "make-docx", "guard.py",
+            "version.py", "drafting-guide", "check_doc_number_caliber",
+            "check_version_consistency", "check_manifest_version", "check_net_tiers",
+            "check_security", "check_online_gate", "_check_no_bytecode",
+            "_script_files", "_net_tiers", "_utf8_env", "--formats",
+            "_check_doc_consistency", "_check_subprocess_encoding")
+    hit += [w for w in impl if w in out]
     if hit:
-        warn.append("残留项目绑定字样：%s" % "、".join(hit))
-    return warn
+        fatal.append("残留实现名或项目绑定字样：%s——对外版读者手上没有这些文件，"
+                     "这类句子对他们等于空指；改成角色称谓（见 ROLE_TERMS）" % "、".join(hit))
+    return warn, fatal
 
 
 if __name__ == "__main__":
