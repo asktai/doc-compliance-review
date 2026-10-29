@@ -89,18 +89,32 @@ def to_dist_mode():
 
 
 def refresh_generated():
-    """用当前代码当场重建运行侧生成物（rmtree 已把它连同旧实例一起删掉）。
-    放在 verify 之前，保证 check.py 的「规则基线比对」与「指纹校验」比的是 fresh 台账。"""
+    """用当前代码当场重建生成物，**实例侧与开发侧各刷一次**。
+
+    放在 verify 之前，保证 check.py 的「规则基线比对」与「指纹校验」比的是 fresh 台账。
+
+    为什么必须刷两处（v3.26.3 补）：生成物 `scripts/.integrity.json` **随包分发**，而
+    **出包源是开发侧**（`pack()` 传的是 `DEV`）、生成物重建却只做在运行实例侧——两棵
+    不同的树。开发侧台账陈旧时它会原样打进包，包内 check.py 于是自带一条"脚本已被修改"
+    的警告，而**退出码仍是 0**：v3.26.2 的包就这么出去了（29 个脚本里 smoke-test.py 一行
+    是旧哈希）。现在 pack.py 会在出包口硬拒陈旧台账（`verify_integrity_fresh`），此处
+    则保证正常流程压根不会走到那一步——**两个位置各司其职：一个让问题暴露，一个让它不
+    发生**，缺一则要么假绿、要么天天卡壳。
+    """
     steps = [("规则基线条账", ["rule-baseline.py", "--update"]),
              ("脚本指纹台账", ["check.py", "--sign"])]
     ok = True
-    for label, args in steps:
-        r = subprocess.run([sys.executable, os.path.join(RUN, "scripts", args[0])] + args[1:],
-                           capture_output=True, text=True)
-        tail = (r.stdout or r.stderr).strip().splitlines()[-1:] or ["(无输出)"]
-        print("[publish] 重建 %-12s → %s" % (label, tail[0]))
-        if r.returncode != 0:
-            ok = False
+    for where, base in (("实例", RUN), ("出包源", DEV)):
+        for label, args in steps:
+            # 出包源只重签指纹台账：源侧的规则基线是长期维护的开发资产，不由发布链改写
+            if base == DEV and label != "脚本指纹台账":
+                continue
+            r = subprocess.run([sys.executable, os.path.join(base, "scripts", args[0])] + args[1:],
+                               capture_output=True, text=True)
+            tail = (r.stdout or r.stderr).strip().splitlines()[-1:] or ["(无输出)"]
+            print("[publish] 重建 %s%s → %s" % (where, label, tail[0]))
+            if r.returncode != 0:
+                ok = False
     return 0 if ok else 1
 
 
