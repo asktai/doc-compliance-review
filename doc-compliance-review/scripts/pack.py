@@ -23,7 +23,7 @@ _sys.dont_write_bytecode = True
       └─ doc-compliance-review/        ← 第一层即技能目录（平台要求，否则无法解析）
            ├─ SKILL.md               ← 每次会话都加载的主口径（刻意瘦身，只留常驻部分）
            ├─ permissions-and-libraries.md／drafting-guide.md／template-guide.md   ← 按需加载，命中入口才读
-            ├─ README.md / 安装使用教程.md / LICENSE.md / VERSION.md
+            ├─ README.md / 安装使用教程.md / LICENSE.md（VERSION.md 沿革不随包）
             ├─ 文档合规审查助手AI合同提示词版.md / SECURITY.md
             ├─ core/  industries/  scripts/（含 TONE.md）  assets/  samples/
            └─ …
@@ -78,8 +78,12 @@ import os, re, sys, json, hashlib, zipfile, argparse, datetime
 # 漏掉会变成「包内文档指向包外不存在的文件」。
 # 注：`scripts/TONE.md`（感谢语参考）**不在此列**——scripts/ 由 FULL_DIRS 整体递归打包，
 # 再列一次会写出同名重复条目（zipfile 会告警且条目数虚增）。它随 scripts/ 进包即达目的。
-FULL_FILES = ["SKILL.md", "README.md", "安装使用教程.md", "LICENSE.md", "VERSION.md",
+FULL_FILES = ["SKILL.md", "README.md", "安装使用教程.md", "LICENSE.md",
               "文档合规审查助手AI合同提示词版.md", "SECURITY.md",
+              # 注：`VERSION.md`（版本沿革）**不随包**（v3.26.2 定）。
+              # 沿革是发布侧演进记录，对外只给「当前是哪版、这版改了什么」（version.json
+              # 的 latest），不给历史版本清单——包内既不塞 history，也不塞这份 130 行沿革表。
+              # 源侧仍保留 VERSION.md（开发维护用），缺了会被 check.py 拦。
               # 按需加载的三份专项口径：SKILL 里只留索引段，命中对应入口时才读这几份，
               # 以此压住 SKILL 的常驻体积。必须随包，否则索引指向包外不存在的文件。
               "permissions-and-libraries.md", "drafting-guide.md", "template-guide.md",
@@ -122,10 +126,10 @@ PLATFORM_MAX_DEPTH = 2
 # 出包时需清空的配置文件（相对技能根）——只清 tools 段，其余段（隐私/输出策略）保持原样
 CONFIG_REL = "scripts/config.json"
 
-# 对外版本清单：包内只留 latest（供「检查更新」用），**history 不随技能分发**（v3.25.8）。
-# 为什么：history 是发布侧演进记录，动辄几十条、每条数百字；使用者只需要知道
-# 「最新是哪版、改了什么、去哪下」。VERSION.md 已随包（沿革的唯一载体），
-# 包内再带一份 history 等于同一事实两处维护，必分家。
+# 对外版本清单：包内只留 latest（供「检查更新」用），**history 与 VERSION.md 都不随包**。
+# 为什么：沿革（历史各版改了什么）属发布侧记录，动辄几十条、每条数百字；使用者只需要知道
+# 「最新是哪版、改了什么、去哪下」。v3.25.8 起剥离 history，v3.26.2 起 VERSION.md 也移出包
+# （只裁 JSON 不够——130 行沿革表才是最容易被翻到的那份），两处同一条口径：历史不给看。
 VERSION_REL = "version.json"
 
 # zip 条目**固定时间戳**（可复现构建）：
@@ -158,8 +162,13 @@ def strip_version_history(text):
     """把 version.json 的 history 数组整体移除，返回新文本；无 history 则返回 None。
 
     包内只留 latest＋元信息：检查更新只用得上最新一版。history 属发布侧演进记录，
-    与 VERSION.md 重复维护必分家（v3.25.7 实测：history 断档、latest 说明没改，
+    与源侧沿革重复维护必分家（v3.25.7 实测：history 断档、latest 说明没改，
     对外清单显示「新版本号配旧说明」）。解析失败一律返回 None（宁原样打包，不出坏文件）。
+
+    同时写入 `"_分发副本": true`（v3.26.2）：让装好的副本**自证身份**——「我是分包副本，
+    history 已按设计剥离，本副本不提供历史版本信息」。没有这个标记，门禁 check.py
+    看到「无 history」只能二选一：要么误报（千问办公实测 v3.25.8–v3.26.1 装完即红），
+    要么放宽成永远不查（开发源把 history 删了也无人知）。标记把这两种情况分开。
     """
     try:
         d = json.loads(text)
@@ -168,7 +177,35 @@ def strip_version_history(text):
     if not isinstance(d, dict) or "history" not in d:
         return None
     d.pop("history", None)
+    d["_分发副本"] = True
     return json.dumps(d, ensure_ascii=False, indent=2) + "\n"
+
+
+def verify_source_manifest(base):
+    """出包前**源侧**断言：开发源 version.json 必须带非空 history，否则拒包（v3.26.2）。
+
+    为什么必须在出包口守：包内 history 会被 strip 掉（设计如此，不随包分发），所以
+    「源里到底有没有」只有此刻还看得见。源若被删，check.py 的版本链校验（首条＝本版／
+    条目去重／链接指向自身）会全部空转成假绿，且清单与源侧沿革从此各说各话。
+    包内不带 history 与「源里必须有 history」是两件事，本函数只管后者，不改包内容。
+
+    返回错误列表（空＝通过）。
+    """
+    fp = os.path.join(base, VERSION_REL)
+    if not os.path.exists(fp):
+        return ["源缺 %s（检查更新与沿革清单都靠它）" % VERSION_REL]
+    try:
+        with open(fp, encoding="utf-8") as f:
+            d = json.load(f)
+    except Exception as e:
+        return ["源 %s 无法解析：%s" % (VERSION_REL, e)]
+    if not isinstance(d, dict):
+        return ["源 %s 顶层不是对象" % VERSION_REL]
+    hist = d.get("history")
+    if not isinstance(hist, list) or not hist:
+        return ["源 %s 的 history 缺失或为空——它是开发侧的版本链真源（包内会自动剥离，"
+                "**无需手删**）；删了源侧就无从校验「首条＝本版／条目去重／链接指向自身」" % VERSION_REL]
+    return []
 
 
 def _zip_write(zf, fp, arc, blank_tools=False, strip_history=False, report=None):
@@ -264,6 +301,12 @@ def verify_zip(zp):
     leaked = [n for n in names if n.startswith(SKILL_DIR + "/" + PRIVATE_DIR + "/")]
     if leaked:
         bad.append("private/ 混入了 %d 个文件（企业内控口径，不得外发）" % len(leaked))
+    # VERSION.md（版本沿革，130 行历史版本表）**不得随包**（v3.26.2 定）：
+    # 对外只给「当前是哪版、这版改了什么」，不给历史版本清单。与 history 剥离同一条口径，
+    # 一个管 JSON、一个管文档——两处都得拦，否则「沿革不给看」只做到一半。
+    if (SKILL_DIR + "/VERSION.md") in names:
+        bad.append("包内混入 VERSION.md（版本沿革）——沿革不随技能分发，"
+                   "对外只提供最新一版信息；FULL_FILES 里漏删或手工塞入")
     # version.json：包内只许带 latest，history 不得随包（v3.25.8 起）。
     # 双向判：history 漏裁即拦；latest 丢失同拦（否则使用者查不到最新版）。
     vj = SKILL_DIR + "/" + VERSION_REL
@@ -276,8 +319,13 @@ def verify_zip(zp):
         else:
             if "history" in vd:
                 bad.append("包内 %s 仍含 history（%d 条）——history 不随技能分发，"
-                           "沿革见 VERSION.md；strip_history 分支未生效"
+                           "沿革不随包；strip_history 分支未生效"
                            % (VERSION_REL, len(vd.get("history") or [])))
+            if vd.get("_分发副本") is not True:
+                bad.append("包内 %s 缺 `_分发副本: true` 标记——装好的副本将无法自证"
+                           "「本副本不提供历史版本信息」，门禁会把「无 history」误判为缺陷"
+                           "（千问办公实测：v3.25.8–v3.26.1 装完跑 check.py 即报错）"
+                           % VERSION_REL)
             if not ((vd.get("latest") or {}).get("version") or "").strip():
                 bad.append("包内 %s 缺 latest.version——使用者将查不到最新版本" % VERSION_REL)
     else:
@@ -502,6 +550,21 @@ def build(base, outdir, include_private=False, tag="v3.0.0", keep_tools=False, f
         return False
     for w in _adm_warn:
         print("  [警告] " + w)
+    # 源侧沿革断言（v3.26.2）：包内不带 history（设计），但**源里必须有**——
+    # 否则 check.py 的版本链校验全成空转，清单与源侧沿革各说各话也无人察觉。
+    _src_bad = verify_source_manifest(base)
+    if _src_bad:
+        for b in _src_bad:
+            print("  [FAIL] " + b)
+        print("  [x] 源侧版本清单未通过，已中止出包"
+              "（在源 version.json 里补回 history 后重跑；包内仍会自动剥离，不必手删）。")
+        for _ext in set(FMT_EXT.values()):
+            _stale = os.path.join(outdir, "%s.%s" % (stem, _ext))
+            if os.path.exists(_stale):
+                os.remove(_stale)
+                print("  [i] 已删除上次残留的 %s（避免误当成新产物）"
+                      % os.path.basename(_stale))
+        return False
     for files, dirs, name in [
         (FULL_FILES, list(FULL_DIRS), "%s.%s" % (stem, FMT_EXT["zip"])),
     ]:
@@ -546,7 +609,7 @@ def build(base, outdir, include_private=False, tag="v3.0.0", keep_tools=False, f
             return False
         print("  [OK] 出包自检通过：顶层／SKILL.md 计数／层级（≤%d 级）／体积（≤%d MB）／private 五项全过"
               % (PLATFORM_MAX_DEPTH, PLATFORM_MAX_MB))
-        print("  [OK] 包内 version.json 只带 latest（history 不随技能分发；沿革唯一载体是 VERSION.md）")
+        print("  [OK] 包内 version.json 只带 latest（history 与 VERSION.md 都不随包：历史不给看）")
 
         # ---- 封装为 .skill（头部 ＋ 同一个 zip 负载）
         sp = os.path.join(outdir, "%s.%s" % (stem, FMT_EXT["skill"]))

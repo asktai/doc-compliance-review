@@ -239,6 +239,7 @@ def online_check(quiet=False, forced=False):
         for c in lat["changes"]:
             print("           · %s" % c)
     print("[version] **要不要更新由你定**——本工具只提示，绝不自动升级，也不会替你下载。")
+    print("[version] 本技能不提供历史版本沿革（沿革不随技能分发）；此处只列最新一版要点。")
     print("[version] 愿意更新的话，按三步走：")
     if lat["page"]:
         print("[version]   第一步 · 打开下载页：%s" % lat["page"])
@@ -572,17 +573,18 @@ def changelog(src, limit=40):
         print("[version] 更新源里没有 SKILL.md：%s" % src)
         return 2
     tgt = vkey(sver)
-    # 优先项目侧 CHANGELOG.md（含实现细节，**不随发布包**）；源里没有则回退包内
-    # VERSION.md 的用户视角摘要——否则终端使用者升级时永远只能看到"无沿革"。
+    # 沿革明细**不随发布包**（v3.26.2 起 VERSION.md 也移出包）：发布包源通常两样都没有。
+    # 仍先看项目侧 CHANGELOG.md，再回退 VERSION.md——只在「源是开发目录」时才有内容，
+    # 供维护侧升级时自查；对普通使用者，这里会明确告知「不提供」，而不是报错。
     _, txt = source_text(src, "CHANGELOG.md")
     src_of_rows = "CHANGELOG.md（项目侧明细）"
     if not txt:
         _, txt = source_text(src, "VERSION.md")
-        src_of_rows = "VERSION.md（包内用户摘要）"
+        src_of_rows = "VERSION.md（维护侧沿革）"
     if not txt:
-        print("[version] 更新源里既无 CHANGELOG.md 也无 VERSION.md（%s）——无法列出沿革。"
-              % (kind or src))
-        print("[version] 新旧差异请以两侧 SKILL.md / README.md 为准。")
+        print("[version] 该更新源不含沿革明细（%s）——发布包按设计不带历史版本信息。" % (kind or src))
+        print("[version] 只能确认版本号新旧：当前 v%s，源 %s。" % (i["version"], sver))
+        print("[version] 升级前想看「这版改了什么」，以源包内 version.json 的 latest.changes 为准。")
         return 0
     rows = []
     for line in txt.splitlines():

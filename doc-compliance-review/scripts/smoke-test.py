@@ -1719,6 +1719,75 @@ def main():
     except Exception as e:
         check("出包裁剪自检", False, repr(e))
 
+    # --- 3.57 分包副本自证（history 不进包，但副本要能说清沿革在哪）---
+    # 背景（千问办公实测）：pack.py 从 v3.25.8 起按设计剥离 history，而 check.py 要求
+    # history 必须存在 → 同一份 check.py，开发源 0 错、装好的副本必红，四个版本都如此，
+    # 只是此前从没人在**产物**上跑过门禁。修法是让包自带 `_分发副本: true` 标记自证身份。
+    # 这里做真副本双向验证：有标记＝分发态须过；无标记且无 history＝开发源须报错。
+    print("\n[3.57] 分包副本自证（历史版本信息不对外提供）")
+    _tmp4 = None
+    try:
+        import importlib.util as _iu4, shutil as _sh4, tempfile as _tf4
+        _sp4 = _iu4.spec_from_file_location("_pk4", os.path.join(HERE, "pack.py"))
+        _pk4 = _iu4.module_from_spec(_sp4)
+        _sp4.loader.exec_module(_pk4)
+        _cut2 = json.loads(_pk4.strip_version_history(
+            '{"latest":{"version":"v1.0.0"},"history":[{"version":"v0.9.0"}]}'))
+        check("出包：裁剪后带 `_分发副本: true` 标记（副本能自证「不提供历史版本信息」）",
+              _cut2.get("_分发副本") is True and "history" not in _cut2,
+              json.dumps(_cut2, ensure_ascii=False)[:90])
+        _root4 = os.path.dirname(HERE)
+        _srcbad = _pk4.verify_source_manifest(_root4)
+        check("出包：源侧断言认「源里有 history」为通过（包内仍会自动剥离）",
+              _srcbad == [], str(_srcbad)[:90])
+        check("出包：FULL_FILES 不含 VERSION.md（沿革不随包）",
+              "VERSION.md" not in _pk4.FULL_FILES, str(_pk4.FULL_FILES)[:70])
+        _tmp4 = _tf4.mkdtemp(prefix="dcr_dist_")
+        _dst4 = os.path.join(_tmp4, "doc-compliance-review")
+        _sh4.copytree(_root4, _dst4,
+                      ignore=_sh4.ignore_patterns("__pycache__", "_发布包", ".git"))
+        # 模拟真实分发包：沿革不随包，先把 VERSION.md 拿掉
+        _vm4 = os.path.join(_dst4, "VERSION.md")
+        _had_vm = os.path.exists(_vm4)
+        if _had_vm:
+            os.remove(_vm4)
+        _vj4 = os.path.join(_dst4, "version.json")
+        _d4 = json.loads(open(_vj4, encoding="utf-8").read())
+        _d4.pop("history", None)
+        _d4["_分发副本"] = True
+        open(_vj4, "w", encoding="utf-8").write(
+            json.dumps(_d4, ensure_ascii=False, indent=2) + "\n")
+        _r4 = run([PY, os.path.join(_dst4, "scripts", "check.py")])
+        check("分包副本（无 history／无 VERSION.md／有标记）跑 check.py 须 0 错"
+              "——千问办公「装完即红」的回归",
+              _r4.returncode == 0,
+              tail_line(_r4.stdout) + " " + tail_line(_r4.stderr))
+        # 反向：把沿革塞回分发包 → 必须报错（「沿革不给看」不能只靠出包时自觉）
+        if _had_vm:
+            _sh4.copyfile(os.path.join(_root4, "VERSION.md"), _vm4)
+            _r6 = run([PY, os.path.join(_dst4, "scripts", "check.py")])
+            check("分发包里塞回 VERSION.md 须报错——沿革不随包不能只靠自觉",
+                  _r6.returncode != 0 and "VERSION.md（版本沿革）" in (_r6.stdout or ""),
+                  tail_line(_r6.stdout))
+            os.remove(_vm4)
+        _d4.pop("_分发副本", None)
+        open(_vj4, "w", encoding="utf-8").write(
+            json.dumps(_d4, ensure_ascii=False, indent=2) + "\n")
+        # 还原成「开发源」形态：VERSION.md 必须在（源侧沿革是维护真源）
+        if _had_vm:
+            _sh4.copyfile(os.path.join(_root4, "VERSION.md"), _vm4)
+        _r5 = run([PY, os.path.join(_dst4, "scripts", "check.py")])
+        check("开发源（无 history 且无标记）跑 check.py 须报错"
+              "——防有人把源的 history 删了还一路绿",
+              _r5.returncode != 0 and "缺 history" in (_r5.stdout or ""),
+              tail_line(_r5.stdout))
+    except Exception as e:
+        check("分包副本自证", False, repr(e))
+    finally:
+        if _tmp4:
+            import shutil as _sh5
+            _sh5.rmtree(_tmp4, ignore_errors=True)
+
     # --- 3.5 版本与依赖（分发与落地成本）---
     print("\n[3.5] 版本与依赖")
     try:

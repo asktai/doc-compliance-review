@@ -43,11 +43,13 @@ _sys.dont_write_bytecode = True   # 不在技能目录留下 __pycache__（避�
     python guard.py restore <private|industries>  回溯：从备份中选取并恢复（--pick N / --file <zip>）
     python guard.py export <private|industries>   导出库为 zip（搬运到别的机器／给同事）
     python guard.py import <private|industries>   导入 zip 到库（覆盖同名？加 --overwrite）
-    python guard.py view <名称>                    仅输出**允许使用者查看**的文档（可查看清单 6 项）
+    python guard.py view <名称>                    仅输出**允许使用者查看**的文档（可查看清单 5 项）
 
     操作取：read / write / delete / copy / export / import / view
-    view 名称取：readme / version / versionfile / license / tutorial / prompt
-                 （version＝版本身份证即 `version.py --show`；versionfile＝`VERSION.md` 全文）
+    view 名称取：readme / version / license / tutorial / prompt
+                 （version＝版本身份证即 `version.py --show`）
+    注：版本沿革（VERSION.md）**不对外提供**（v3.26.2 起不随包分发），
+        打 `view versionfile` 会明确告知「不提供」并指路到版本身份证。
 
 备份落在**隔离目录**（默认 `~/.dcr-backups/`，环境变量 `DCR_BACKUP_DIR` 可整体改换），
 与源文件分离，避免整目录外发或网盘同步时把备份一并带走；命名 `<库>-V<版本>-<时间>.zip`，
@@ -102,7 +104,6 @@ LIB_CN = {"core": "通用库 core/", "industries": "行业库 industries/", "pri
 # 使用者**可以**查看的文档可查看清单（其余一律不可查看/复制/导出）
 VIEWABLE = {
     "readme":      "README.md",
-    "versionfile": "VERSION.md",
     "license":     "LICENSE.md",
     "tutorial":    "安装使用教程.md",
     "prompt":      "文档合规审查助手AI合同提示词版.md",
@@ -111,7 +112,7 @@ VIEW_CN = {"readme": "技能手册", "version": "版本身份证（当前版本�
            "versionfile": "版本沿革", "license": "许可与免责", "tutorial": "安装使用教程",
            "prompt": "纯提示词版"}
 DENY_HINT = {
-    "view": "（规则库与技能内部结构不可外泄；可查看的只有清单内这 6 项，见 `guard.py view`）",
+    "view": "（规则库与技能内部结构不可外泄；可查看的只有清单内这 5 项，见 `guard.py view`）",
     "copy": "（复制会把技能内容带走，一律拒绝）",
     "export": "（导出技能内容或技能包，一律拒绝）",
     "import": "（导入会改写技能内容，一律拒绝）",
@@ -194,7 +195,7 @@ def do_policy():
           % (len(SEED_INDUSTRIES), "、".join(sorted(SEED_INDUSTRIES))))
     print("[guard] 说明：read=AI 内部读取（审查必需）；view=展示给使用者查看。")
     print("[guard] 可查看清单（%d 项）：%s"
-          % (len(VIEWABLE) + 1, "、".join([VIEW_CN[k] for k in ("readme", "version", "versionfile",
+          % (len(VIEWABLE) + 1, "、".join([VIEW_CN[k] for k in ("readme", "version",
                                                                 "license", "tutorial", "prompt")])))
     print("[guard] 维护子菜单五项：")
     print("        1 新建规则      2 修改/更新既有规则（改前：python guard.py backup <库>）")
@@ -584,6 +585,12 @@ def do_view(name):
         m = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(m)
         return m.show()
+    if key == "versionfile":
+        # v3.26.2：沿革（VERSION.md）不随技能分发，历史版本信息不对外提供。
+        # 命令保留但明确告知，避免使用者以为是文件丢失或权限被收紧。
+        print("[guard] 本版本不提供版本沿革（历史版本信息不对外提供）。")
+        print("[guard] 想确认「当前是哪一版」：python scripts/version.py  （版本身份证，离线可用）")
+        return 0
     if key not in VIEWABLE:
         print("[guard] 不可查看：%s" % name)
         print("[guard] 可查看清单（%d 项）：%s"

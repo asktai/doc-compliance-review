@@ -1,5 +1,5 @@
 {
-  "_说明": "在线版本清单。技能侧 `scripts/version.py --notice`（默认联网检查）会读取本文件，向使用者展示：最新版本号、发布日期、更新了哪些内容、下载指引页。字段口径：version＝最新版本号（小写 v 前缀；SKILL.md frontmatter 为同号裸写、不带 v，二者指同一版本）；date＝该版本发布日期（YYYY-MM-DD）；summary＝一句话概述；changes＝本版要点列表；download_page＝人去看的下载指引页；files＝分发包直链（.skill／.zip）。本文件只描述'有哪些版本、去哪儿下载'，不含任何使用者信息，工具读取时也不会上传任何数据。",
+  "_说明": "在线版本清单。技能侧 `scripts/version.py --notice`（默认联网检查）会读取本文件，向使用者展示：最新版本号、发布日期、更新了哪些内容、下载指引页。字段口径：version＝最新版本号（小写 v 前缀；SKILL.md frontmatter 为同号裸写、不带 v，二者指同一版本）；date＝该版本发布日期（YYYY-MM-DD）；summary＝一句话概述；changes＝本版要点列表；download_page＝人去看的下载指引页；files＝分发包直链（.skill／.zip）。本文件只描述'有哪些版本、去哪儿下载'，不含任何使用者信息，工具读取时也不会上传任何数据。另有 `_分发副本`：出包时由 pack.py 自动写入的标记（`true` ＝本文件是分发包内的副本，history 已按设计剥离；开发源内不出现该字段）。**历史版本信息不对外提供**——本文件只负责「最新是哪版、这版改了什么、去哪儿下」，不含历史版本清单。",
   "product": "文档合规审查助手AI合同",
   "skill_id": "doc-compliance-review",
   "latest": {

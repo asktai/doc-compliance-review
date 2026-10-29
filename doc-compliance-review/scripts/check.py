@@ -100,10 +100,33 @@ ASSET_REF_RE = re.compile(r"!\[[^\]]*\]\((?:\./)?(assets/[^)\s\"']+)\)")
 
 
 # ---------------------------------------------------------------- 校验项
+def _is_distribution():
+    """本副本是否**分发包**（`pack.py` 出包时在 version.json 写入 `_分发副本: true`）。
+
+    分发包与开发源在「沿革」这件事上判据正好相反：分发包里**没有** history、**没有**
+    VERSION.md（历史不给看）；开发源里**必须有**这两样（否则版本链校验全成空转）。
+    只看包内自带标记，不靠 `.git`／`_发布包` 之类的路径特征——那些在别人机器上不成立。
+    """
+    try:
+        with open(os.path.join(ROOT, "version.json"), encoding="utf-8") as f:
+            d = json.load(f)
+    except Exception:
+        return False
+    return isinstance(d, dict) and d.get("_分发副本") is True
+
+
 def check_required_files():
+    dist = _is_distribution()
     for f in REQUIRED_FILES:
+        if f == "VERSION.md" and dist:
+            continue          # 分发包按设计不带版本沿革（v3.26.2）
         if not os.path.exists(os.path.join(ROOT, f)):
             err("缺少文件: %s" % f)
+    # 反向：分发包里**不得**出现 VERSION.md——130 行历史版本表，正是「历史不给看」
+    # 要挡的那一份。只裁 JSON 的 history 不够，文档侧也得挡（两处同一口径）。
+    if dist and os.path.exists(os.path.join(ROOT, "VERSION.md")):
+        err("分发包内出现 VERSION.md（版本沿革）——沿革不随技能分发，对外只提供最新一版信息；"
+            "出包漏排或手工塞入")
 
 
 def _industry_slugs():
@@ -1385,7 +1408,8 @@ def _check_doc_consistency():
     不必满文档找。
     """
     DOCS = ("SKILL.md", "README.md", "安装使用教程.md",
-            "文档合规审查助手AI合同提示词版.md", "drafting-guide.md")
+            "文档合规审查助手AI合同提示词版.md", "drafting-guide.md",
+            "permissions-and-libraries.md")
 
     def lines(rel):
         p = os.path.join(ROOT, rel)
@@ -1401,6 +1425,15 @@ def _check_doc_consistency():
         ("能检错写成查风险", r"能检是\*\*查风险\*\*"),
         ("能检错写成拿规则库查文档", r"能检 是拿规则库去查文档"),
         ("能核错写成机械错误", r"能核\*\*是拿产物去对\"有没有机械错误\""),
+        # 沿革不对外提供（v3.26.2）：history 与 VERSION.md 都不随包，旧口径「VERSION.md 随包、
+        # 是沿革载体、可查看」一律禁止——它会让文档对外承诺一个包内根本不存在的文件。
+        ("沿革仍写随包/唯一载体", r"VERSION\.md (?:已随包|随包|是沿革的唯一载体)"),
+        ("可查看清单仍写 VERSION.md 六项", r"可查看的只有[^\n]{0,90}VERSION\.md[^\n]{0,40}六项"),
+        ("技能本体仍写 6 项可看", r"技能本体只有\s*6\s*项可看"),
+        ("可看的只有六项", r"可看的只有六项"),
+        # 项数也钉住：可查看清单＝5 项（README／版本身份证／LICENSE／教程／提示词版）。
+        # 写 6 项的一定是把 VERSION.md 又算进去了——数字与清单两头都拦，防「改了话没改数」。
+        ("可查看项数仍写 6 项", r"(?:可查看的只有|可以看的只有|可看的只有)\s*\*{0,2}\s*6\s*项"),
     ]
     bad = []
     for rel in DOCS:
@@ -1408,6 +1441,19 @@ def _check_doc_consistency():
             for name, pat in FORBID:
                 if re.search(pat, line):
                     bad.append("%s:%d 命中禁止表述[%s]" % (rel, ln, name))
+
+    # ---- 正向断言：可查看清单里不得再出现 VERSION.md（沿革不对外提供）----
+    # 允许「…五项（版本沿革 VERSION.md 不对外提供）」这类**明确否定**的说明句。
+    for rel in ("README.md", "SKILL.md", "permissions-and-libraries.md"):
+        for ln, line in lines(rel):
+            if not re.search(r"(可查看的只有|可看的只有|项可看)", line):
+                continue
+            if "VERSION.md" not in line:
+                continue
+            if "不对外提供" in line or "不随包" in line:
+                continue
+            bad.append("%s:%d 可查看清单仍含 VERSION.md——沿革不对外提供，不能列为可查看项"
+                       % (rel, ln))
     if bad:
         err("文档含禁止的陈旧/错误表述（与现行模型冲突）：%s" % "；".join(bad))
 
@@ -2168,7 +2214,20 @@ def check_manifest_version():
             "发布页会显示「新版本号配旧更新说明」，请同步 latest.summary／changes" % (others,))
     hist = (d or {}).get("history") or []
     if not hist:
-        err("version.json 缺 history 数组——对外只留最新一版，用户看不到演进")
+        # v3.26.2：分「开发源」与「分包副本」两种身份，不再一概论错。
+        # 起因（千问办公实测）：pack.py 从 v3.25.8 起按设计剥离 history，而这里要求
+        # history 必须存在——于是同一份 check.py，开发源跑 0 错、装好的副本跑必红，
+        # v3.25.8～v3.26.1 每一版都如此，只是此前从没人在产物上跑过门禁。
+        # 判据用包内自带标记（pack.py 写 `_分发副本: true`），不靠路径/目录猜测：
+        # 有标记＝分发包，history 缺失属设计内（历史不给看，本副本也不带 VERSION.md）；
+        # 无标记＝开发源，history 必须存在（删了版本链校验全成空转）。
+        if (d or {}).get("_分发副本") is True:
+            info("version.json 无 history：本副本为分发包（pack.py 已按设计剥离，"
+                 "带 `_分发副本` 标记）——历史版本信息不对外提供，只给最新一版")
+        else:
+            err("version.json 缺 history 数组——它是开发源的版本链真源，删了"
+                "「首条＝本版／条目去重／链接指向自身」全套校验即成空转；"
+                "出包时由 pack.py 自动剥离，无需手删（若这确是分发包，须带 `_分发副本: true`）")
     elif str(hist[0].get("version") or "") != tv:
         err("version.json 的 history 首条为 %r，应为当前版本 %s（新版本发布时须把旧 latest 挪入 history）"
             % (hist[0].get("version"), tv))
@@ -2840,6 +2899,11 @@ def clean():
 
 # ---------------------------------------------------------------- 工具
 def _read(p):
+    if not os.path.exists(p):
+        # 文件不在就按空内容处理：调用方一律是「有内容才校验」，空串自然跳过。
+        # 分发包按设计不带 VERSION.md（沿革不随包），这里不能因此抛 FileNotFoundError
+        # ——否则「装完即红」会从 history 换到这个路径上再来一次。
+        return ""
     for enc in ("utf-8-sig", "utf-8", "gbk"):
         try:
             with open(p, encoding=enc) as f:
