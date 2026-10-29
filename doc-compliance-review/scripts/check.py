@@ -1865,6 +1865,100 @@ def check_engine_implementations():
     _check_engine_count()
 
 
+def _check_menu_entries():
+    """菜单完整性：引擎做了、菜单里却点不到（2026-10-29 加，v3.26.6）。
+
+    事实依据：法规检索 `legal-search.py`、法规汇编 `legal-compile.py`、OCR
+    `preprocess.py`、结构化 `structure.py` 四个引擎**早就在用**（引擎表标 ✅、
+    `description` 也一直宣传「查法条、编法规汇编」），但 0.5 的功能菜单里**一个入口都没有**。
+    用户按「向导」看到的是一份少了四行的功能表——等于做了没人用得上；
+    而门禁一路全绿，因为没人查过「引擎表 ↔ 菜单」这一对。
+
+    查四件事：
+      ① 菜单编号连续（0..N-1，不缺不重）——编号跳号，用户回数字就会打空；
+      ② 正文「一次性列出 N 项」与实数一致（改了菜单忘改这句，是同一类漂移）；
+      ③ 七类能力关键词必须在菜单里现身（缺哪个报哪个）——防「再次漏项」的正面断言；
+      ④ 每一项都要有去向——只列不指路，用户点进去仍是死路。
+
+    不做什么：**不逐行比对引擎表**。菜单是面向使用者的组织，允许把两个引擎合成一项
+    （如「格式转换」＝入向 preprocess ＋ 出向 make-docx），逐行比对会逼着把内部实现
+    细节塞进菜单。故判据落在**能力层关键词**，不落在实现层引擎行。
+    """
+    p = os.path.join(ROOT, "SKILL.md")
+    if not os.path.exists(p):
+        return
+    src = _read(p)
+    m = re.search(r"【Q1 · 本技能功能 · 请单选[^\n]*\n(.*?)\n```", src, re.S)
+    if not m:
+        err("SKILL.md 找不到 0.5 的菜单块（【Q1 · 本技能功能 · 请单选）——"
+            "菜单完整性无从核对")
+        return
+    block = m.group(1)
+    nums = [int(x) for x in re.findall(r"(?m)^\s*(\d+)\.\s", block)]
+    if not nums:
+        err("0.5 菜单块里没解析出任何编号项（应形如「0. 背景资料录入」）")
+        return
+    n = len(nums)
+
+    # ① 连续、不重复
+    if sorted(nums) != list(range(n)):
+        err("0.5 菜单编号不连续或有重复：%s（应为 0..%d）" % (nums, n - 1))
+
+    # ② 声称的项数 = 实数
+    mm = re.search(r"一次性列出\s*(\d+)\s*项", src)
+    if not mm:
+        err("SKILL.md 0.5 处找不到「一次性列出 N 项」的项数表述")
+    elif int(mm.group(1)) != n:
+        err("0.5 菜单实有 %d 项，正文却写「一次性列出 %s 项」——"
+            "改了菜单没改这句话，用户会以为还有没显示的项"
+            % (n, mm.group(1)))
+
+    # ③ 能力关键词必须在场（正面断言：宁可多拦一次，不再漏项）
+    MUST = {
+        "背景资料录入": "前置项",
+        "文档审查": "非合同类审查",
+        "合同审查": "合同类审查",
+        "文档脱敏": "脱敏引擎",
+        "文档比对": "比对引擎",
+        "撰写合同": "撰写引擎",
+        "撰写合同模板": "模板撰写",
+        "文档转模板": "转模板",
+        "合同转模板": "转模板",
+        "维护私有库": "私有层维护",
+        "维护行业库": "行业层维护",
+        "帮助说明": "手册",
+        "精要总结": "总结能力",
+        "格式转换": "preprocess 入向 / make-docx 出向",
+        "OCR": "OCR 引擎",
+        "结构化": "结构化引擎",
+        "法规检索": "legal-search",
+        "法规汇编": "legal-compile",
+        "引用核验": "legal-verify",
+        "公文写作": "gb9704 版式与体检",
+    }
+    miss = [k for k in MUST if k not in block]
+    if miss:
+        err("0.5 菜单缺以下能力入口：%s——引擎在用、菜单却没有，"
+            "等于做了没人用得上（对应引擎：%s）"
+            % ("、".join(miss), "；".join(MUST[k] for k in miss)))
+
+    # ④ 每一项都要有去向
+    dm = re.search(r"(?m)^> \*\*去向\*\*：(.*)$", src)
+    if not dm:
+        err("SKILL.md 0.5 处找不到「去向」段——菜单列了却不说每项走哪条链路")
+        return
+    dest = set()
+    for seg in dm.group(1).replace("**", "").split("；"):
+        sm = re.match(r"^\s*(\d+(?:[／/]\d+)*)\s*→", seg)
+        if sm:
+            for x in re.split(r"[／/]", sm.group(1)):
+                dest.add(int(x))
+    no_dest = sorted(set(nums) - dest)
+    if no_dest:
+        err("0.5 菜单第 %s 项没有去向（「去向」段里查不到该编号）——"
+            "只列不指路，用户点进去仍是死路" % "、".join(map(str, no_dest)))
+
+
 def _check_engine_count():
     """引擎数量与编号自洽：表里有多少行编号、正文就该写多少个引擎。
 
@@ -3120,6 +3214,7 @@ def main():
         check_doc_number_caliber()
         _check_doc_consistency()
         _check_pseudo_controls()
+        _check_menu_entries()
         check_package_fields()
         check_platform_limit()
         check_sample_baseline()

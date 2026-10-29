@@ -1997,6 +1997,42 @@ def main():
         if _pvbak is not None:
             open(_pvp, "wb").write(_pvbak)      # 无论成败都按字节还原，正式文件不留污染
 
+    print("\n[3.62] 功能菜单完整性（引擎在用，就必须在菜单里点得到）")
+    _skp = os.path.join(os.path.dirname(HERE), "SKILL.md")
+    _skbak = None
+    try:
+        _skbak = open(_skp, "rb").read()
+        _skt = _skbak.decode("utf-8")
+        _mm = re.search(r"【Q1 · 本技能功能 · 请单选[^\n]*\n(.*?)\n```", _skt, re.S)
+        _blk = _mm.group(1) if _mm else ""
+        _nums = [int(x) for x in re.findall(r"(?m)^\s*(\d+)\.\s", _blk)]
+        # 编号连续是硬要求：跳号的话用户回「12」会打空，而菜单看上去毫无异样
+        check("功能菜单 20 项、编号 0–19 连续",
+              len(_nums) == 20 and _nums == list(range(20)),
+              "实有 %d 项：%s" % (len(_nums), _nums))
+        # 七类曾漏掉（或从未有过入口）的能力必须在场——正面断言，缺一项即红
+        _need = ["格式转换", "OCR", "结构化", "法规检索", "法规汇编", "引用核验", "公文写作"]
+        _lost = [k for k in _need if k not in _blk]
+        check("菜单含曾漏掉的七类能力入口（格式转换/OCR/结构化/法规检索/汇编/引用核验/公文写作）",
+              not _lost, "缺：%s" % "、".join(_lost) if _lost else "七类齐备")
+        # 区分度：把「法规检索」那一行删掉，门禁必须报错——否则上面两条只是恒绿的装饰
+        _line = re.search(r"(?m)^\s*\d+\.\s*法规检索.*\n", _blk)
+        if _line:
+            open(_skp, "wb").write(
+                _skt.replace(_blk, _blk.replace(_line.group(0), "", 1), 1).encode("utf-8"))
+            _r62 = run([PY, os.path.join(HERE, "check.py")])
+            open(_skp, "wb").write(_skbak)
+            check("注入[菜单删「法规检索」] 门禁须报错——证明这条断言有区分度",
+                  _r62.returncode != 0 and "法规检索" in (_r62.stdout or ""),
+                  tail_line(_r62.stdout))
+        else:
+            check("注入锚点：菜单里的「法规检索」行仍在", False, "锚点丢失，注入无效")
+    except Exception as e:
+        check("功能菜单完整性", False, repr(e))
+    finally:
+        if _skbak is not None:
+            open(_skp, "wb").write(_skbak)      # 无论成败按字节还原，正式文件不留污染
+
     # --- 3.5 版本与依赖（分发与落地成本）---
     print("\n[3.5] 版本与依赖")
     try:
