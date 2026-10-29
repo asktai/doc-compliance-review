@@ -809,7 +809,8 @@ def check_freshness_engine():
         return
     try:
         r = subprocess.run([sys.executable, p, "--self-test"],
-                           capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120)
+                           capture_output=True, text=True, encoding="utf-8", errors="replace",
+                           env=_utf8_env(), timeout=120)
     except Exception as e:
         err("巡检自检跑不起来：%s" % e)
         return
@@ -820,6 +821,12 @@ def check_freshness_engine():
         return
     for must in ("同一条文必判一致", "混入条目标题须判不一致", "库内 sources 均带 grp/enc"):
         if must not in out:
+            # 顺序很重要：先说清「是不是输出本身不可信」，再谈判据。
+            # v3.26.2 之前这里直接报「判据被删或改名」，把 GBK 乱码误诊成红线失效。
+            hint = _garbled_hint(out)
+            if hint:
+                err(hint + "\n原始输出（乱码）：" + out.strip()[:160])
+                return
             err("巡检自检缺少关键判据项「%s」——判据被删或改名，门禁等于失效" % must)
             return
     n_ok = len(re.findall(r"\[OK\]", out))
@@ -1940,7 +1947,7 @@ def _check_subprocess_encoding():
     多行调用的 encoding 写在续行，会误报。按括号配平抓出**完整参数区**再判。
     errors 一并建议（replace 优于 ignore：ignore 静默吞字节，replace 至少留痕）。
     """
-    bad = []
+    bad, noenv = [], []
     scripts_dir = os.path.join(ROOT, "scripts")
     if not os.path.isdir(scripts_dir):
         return
@@ -1967,11 +1974,41 @@ def _check_subprocess_encoding():
                 bad.append("%s:%d（encoding 重复 %d 次）" % (fn, ln, enc))
             elif enc == 0 and "text=True" in args:
                 bad.append("%s:%d" % (fn, ln))
+            # 第二道保险：**本文件（check.py）**捕获子进程输出的调用必须显式给
+            # env=_utf8_env()。为什么只盯 check.py：它拿子进程输出**做判据匹配**，
+            # 一旦解码错位就会把乱码误诊成「判据被删／脚本崩了」——代价最高；
+            # 其余脚本的 spawn 只把输出转给人看（且 errors 已设 replace/ignore），
+            # 乱码是显示问题而非误判，且它们调的子进程都是本技能脚本（已全部自钉
+            # stdout，见第三道）。make-docx 调的是 soffice（外部程序），env 无意义，
+            # 一并豁免。这是有意的取舍，不是漏检。
+            if fn == "check.py" and ("capture_output" in args or "stdout=subprocess.PIPE" in args):
+                if "_utf8_env()" not in args:
+                    noenv.append("%s:%d" % (fn, ln))
+
+    # 第三道保险（v3.26.2 千问办公实测抓出）：**每个脚本自己**都要钉 stdout 编码。
+    # 只查父侧 encoding 是不够的——父侧写对了、子脚本没钉，照样乱码：
+    # 中文 Windows 控制台下子进程按 GBK 写 → 父侧 UTF-8 解出 U+FFFD → 判据全不匹配
+    # → 门禁把「编码噪声」误报成「判据被删／脚本崩了」。这是**误诊**，比不检更坏。
+    nopin = []
+    for fn in sorted(os.listdir(scripts_dir)):
+        if not fn.endswith(".py"):
+            continue
+        if "stdout.reconfigure" not in _read(os.path.join(scripts_dir, fn)):
+            nopin.append(fn)
+
     if bad:
         err("subprocess.run 用了 text=True 却未指定 encoding（Windows 下按 GBK "
             "解码 UTF-8 输出会乱码，装机冒烟会全灭）：%s" % "、".join(bad))
-    else:
-        info("subprocess 编码：所有 text=True 调用均已锁定 UTF-8（Windows 装机不再乱码）")
+    if noenv:
+        err("subprocess.run 捕获子进程输出却未传 env=_utf8_env()（子进程会按 locale 写出，"
+            "中文 Windows 下父侧解出乱码，判据全不匹配）：%s" % "、".join(noenv))
+    if nopin:
+        err("以下脚本未自钉 stdout 编码（`_sys.stdout.reconfigure(encoding=\"utf-8\")`）——"
+            "被 spawn 时在非 UTF-8 环境会写出乱码，父侧据此误报判据失效：%s" % "、".join(nopin))
+    if not (bad or noenv or nopin):
+        n_py = sum(1 for x in os.listdir(scripts_dir) if x.endswith(".py"))
+        info("subprocess 编码：text=True 均锁 UTF-8、捕获输出均传 _utf8_env()、"
+             "%d 个脚本全部自钉 stdout（三处编码链闭环）" % n_py)
 
 
 def _check_trigger_words():
@@ -2798,7 +2835,8 @@ def check_cite_alignment():
         return
     try:
         r = subprocess.run([sys.executable, modp, "--audit-rules"],
-                           capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120)
+                           capture_output=True, text=True, encoding="utf-8", errors="replace",
+                           env=_utf8_env(), timeout=120)
     except Exception as e:
         err("条号对位自检跑不起来：%s" % e)
         return
@@ -2806,7 +2844,15 @@ def check_cite_alignment():
     m = re.search(r"引用 (\d+) 条｜基线 (\d+) 条｜条号位移 (\d+) 处｜条文变动 (\d+) 条",
                   out)
     if not m:
-        err("条号对位自检输出无法解析（脚本可能崩了）：%s" % out.strip()[:200])
+        hint = _garbled_hint(out)
+        if hint:
+            err(hint + "\n原始输出（乱码）：" + out.strip()[:160])
+            return
+        if r.returncode != 0:
+            err("条号对位自检跑挂了（退出 %d）：%s"
+                % (r.returncode, out.strip()[:200]))
+            return
+        err("条号对位自检输出无法解析（退出 0 但格式变了）：%s" % out.strip()[:200])
         return
     n_cur, n_base, n_shift, n_chg = (int(x) for x in m.groups())
     if r.returncode != 0 or n_shift or n_chg:
@@ -2898,6 +2944,42 @@ def clean():
 
 
 # ---------------------------------------------------------------- 工具
+def _utf8_env():
+    """给被 spawn 的子进程一份**强制 UTF-8** 的环境（编码链的第二道保险）。
+
+    v3.26.2 千问办公实测：装好的副本跑 check.py 报两条 [E]——
+    「条号对位自检输出无法解析（脚本可能崩了）」与「巡检自检缺少关键判据项，判据被删或改名」。
+    两条**都是误诊**：真实原因是子脚本没自钉 stdout 编码，中文 Windows 控制台下按 GBK 写出，
+    父侧按 UTF-8 解读出 U+FFFD 乱码 → 三条判据一条都匹配不上 → 被说成「判据被删」。
+    **把编码噪声报成了红线失效，比不做检查更坏**：人按提示去查判据，越查越远。
+
+    第一道是子脚本自身 `stdout.reconfigure(encoding="utf-8")`（28 个脚本全覆盖）；
+    这里再做第二道，从环境上掐掉「子进程按非 UTF-8 写出」的可能——万一以后新加脚本漏钉。
+    """
+    env = dict(os.environ)
+    env["PYTHONIOENCODING"] = "utf-8"
+    env["PYTHONUTF8"] = "1"
+    return env
+
+
+def _garbled_hint(out, n_scripts=None):
+    """输出里出现 U+FFFD 替换符 ⇒ 编码链断了，不是脚本崩了、也不是判据被删。
+
+    返回非空串＝确诊编码问题（调用方用它的文案报错）；返回空串＝输出可正常解读。
+    单独成函数的原因：两处 spawn（legal-verify、freshness-patrol）都要这个判断，
+    文案写两遍必分家——这正是本项目反复踩的「多处重写」型病灶。
+    """
+    n = (out or "").count("\ufffd")
+    if not n:
+        return ""
+    exp = "28" if n_scripts is None else str(n_scripts)
+    return ("子进程输出解码异常（含 %d 个替换符 U+FFFD）——**这是编码链断裂，不是脚本崩了，"
+            "也不是判据被删或改名**。成因：子脚本未自钉 stdout 编码，或运行环境强制了非 UTF-8"
+            "（中文 Windows 控制台即 GBK）。自检：`grep -l 'stdout.reconfigure' scripts/*.py "
+            "| wc -l` 应为 %s；父侧已强制 PYTHONIOENCODING=utf-8，若仍复发说明该脚本被绕过"
+            "（如被别的解释器启动）。**本项按「输出不可信」处理，不放行。**" % (n, exp))
+
+
 def _read(p):
     if not os.path.exists(p):
         # 文件不在就按空内容处理：调用方一律是「有内容才校验」，空串自然跳过。

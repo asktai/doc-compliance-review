@@ -1788,6 +1788,35 @@ def main():
             import shutil as _sh5
             _sh5.rmtree(_tmp4, ignore_errors=True)
 
+    # --- 3.58 编码链（非 UTF-8 环境下门禁不得误诊）---
+    print("\n[3.58] 编码链（中文 Windows／GBK 环境）")
+    try:
+        # 千问办公实测（v3.26.2）：装好的副本在 GBK 控制台下跑 check.py 报两条 [E]——
+        # 「条号对位自检输出无法解析（脚本可能崩了）」与「巡检自检缺少关键判据项，
+        # 判据被删或改名」。两条**都是误诊**：子脚本没自钉 stdout，按 GBK 写出，
+        # 父侧 UTF-8 解出 U+FFFD，三条判据一条都匹配不上 → 被说成「判据被删」。
+        # 开发侧（Linux 全 UTF-8）永远复现不了，这是「在我机器上是好的」的又一形态。
+        # 这里用 PYTHONIOENCODING=gbk 精确复现该环境，要求 0 错且输出无替换符。
+        _env_gbk = dict(os.environ, PYTHONIOENCODING="gbk")
+        _rg = subprocess.run([PY, os.path.join(HERE, "check.py")], capture_output=True,
+                             text=True, encoding="utf-8", errors="replace",
+                             env=_env_gbk, timeout=240)
+        _og = (_rg.stdout or "") + (_rg.stderr or "")
+        check("GBK 环境跑 check.py 须 0 错且无乱码——复现千问「判据被删」误报",
+              _rg.returncode == 0 and "\ufffd" not in _og,
+              tail_line(_og))
+        _nopin = []
+        for _fn in sorted(os.listdir(HERE)):
+            if not _fn.endswith(".py"):
+                continue
+            with open(os.path.join(HERE, _fn), encoding="utf-8", errors="replace") as _fh:
+                if "stdout.reconfigure" not in _fh.read():
+                    _nopin.append(_fn)
+        check("全部脚本自钉 stdout 编码（被 spawn 时不会按 locale 写出）",
+              not _nopin, "、".join(_nopin))
+    except Exception as e:
+        check("编码链", False, repr(e))
+
     # --- 3.5 版本与依赖（分发与落地成本）---
     print("\n[3.5] 版本与依赖")
     try:
