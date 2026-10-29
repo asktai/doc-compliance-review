@@ -3,22 +3,38 @@
   "product": "文档合规审查助手AI合同",
   "skill_id": "doc-compliance-review",
   "latest": {
-    "version": "v3.26.7",
+    "version": "v3.26.8",
     "date": "2026-10-29",
-    "summary": "修 H-01 的可确认缺陷：description_zh 是平台必填字段，此前被删导致整包必被拒收",
+    "summary": "2 审查意见批注版改为在原稿上批注（此前它新建文档、根本不读 --source-docx）；并新增原稿格式预读，.doc 老格式自动转 .docx 再做底",
     "changes": [
-      "**`description_zh` 恢复，但改成「简短中文介绍」（150 字）**。上一轮判断「两个中文 description 重复」时把它整个删了，并在门禁里写了负向断言防回潮——判断的**现象**没错（两段都是五百字上下的中文长文），但**处置错了**：WorkBuddy 开放平台字段表中 `description_zh` 是**必填**，缺失时解析器直接报「缺少 Skill 中文描述(description_zh)」，整包拒收。本地门禁全绿，因为它只认我们自己的断言。**删掉一个必填字段，等于把包做成平台必然拒收的包，而本地一切正常。**",
-      "真正的病是「两个字段写成同一份长文」，不是「有两个中文字段」。平台对二者职责分得很清：`description` 给模型判触发（要写全用途与触发词，现 723 字保留不动），`description_zh` 是**详情页给人看的简短介绍**。故修法是各归其位——`description_zh` 150 字简介、`description_en` 由 1863 字符压到 553 字符（英文详情页简介，不是 `description` 的译本）",
-      "门禁判据随之重定（`check.py`）：从「**禁止** `description_zh` 存在」改为「**必须**存在且 ≤200 字、`description_en` ≤700 字符、且 `description_zh` 前 40 字不得与 `description` 重合」。四条注入全部实测命中（删字段／抄长文／英文膨胀／复制开头），还原后字节一致。docstring 里保留上一轮的判断与它的错法，因为下一个想「再删一个」的人会踩同一坑",
-      "冒烟 226 → **231 项**，新增 5 项：平台必填 8 字段齐备、`description_zh` 简短、`description_en` 简短、注入删字段须报错、注入抄长文须报错"
+      "**2 审查意见批注版改为「在原稿上批注」**。此前 type 2 根本不读 `--source-docx`：它新建一份「标题＋免责声明＋按条款编号的原文/修改后清单」，把意见以 Word 批注挂在这份**重建清单的条款标题**上——而 type 1 修订版是走原稿的。同一轮审查，两个交付物一个在原稿上、一个在新文档上，使用者打开才发现「批注版不是我的合同」；函数 docstring 与 README 都写着「批注锚定到对应条款」，实现与之不符。现新增 `from_source_docx_comment()`：以原稿为底，**正文段落、run 切分、字体、版式一字不动**，把每条意见锚到原稿对应段落，产物**段落序列与原稿逐段相等**。",
+      "**无原稿时降级必须显式**：回退「重建清单」形态，文件名加 `-降级`、标题写「（批注版·非原稿）」、文档属性与正文首段同时写明「本件不是原稿」——不许再把新建文档当原稿批注版交付。部分意见定位不到标 `-降级-部分`，正文仍为原稿。",
+      "**原稿格式预读（按文件头不按扩展名）**：`.docx` 直接用；Word 97-2003 二进制（`.doc`，以及被改成 `.docx` 扩展名的老格式）先用 LibreOffice 转成 `.docx` 再做底；非 Word 压缩包与无法识别格式直接判不可用并说清原因。**1／2／3／4／6／7 六类共享同一次转换**。此前 `.doc` 一律降级，等于把「Word 老格式」当成「没有原稿」。",
+      "**回归守卫：冒烟 231 → 237 项**（含「不读原稿即红」的段落序列判据）。另修 `check.py`「缓存防护」判据的量错：原按 `src[:4000]` 找开关，docstring 一长就误报「漏写」。"
     ],
     "download_page": "https://github.com/asktai/doc-compliance-review/releases",
     "files": {
-      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.26.7/文档合规审查助手AI合同_v3.26.7_20261029_(doc-compliance-review).skill",
-      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.26.7/文档合规审查助手AI合同_v3.26.7_20261029_(doc-compliance-review).zip"
+      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.26.8/文档合规审查助手AI合同_v3.26.8_20261029_(doc-compliance-review).skill",
+      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.26.8/文档合规审查助手AI合同_v3.26.8_20261029_(doc-compliance-review).zip"
     }
   },
   "history": [
+    {
+      "version": "v3.26.8",
+      "date": "2026-10-29",
+      "summary": "2 审查意见批注版改为在原稿上批注（此前它新建文档、根本不读 --source-docx）；并新增原稿格式预读，.doc 老格式自动转 .docx 再做底",
+      "changes": [
+        "**2 审查意见批注版改为「在原稿上批注」**。此前 type 2 根本不读 `--source-docx`：它新建一份「标题＋免责声明＋按条款编号的原文/修改后清单」，把意见以 Word 批注挂在这份**重建清单的条款标题**上——而 type 1 修订版是走原稿的。同一轮审查，两个交付物一个在原稿上、一个在新文档上，使用者打开才发现「批注版不是我的合同」；函数 docstring 与 README 都写着「批注锚定到对应条款」，实现与之不符。现新增 `from_source_docx_comment()`：以原稿为底，**正文段落、run 切分、字体、版式一字不动**，把每条意见锚到原稿对应段落，产物**段落序列与原稿逐段相等**。",
+        "**无原稿时降级必须显式**：回退「重建清单」形态，文件名加 `-降级`、标题写「（批注版·非原稿）」、文档属性与正文首段同时写明「本件不是原稿」——不许再把新建文档当原稿批注版交付。部分意见定位不到标 `-降级-部分`，正文仍为原稿。",
+        "**原稿格式预读（按文件头不按扩展名）**：`.docx` 直接用；Word 97-2003 二进制（`.doc`，以及被改成 `.docx` 扩展名的老格式）先用 LibreOffice 转成 `.docx` 再做底；非 Word 压缩包与无法识别格式直接判不可用并说清原因。**1／2／3／4／6／7 六类共享同一次转换**。此前 `.doc` 一律降级，等于把「Word 老格式」当成「没有原稿」。",
+        "**回归守卫：冒烟 231 → 237 项**（含「不读原稿即红」的段落序列判据）。另修 `check.py`「缓存防护」判据的量错：原按 `src[:4000]` 找开关，docstring 一长就误报「漏写」。"
+      ],
+      "download_page": "https://github.com/asktai/doc-compliance-review/releases",
+      "files": {
+        "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.26.8/文档合规审查助手AI合同_v3.26.8_20261029_(doc-compliance-review).skill",
+        "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.26.8/文档合规审查助手AI合同_v3.26.8_20261029_(doc-compliance-review).zip"
+      }
+    },
     {
       "version": "v3.26.7",
       "date": "2026-10-29",
@@ -764,5 +780,5 @@
   ],
   "_维护说明": "出包后请同步更新本文件（latest 段与 history）。真源是 SKILL.md 的 version 与 VERSION.md 的沿革；本文件是'对外公布的清单'，须与真源一致，否则使用者会被引向旧版。",
   "schema": 1,
-  "version": "3.26.7"
+  "version": "3.26.8"
 }

@@ -14,14 +14,17 @@
     **给 --source-docx 时走原稿级修订**：在原稿既有 run 之间插痕迹，版式沿用原稿。
   · 类型 4（红线修订格式版）：粒度同 1，痕迹改用灰色删除线／红色下划线，不依赖 Word 修订功能。
     **给 --source-docx 时同样以原稿为底**（同一套定位逻辑，痕迹换成纯格式标记）。
-  · 类型 2（批注版）：每条意见以 Word 批注锚定到对应条款；需 python-docx>=1.2，
-    低版本自动降级为「意见附于条款之后」。`--comments` 为兼容保留的等价开关。
+  · 类型 2（批注版）：**原稿就地批注**——给 `--source-docx` 时以原稿为底，正文一字不改，
+    每条意见以 Word 批注锚定到原稿对应段落；无原稿时才回退「重建清单」形态，
+    并在文件名与文档属性标注「非原稿批注」（与 1 修订版同一条硬性要求）。
+    需 python-docx>=1.2，低版本回退重建形态并标注。`--comments` 为兼容保留的等价开关。
   · **不人为增加抬头（保持原版观感）**：1、3、4、6、7 五类＝还原原文的交付物，
     标题即原文标题（**不加「（修订模式）」等类型后缀**）、正文**不加「说明：…」段**；
     类型／审查人／轮次／时间写入 **docx 核心属性**（资源管理器右键「属性」即见）与文件名。
     1、4 另在标题上挂 **1 条「这是什么文件」批注 ＋ 每处修改 1 条意见批注**；
     3、6、7 **零批注**（可能对外发出或纯原文转录，不夹带内部审查意见）。
-    报告类（2、5、8、9、10）是本技能新写的文书，标题与报告免责声明属文书固有内容，不适用此节。
+    2 批注版走原稿路线时正文即原稿，同样不加抬头；只有降级重建形态才是新写文书。
+    报告类（5、8、9、10）是本技能新写的文书，标题与报告免责声明属文书固有内容，不适用此节。
   · 类型 8（文件比对报告）：比对**两份文件 / 两个版本**（如对方回稿 ↔ 我方上版），
     输入 spec.compare{a_text,b_text,a_label,b_label}，或命令行 --cmp-a/--cmp-b 指定文本文件；
     未提供两份全文时，自动降级为「条款级变更台账」（原文 ↔ 修改后）。
@@ -59,17 +62,20 @@
                 可用 --out 覆盖；--subdir 建子文件夹）
   （--ts 建议由 AI 传入准确时间，勿依赖本机时钟）
   --types 可用 slug（tracked/redline/clean/report/reportc/masked/original/diff/compare/template）或中文类型名。
-  --source-docx <原稿.docx>：半档C 排版保真，对 1修订版/3清洁版/4红线版/6脱敏版/7照录版 生效；
+  --source-docx <原稿.docx>：半档C 排版保真，对 1修订版/2批注版/3清洁版/4红线版/6脱敏版/7照录版 生效；
                              1、4 在原稿既有 run 之间插修订痕迹（w:ins/w:del 或红线格式），
-                             3、6、7 只做段落级替换文字；均保留原稿版式。
-                             原稿不可用或条款定位不到则自动回退样式档位，并按降级口径标注。
+                             2 只挂批注、正文一字不改，3、6、7 只做段落级替换文字；均保留原稿版式。
+                             **格式预读**：按文件头判断真实格式（不看扩展名）——.docx 直接用；
+                             Word 97-2003 二进制（.doc 及改过扩展名的）用 LibreOffice 转成 .docx 后使用；
+                             转换不可用或条款定位不到则自动回退样式档位，并按降级口径标注。
 spec.json 关键字段：
   name / source / report_title / disclaimer / reviewer / round
   clauses[]: heading / original / revised / rating / basis / comment
   original_text（可选）：原文照录版/原文脱敏版 需要（全文文本）
   compare{a_label,a_text,b_label,b_text}（可选）：文件比对报告 需要（两份全文）
   template{name,placeholders[],body,optional[],notes}（可选）：模板版 需要（转模板 / 撰写模板）
-依赖：python-docx（>=1.2，支持批注）；openpyxl（Excel 导出）；LibreOffice（PDF 导出，可选）；
+依赖：python-docx（>=1.2，支持批注）；openpyxl（Excel 导出）；LibreOffice（PDF 导出，可选；
+      亦用于把 .doc/.wps/.rtf 转成 .docx 供原稿做底，缺失时这几类老格式降级并标注）；
       markdown（HTML 导出，可选——缺失时自动降级内置转换器，HTML 照样出）。
 """
 import sys as _sys
@@ -260,7 +266,7 @@ def sanitize(name):
     s = re.sub(r"[\\/:*?\"<>|（）()【】\[\]·、,，]+", "", s)
     return s[:40] or "contract"
 
-REV_SLUGS = ("tracked", "redline")      # 需要「在原稿上改」的两类（1 修订版 / 4 红线版）
+SRC_SLUGS = ("tracked", "reportc", "redline")   # 必须在原稿上做的三类（1 修订版／2 批注版／4 红线版）
 REV_DEGRADED = {}                       # slug → 降级原因；由 DOC_GEN 生成时写入，供 outname 判定
 
 
@@ -271,9 +277,11 @@ def outname(slug, ext="docx"):
     取的是本件是否降级，而非本轮是否降级——同一轮里 1 降级、3 以原稿做底是正常情形。
     """
     tag = ""
-    if slug in REV_SLUGS and REV_DEGRADED.get(slug):
-        # 部分落位（仍是原稿件）标「-降级-部分」，完全重建才标「-降级」
-        tag = "-降级-部分" if REV_FALLBACK.get("hit") else "-降级"
+    if slug in SRC_SLUGS and REV_DEGRADED.get(slug):
+        # 部分落位（仍是原稿件）标「-降级-部分」，完全重建才标「-降级」。
+        # 2 批注版看 COMMENT_FALLBACK：它的「落位」是意见挂上没挂上，与正文改没改不是一回事。
+        _st = COMMENT_FALLBACK if slug == "reportc" else REV_FALLBACK
+        tag = "-降级-部分" if _st.get("hit") else "-降级"
     return f"{SOURCE}_{SLUGS[slug]}{tag}_{REVIEWER}_r{ROUND}_{TS}.{ext}"
 
 def tracked_ins(p, text):
@@ -413,12 +421,18 @@ def set_meta(doc, spec, slug, fallback=""):
                        % (SLUGS.get(slug, slug), REVIEWER, ROUND, TS))
         if fallback:
             # 两种降级不能混为一谈：完全没落到原稿（重建）vs 部分条款没落位（仍是原稿件）
-            if REV_FALLBACK.get("hit"):
-                cp.comments += ("\n⚠ 降级（部分）：本件已在原稿上改，但%s——补全原稿或核对条款标题后可重跑"
-                                % fallback)
+            # 2 批注版的落位与否看 COMMENT_FALLBACK（tracked/redline 用 REV_FALLBACK），
+            # 措辞也随类型变：批注版「没落位」＝这条意见没挂上，不是正文没改。
+            _is_cm = (slug == "reportc")
+            _st = COMMENT_FALLBACK if _is_cm else REV_FALLBACK
+            _act = "批注" if _is_cm else "改"
+            if _st.get("hit"):
+                cp.comments += ("\n⚠ 降级（部分）：本件已在原稿上%s，但%s——补全原稿或核对条款标题后可重跑"
+                                % (_act, fallback))
             else:
-                cp.comments += ("\n⚠ 降级：非原稿修改（原因：%s）——补交可编辑原稿 .docx 后可重跑获得原稿级修改"
-                                % fallback)
+                cp.comments += ("\n⚠ 降级：%s（原因：%s）——补交可编辑原稿 .docx 后可重跑获得%s"
+                                % ("非原稿批注" if _is_cm else "非原稿修改", fallback,
+                                   "原稿就地批注" if _is_cm else "原稿级修改"))
     except Exception:
         pass
     return doc
@@ -450,24 +464,39 @@ def add_delivery_note(doc, runs, slug, spec=None):
         return False
 
 
+def _note_text(c):
+    """一条审查意见的批注正文：2 批注版与 1／4 的条款批注共用同一份措辞（一概念一处）。"""
+    if not (c.get("rating") or c.get("comment") or c.get("basis") or c.get("revised")):
+        return ""
+    return ("【评级】%s\n【风险描述】%s\n【法律依据】%s\n【修改建议】%s"
+            % (c.get("rating") or "—", c.get("comment") or "—",
+               c.get("basis") or "—", c.get("revised") or "—"))
+
+
+def _attach_comment(doc, runs, text):
+    """把批注挂到 runs 上；失败返回 False（由调用方记 miss，不静默吞掉）。"""
+    try:
+        doc.add_comment(runs, text=text, author=REVIEWER or "AI 文档合规审查助手",
+                        initials=(REVIEWER or "AI")[:3])
+        return True
+    except Exception as e:
+        print("[make-docx] 批注挂载失败：%s" % str(e)[:80])
+        return False
+
+
 def add_clause_note(doc, runs, c):
     """条款标题上挂 1 条审查意见批注；无实质意见时不挂。
 
     锚点只能取条款标题：修订版的正文文字都在 w:ins／w:del 里，取不到可锚定的 run。
+    措辞与 2 批注版共用 _note_text（同一份「评级／风险描述／法律依据／修改建议」口径），
+    避免同一条意见在两类交付物里长得不一样。
     """
     if not runs or not can_comment(doc):
         return False
-    if not (c.get("rating") or c.get("comment") or c.get("basis") or c.get("revised")):
+    txt = _note_text(c)
+    if not txt:
         return False
-    txt = ("【%s】%s\n法律依据：%s\n修改建议：%s"
-           % (c.get("rating") or "—", c.get("comment") or "—",
-              c.get("basis") or "—", c.get("revised") or "—"))
-    try:
-        doc.add_comment(runs, text=txt, author=REVIEWER or "AI 文档合规审查助手",
-                        initials=(REVIEWER or "AI")[:3])
-        return True
-    except Exception:
-        return False
+    return _attach_comment(doc, runs, txt)
 
 
 def render_diff_runs(p, o, v, kind):
@@ -623,12 +652,25 @@ def doc_report(spec):
     return doc
 
 def doc_report_comments(spec):
-    """审查意见报告·批注版：正文保持原条款，意见以 Word 批注锚定到对应条款（需 python-docx>=1.2）。"""
+    """2 审查意见批注版：**原稿就地批注**——正文保持原稿一字不改，意见以 Word 批注锚定到对应条款。
+
+    有可读原稿时走 from_source_docx_comment（原稿做底，段落／run 格式／版式全不动）；
+    无原稿、原稿打不开或一条都定位不到时，才回退下面「重建清单」形态——它是**新写文书**，
+    不是原稿，因此必须在文件名（`-降级`）与文档属性两处标注「非原稿批注」。
+    这与 1 修订版同一条硬性要求：**不得脱离原稿凭空重建正文再冒充原稿**。
+    """
+    _sd = from_source_docx_comment(spec)
+    if _sd is not None:
+        return set_meta(_sd, spec, "reportc", fallback=COMMENT_FALLBACK["reason"])
     doc = Document()
-    add_report_title(doc, spec.get("report_title", "文档合规审查意见报告") + "（批注版）")
-    set_meta(doc, spec, "reportc")
+    add_report_title(doc, spec.get("report_title", "文档合规审查意见报告") + "（批注版·非原稿）")
+    set_meta(doc, spec, "reportc",
+             fallback=COMMENT_FALLBACK["reason"] or "未提供可编辑的 .docx 原稿")
     add_disclaimer(doc, spec)
     doc.add_paragraph("源文件：" + title(spec) + "　审查人：" + REVIEWER + "　轮次：r" + ROUND)
+    doc.add_paragraph("⚠ 本件不是原稿：未拿到可编辑原稿（或原稿中一条意见都定位不到），"
+                      "正文为按审查规格重建的清单，仅供阅读；意见未落在使用者上传的那份文件上。"
+                      "补交原稿 .docx 后重跑即可获得原稿就地批注版。")
     _ok_cm = can_comment(doc)   # 注意：局部变量不得叫 can_comment（会遮蔽同名函数）
     if not _ok_cm:
         doc.add_paragraph("提示：当前 python-docx 版本不支持批注（需 >=1.2），已降级为「意见附于条款之后」的呈现方式。")
@@ -641,17 +683,10 @@ def doc_report_comments(spec):
             p = doc.add_paragraph(); p.add_run("原文：").bold = True; p.add_run(c.get("original", ""))
         if c.get("revised"):
             p = doc.add_paragraph(); p.add_run("修改后：").bold = True; p.add_run(c.get("revised", ""))
-        note = (f"【评级】{c.get('rating') or '—'}\n"
-                f"【风险描述】{c.get('comment') or '—'}\n"
-                f"【法律依据】{c.get('basis') or '—'}\n"
-                f"【修改建议】{c.get('revised') or '—'}")
-        if _ok_cm:
-            try:
-                doc.add_comment(h.runs, text=note, author=REVIEWER or "AI 文档合规审查助手",
-                                initials=(REVIEWER or "AI")[:3])
-            except Exception:
-                doc.add_paragraph("批注内容：" + note.replace("\n", " "))
-        else:
+        note = _note_text(c) or "（本条款无实质意见）"
+        if _ok_cm and not _attach_comment(doc, h.runs, note):
+            doc.add_paragraph("批注内容：" + note.replace("\n", " "))
+        elif not _ok_cm:
             doc.add_paragraph("批注内容：" + note.replace("\n", " "))
     return doc
 
@@ -787,7 +822,145 @@ def _original_text(spec):
 # ---------- 半档 C：以原稿 docx 做底 ＋ 段落级替换（排版保真） ----------
 # 只换文字、不增删段落：字体/字号/对齐/缩进/行距/页边距/页眉页脚/表格/图片全部沿用原稿。
 # 适用于"不改段落数、只换文字"的三类：3清洁版 / 6脱敏版 / 7照录版。
-SOURCE_DOCX = ""   # 由 --source-docx 或 spec.source_docx 注入；为空时走 B 档（样式档位重建）
+SOURCE_DOCX = ""   # 预读后**可用**的原稿路径（.doc 已转换）；为空时走 B 档（样式档位重建）
+RAW_SOURCE_DOCX = ""   # 使用者原样给的路径（可能是 .doc/.wps，也可能路径根本不存在）
+
+
+# ---------- 原稿格式预读（docx 直接用 ／ 老格式转换 ／ 转不了降级并说清原因） ----------
+# **为什么按文件头判断而不按扩展名**：使用者交上来的「合同.docx」有相当一部分其实是
+# Word 97-2003 二进制（改过扩展名），也可能是 WPS 的 .wps、或干脆是个加密 zip。按扩展名
+# 放行，失败会发生在 Document(path) 里抛「Package not found」这类内部异常——报出来是
+# python-docx 的锅，与真实原因（这是 .doc，本机没装 LibreOffice）对不上，使用者无从下手。
+# 按文件头判断，才能把话说成「这是 Word 97-2003 格式，转不了」。
+_OLE2_MAGIC = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
+SRC_PROBE = {"raw": "", "path": "", "note": "", "reason": "", "done": False}
+_CONV_TMP = ""          # 转换产物所在临时目录（进程退出时清掉，不在使用者目录留垃圾）
+
+
+def _zip_is_word(path):
+    """zip 包是否为 Word 文档：看包内有没有 word/document.xml。"""
+    try:
+        import zipfile
+        with zipfile.ZipFile(path) as z:
+            if "word/document.xml" in z.namelist():
+                return True
+            ct = z.read("[Content_Types].xml").decode("utf-8", "replace")
+            return "wordprocessingml" in ct
+    except Exception:
+        return False
+
+
+def _file_kind(path):
+    """读文件头判断真实承载：word（OOXML Word）／zip（非 Word 的压缩包）／ole2（97-2003 二进制）／other／missing。"""
+    if not path or not os.path.exists(path):
+        return "missing"
+    try:
+        with open(path, "rb") as f:
+            head = f.read(8)
+    except OSError:
+        return "other"
+    if head[:4] == b"PK\x03\x04":
+        return "word" if _zip_is_word(path) else "zip"
+    if head[:8] == _OLE2_MAGIC:
+        return "ole2"
+    return "other"
+
+
+def _convert_to_docx(path):
+    """LibreOffice 无头模式把 .doc/.wps/.rtf/.odt 转成 .docx；返回 (新路径, 失败原因)。"""
+    global _CONV_TMP
+    import subprocess, tempfile
+    if _cfgmod and not _cfgmod.tool_available(_CFG, "soffice"):
+        return "", "未检测到 LibreOffice"
+    outdir = _CONV_TMP or tempfile.mkdtemp(prefix="dcc-src-")
+    _CONV_TMP = outdir
+    try:
+        os.makedirs(outdir, exist_ok=True)
+    except OSError as e:
+        return "", "临时目录不可写（%s）" % str(e)[:60]
+    target = os.path.join(outdir, os.path.splitext(os.path.basename(path))[0] + ".docx")
+    # 先删旧件：同名残留会让「本次转换失败」被上一次的产物冒充成成功
+    try:
+        if os.path.exists(target):
+            os.remove(target)
+    except OSError:
+        pass
+    cmd = [SOFFICE, "-env:UserInstallation=file://" + os.path.join(outdir, "lo-profile"),
+           "--headless", "--convert-to", "docx", "--outdir", outdir, path]
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8",
+                           errors="replace", timeout=PDF_TIMEOUT)
+    except Exception as e:
+        return "", "转换进程失败（%s）" % str(e)[:60]
+    if os.path.exists(target) and os.path.getsize(target) > 0:
+        return target, ""
+    tail = ((r.stderr or "") + (r.stdout or "")).strip().replace("\n", " ")[:80]
+    return "", "LibreOffice 未产出 .docx（返回码 %s%s）" % (r.returncode, "：" + tail if tail else "")
+
+
+def prepare_source(path):
+    """原稿格式预读：按文件头定格式 → .docx 直接用／老格式转 .docx／不行给出人话原因。
+
+    返回可用 `.docx` 路径（不可用返回空串）；过程与原因记在 SRC_PROBE，供各处降级标注引用。
+    **同一路径只做一次**：转一次 Word 要几秒，六类交付物各转一遍纯属浪费。
+    """
+    path = (path or "").strip().strip('"')
+    if SRC_PROBE["done"] and SRC_PROBE["raw"] == path:
+        return SRC_PROBE["path"]
+    SRC_PROBE.update({"raw": path, "path": "", "note": "", "reason": "", "done": True})
+    if not path:
+        SRC_PROBE["reason"] = "未提供原稿文件"
+        return ""
+    ext = os.path.splitext(path)[1].lower()
+    kind = _file_kind(path)
+    if kind == "missing":
+        SRC_PROBE["reason"] = "原稿路径不存在：%s" % path
+        return ""
+    if kind == "word":
+        SRC_PROBE["path"] = path
+        if ext not in ("", ".docx"):
+            SRC_PROBE["note"] = ("文件头判定为 Word 文档（扩展名是 %s、实际是 .docx），已按 .docx 使用"
+                                 % ext)
+        return path
+    if kind == "zip":
+        SRC_PROBE["reason"] = ("文件是压缩包但不是 Word 文档（可能是 .xlsx/.pptx、加密包，"
+                               "或扩展名标错）")
+        return ""
+    if kind == "ole2":
+        conv, why = _convert_to_docx(path)
+        if conv:
+            SRC_PROBE["path"] = conv
+            SRC_PROBE["note"] = ("原稿是 Word 97-2003 二进制格式（%s），已用 LibreOffice 转成 .docx 做底"
+                                 "——转换只换容器不改文字，表格/图片/页眉页脚一并带来；"
+                                 "若版式异常复杂，建议使用者另存为 .docx 后重跑" % (ext or ".doc"))
+            return conv
+        SRC_PROBE["reason"] = ("原稿是 Word 97-2003 二进制格式（%s），本机转不成 .docx：%s"
+                               % (ext or ".doc", why))
+        return ""
+    SRC_PROBE["reason"] = "无法识别的文件格式（既不是 .docx 也不是 .doc）%s" % (("：" + ext) if ext else "")
+    return ""
+
+
+def _ensure_src(spec=None):
+    """取已预读的原稿路径；尚未预读时按 SOURCE_DOCX → spec.source_docx 顺序补做一次。"""
+    if SRC_PROBE["done"]:
+        return SRC_PROBE["path"]
+    return prepare_source(SOURCE_DOCX or ((spec or {}).get("source_docx") or ""))
+
+
+def _cleanup_conv():
+    """清掉转换用临时目录（只在进程内转过东西时才有）；失败无关紧要。"""
+    if not _CONV_TMP:
+        return
+    try:
+        import shutil
+        shutil.rmtree(_CONV_TMP, ignore_errors=True)
+    except Exception:
+        pass
+
+
+import atexit as _atexit
+_atexit.register(_cleanup_conv)
 
 
 def _has_drawing(run):
@@ -833,9 +1006,12 @@ def _source_lines(spec, kind):
 
 
 def from_source_docx(spec, kind):
-    """以原稿 docx 为底产出三类交付物；不可用（无原稿/非 docx/打开失败）时返回 None 走 B 档。"""
-    path = SOURCE_DOCX or (spec.get("source_docx") or "")
-    if not path or not str(path).lower().endswith(".docx") or not os.path.exists(path):
+    """以原稿 docx 为底产出三类交付物；不可用（无原稿/打不开）时返回 None 走 B 档。
+
+    原稿格式由 prepare_source 预读：.docx 直接用，Word 97-2003 先转 .docx 再做底。
+    """
+    path = _ensure_src(spec)
+    if not path:
         return None
     try:
         doc = Document(path)
@@ -1125,12 +1301,13 @@ def from_source_docx_rev(spec, kind):
     """原稿级修订：以原稿 docx 为底，把 clauses 的修订注入为痕迹。
 
     kind=tracked（1 修订版）／redline（4 红线版）。
+    原稿格式由 prepare_source 预读（.doc 会先转 .docx）。
     成功返回 doc；返回 None 表示降级（原因已写入 REV_FALLBACK["reason"]）。
     """
-    path = SOURCE_DOCX or (spec.get("source_docx") or "")
+    path = _ensure_src(spec)
     REV_FALLBACK.update({"reason": "", "hit": 0, "miss": 0})
-    if not path or not str(path).lower().endswith(".docx") or not os.path.exists(path):
-        REV_FALLBACK["reason"] = "未提供可编辑的 .docx 原稿"
+    if not path:
+        REV_FALLBACK["reason"] = SRC_PROBE["reason"] or "未提供可编辑的 .docx 原稿"
         return None
     try:
         doc = Document(path)
@@ -1195,6 +1372,78 @@ def from_source_docx_rev(spec, kind):
         return None
     print("[make-docx] 原稿级修订：以原稿做底注入 %d 处%s痕迹（%s）"
           % (hit, "修订" if kind == "tracked" else "红线", os.path.basename(path)))
+    return doc
+
+
+# ---------- 半档 C·批注：以原稿做底挂批注（2 审查意见批注版） ----------
+# 与「原稿级修订」同一套定位逻辑，区别只在**不写痕迹**：段落文字、run 格式、版式一律不动，
+# 只把 note 绑到定位段落的 run 上。**不做 run 合并**——合并会重写原稿的 run 切分（同一处
+# 文字被拆成多个 run 往往是因为局部加粗/下划线），批注版正文必须与原稿逐段一致，格式也不例外。
+COMMENT_FALLBACK = {"reason": "", "hit": 0, "miss": 0}   # 供主流程读取并在两处标注降级
+
+
+def from_source_docx_comment(spec):
+    """2 批注版·原稿就地批注：以原稿为底，**正文一字不改**，每条意见挂成 Word 批注。
+
+    成功返回 doc（原稿件，段落序列与原稿完全一致）；返回 None 表示降级，原因写入
+    COMMENT_FALLBACK["reason"]，调用方回退「重建清单」形态并显式标注「非原稿批注」。
+
+    定位**不前进 cursor**：clauses 常按风险高低排序、而非原稿顺序，前进式定位会漏掉
+    排在前面的条款；批注多条挂同一段只影响观感，漏挂则等于意见没提。
+    """
+    COMMENT_FALLBACK.update({"reason": "", "hit": 0, "miss": 0})
+    path = _ensure_src(spec)
+    if not path:
+        COMMENT_FALLBACK["reason"] = SRC_PROBE["reason"] or "未提供可编辑的 .docx 原稿"
+        return None
+    cs = clauses(spec)
+    if not cs:
+        COMMENT_FALLBACK["reason"] = "审查规格缺条款（clauses），无法定位批注位置"
+        return None
+    try:
+        doc = Document(path)
+    except Exception as e:
+        COMMENT_FALLBACK["reason"] = "原稿打开失败（%s）" % str(e)[:60]
+        print("[make-docx] 原稿就地批注回退：%s" % COMMENT_FALLBACK["reason"])
+        return None
+    if not can_comment(doc):
+        COMMENT_FALLBACK["reason"] = "当前 python-docx 不支持批注（需 >=1.2）"
+        return None
+
+    paras = _rev_all_paras(doc)
+    hit, miss = 0, []
+    for c in cs:
+        txt = _note_text(c)
+        if not txt:
+            continue                        # 无实质意见，原稿不动（与 1／4 同一口径）
+        idx, mode = _rev_locate(paras, c, 0)
+        if idx < 0:
+            miss.append(c.get("heading") or (c.get("original") or "")[:16] or "（无标题条款）")
+            continue
+        p = paras[idx]
+        runs = [r for r in p.runs if (r.text or "").strip()] or list(p.runs)
+        if not runs:
+            miss.append(c.get("heading") or (c.get("original") or "")[:16] or "（空段落）")
+            continue
+        if _attach_comment(doc, runs, txt):
+            hit += 1
+        else:
+            miss.append(c.get("heading") or (c.get("original") or "")[:16])
+    COMMENT_FALLBACK["hit"], COMMENT_FALLBACK["miss"] = hit, len(miss)
+    if hit == 0:
+        # 一条都没挂上就不叫「部分」：说成部分会让日志读起来像「大部分已挂上」，
+        # 而实际交付的是重建件。此处直说回退，原因带上没对上的条款名。
+        _names = "、".join(miss[:3])
+        COMMENT_FALLBACK["reason"] = ("原稿中未能定位任何待批注条款%s"
+                                      % (("（%s）" % _names) if _names else ""))
+        print("[make-docx] 原稿就地批注回退：%s" % COMMENT_FALLBACK["reason"])
+        return None
+    if miss:
+        COMMENT_FALLBACK["reason"] = ("%d 条意见无法在原稿中定位对应段落（%s），该部分未挂上"
+                                      % (len(miss), "、".join(miss[:3])))
+        print("[make-docx] 原稿就地批注（部分）：%s" % COMMENT_FALLBACK["reason"])
+    print("[make-docx] 原稿就地批注：以原稿做底挂 %d 条批注、正文一字未改（%s）"
+          % (hit, os.path.basename(path)))
     return doc
 
 
@@ -1861,7 +2110,7 @@ def html_page(slug, spec, body):
 
 
 def main():
-    global REVIEWER, ROUND, TS, SOURCE, SOURCE_DOCX
+    global REVIEWER, ROUND, TS, SOURCE, SOURCE_DOCX, RAW_SOURCE_DOCX
     ap = argparse.ArgumentParser(description="文档合规审查交付物产出（10 类型，审查人必填；类型以勾选框多选、一次全部显示供用户勾选）")
     ap.add_argument("spec")
     ap.add_argument("--out", default=None, help="输出目录（默认 D:\\文档合规审查报告\\输出）")
@@ -1879,9 +2128,11 @@ def main():
     ap.add_argument("--style", default=None,
                     help="排版样式档位：default（不改动）/contract（合同风，默认）/official（公文风）；亦可写 spec.style 或 config.json 的 render.style；只对 1、3、4、6、7 五类生效")
     ap.add_argument("--source-docx", default=None,
-                    help="半档C 排版保真：原稿 .docx 路径。指定后 1修订版/4红线版 在原稿 run 之间插修订痕迹、"
-                         "3清洁版/6脱敏版/7照录版 只替换段落文字（均保留字体/对齐/缩进/页边距/页眉页脚/表格），"
-                         "不可用或条款定位不到则自动回退样式档位并按降级口径标注")
+                    help="半档C 排版保真：原稿路径。指定后 1修订版/4红线版 在原稿 run 之间插修订痕迹、"
+                         "2批注版 只在原稿上挂批注（正文一字不改）、3清洁版/6脱敏版/7照录版 只替换段落文字"
+                         "（均保留字体/对齐/缩进/页边距/页眉页脚/表格）。**按文件头预读真实格式**："
+                         ".docx 直接用；Word 97-2003 二进制（.doc 或改过扩展名的）自动用 LibreOffice 转 .docx；"
+                         "转不了或条款定位不到则回退并按降级口径标注（文件名＋文档属性两处）")
     ap.add_argument("--cmp-a", default=None, help="文件比对报告：旧版文本文件（.txt/.md；亦可用 spec.compare.a_text）")
     ap.add_argument("--cmp-b", default=None, help="文件比对报告：新版文本文件（.txt/.md；亦可用 spec.compare.b_text）")
     a = ap.parse_args()
@@ -1918,10 +2169,15 @@ def main():
         TS = datetime.datetime.now().strftime("%Y%m%d-%H%M")
         print("[make-docx] 提示：未提供 --ts，时间戳取本机时钟（可能不准确）；建议由 AI 传入准确时间 --ts YYYYMMDD-HHMM。")
     SOURCE = sanitize(spec.get("source") or spec.get("name") or "contract")
-    SOURCE_DOCX = (a.source_docx or spec.get("source_docx") or "")
-    if SOURCE_DOCX and not os.path.exists(SOURCE_DOCX):
-        print("[make-docx] 提示：--source-docx 路径不存在，1、3、4、6、7 回退样式档位：%s" % SOURCE_DOCX)
-        SOURCE_DOCX = ""
+    # 原稿格式预读：.docx 直接用，Word 97-2003 转 .docx，转不了就说清为什么——
+    # 这一步在**取类型之前**做，六类交付物共用同一次预读结果（否则 .doc 会被转六遍）。
+    RAW_SOURCE_DOCX = (a.source_docx or spec.get("source_docx") or "")
+    SOURCE_DOCX = prepare_source(RAW_SOURCE_DOCX)
+    if RAW_SOURCE_DOCX and not SOURCE_DOCX:
+        print("[make-docx] 提示：原稿不可用，1、2、3、4、6、7 回退（降级件会标注）：%s"
+              % SRC_PROBE["reason"])
+    elif SRC_PROBE["note"]:
+        print("[make-docx] 原稿预读：%s" % SRC_PROBE["note"])
     set_style(a.style or spec.get("style")
               or (_cfgmod.render_opt(_CFG, "style") if _cfgmod else None) or "contract")
     if STYLE != "default":
@@ -1972,8 +2228,9 @@ def main():
         if "docx" in fmts:
             # 先产对象再取名：1、4 是否降级只有生成完才知道（降级件名里要带「-降级」标记）
             docobj = DOC_GEN[t](spec)
-            if t in REV_SLUGS:
-                REV_DEGRADED[t] = REV_FALLBACK.get("reason") or ""
+            if t in SRC_SLUGS:
+                REV_DEGRADED[t] = (COMMENT_FALLBACK if t == "reportc"
+                                   else REV_FALLBACK).get("reason") or ""
             name = outname(t, "docx"); p = os.path.join(a.out, name)
             docobj.save(p); made.append(name); docx_paths.append(p)
         if "md" in fmts and t in MD_GEN:

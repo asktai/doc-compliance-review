@@ -882,6 +882,34 @@ def check_security():
     _check_no_bytecode()
 
 
+def bytecode_leaks():
+    """返回「未在首个业务 import 之前关闭字节码写入」的脚本名（空表＝合规）。
+
+    **判据只有这一份**：门禁与冒烟都调它。此前冒烟里另抄了一份同样的 `src[:4000]` 查法，
+    两处各写一遍必然分家——本文件 docstring 一加长就出现过「门禁误报漏写、冒烟也误报」，
+    而它们本来就是同一条判据的两个副本。
+
+    为什么按「首个业务 import 之前」定位而不按固定字数：开关只有写在**任何 import 之前**
+    才管用，与文件头多长无关；取固定字数只是一种近似，文档一长就把开关挤出窗口，
+    报出来是「明明写了却判漏写」——量的位置不对，结论就与事实相反。
+    """
+    bad = []
+    for p in _script_files():
+        if not p.endswith(".py") or os.path.basename(p) == "_config.py":
+            continue   # _config.py 自身就是这个开关的实现方，也是被 import 的第一站
+        lines = _read(p).splitlines()
+        stop = len(lines)
+        for i, ln in enumerate(lines):
+            _s = ln.strip()
+            if _s.startswith(("import ", "from ")) and _s not in ("import sys", "import sys as _sys"):
+                stop = i
+                break
+        head = "\n".join(lines[:stop])
+        if "_sys.dont_write_bytecode" not in head and "sys.dont_write_bytecode" not in head:
+            bad.append(os.path.basename(p))
+    return bad
+
+
 def _check_no_bytecode():
     """每个脚本都必须在 import 之前关掉字节码写入——文档承诺「脚本禁止生成 __pycache__」。
 
@@ -890,14 +918,7 @@ def _check_no_bytecode():
     实测漏写是静默的——CLI 直跑不报错，只有被 import 时才留痕，肉眼看不出来。
     这既是「无缓存留痕」的技术措施，也影响 `pack.py` 出包的确定性（包里会混进 .pyc）。
     """
-    bad = []
-    for p in _script_files():
-        if not p.endswith(".py") or os.path.basename(p) == "_config.py":
-            continue   # _config.py 自身就是这个开关的实现方，也是被 import 的第一站
-        src = _read(p)
-        head = src[:4000]            # 只看文件头，开关必须在真正的业务 import 之前
-        if "_sys.dont_write_bytecode" not in head and "sys.dont_write_bytecode" not in head:
-            bad.append(os.path.basename(p))
+    bad = bytecode_leaks()
     if bad:
         err("以下脚本未在文件头关闭字节码写入（被 import 时会在技能目录留下 __pycache__）："
             "%s；应在首个 import 前加 `import sys as _sys` ＋ `_sys.dont_write_bytecode = True`"

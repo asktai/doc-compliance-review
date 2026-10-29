@@ -1045,6 +1045,127 @@ def main():
     except Exception as e:
         check("原稿级修订自检", False, repr(e))
 
+    # --- 3.z2 原稿就地批注（2 批注版：正文＝原稿、意见挂在原稿段落上）---
+    # 这一组是 D-2 的回归守卫：v3.26.6 及以前 type 2 根本不读 --source-docx，
+    # 交出的是「新建清单 ＋ 批注挂在清单标题上」，与 1 修订版行为不一致却看不出来。
+    # 判据取**段落序列逐段相等**——只要它偷懒重建，段落数与文字必然不同，一眼红。
+    print("\n[3.z2] 原稿就地批注（2 审查意见批注版）")
+    _NC = ["批注版：以 --source-docx 为底（段落序列与原稿逐段相等）",
+           "批注版：意见挂到原稿对应段落",
+           "批注版：批注者＝审查人、条数＝实质意见数",
+           "批注版：无原稿时回退并标注非原稿",
+           "批注版：部分定位不到标 -降级-部分 且仍是原稿",
+           "批注版：.doc 老格式先转 .docx 再做底"]
+    try:
+        import docx as _dxn
+        from docx.oxml.ns import qn as _qn2
+        _sd = os.path.join(sdir, "合同比对A版.docx")
+        if not os.path.exists(_sd):
+            for _n in _NC:
+                skip(_n, "无 A 版样本（自检样本缺失）")
+        else:
+            _src = _dxn.Document(_sd)
+            _ptx = [p.text for p in _src.paragraphs]
+
+            def _cl(i):
+                """取第 i 段切出「标题＋正文」当一条审查意见（原文＝该段冒号后的整段）。"""
+                head, _, body = _ptx[i].partition("：")
+                return {"heading": head + "：", "original": body,
+                        "revised": body + "（自检改写）", "rating": "★★",
+                        "comment": "自检用", "basis": "自检用"}
+
+            _si = [i for i, t in enumerate(_ptx) if t.startswith("第五条")][0]
+            _cs = [_cl(_si), _cl(_si + 1)]
+            _csp = os.path.join(work, "cmt-spec.json")
+            with open(_csp, "w", encoding="utf-8") as f:
+                json.dump({"name": "批注版自检", "source": "合同比对A版", "clauses": _cs},
+                          f, ensure_ascii=False)
+
+            def _run_cmt(spec_path, outdir, src=None, types="reportc"):
+                cmd = [PY, os.path.join(HERE, "make-docx.py"), spec_path,
+                       "--reviewer", "SMOKE-TEST", "--types", types,
+                       "--out", outdir, "--ts", "20260101-0000"]
+                if src:
+                    cmd += ["--source-docx", src]
+                run(cmd)
+                fs = [x for x in os.listdir(outdir) if x.endswith(".docx")] if os.path.isdir(outdir) else []
+                return fs
+
+            _cout = os.path.join(work, "原稿批注")
+            _fs = _run_cmt(_csp, _cout, _sd)
+            if not _fs:
+                for _n in _NC:
+                    check(_n, False, "未见批注版产出")
+            else:
+                _f = _fs[0]
+                _od = _dxn.Document(os.path.join(_cout, _f))
+                _otx = [p.text for p in _od.paragraphs]
+                check(_NC[0], _otx == _ptx,
+                      "%d 段 vs 原稿 %d 段%s" % (len(_otx), len(_ptx),
+                                                "" if _otx == _ptx else "（首处不同：%s ↔ %s）"
+                                                % (next((a for a, b in zip(_otx, _ptx) if a != b), "")[:18],
+                                                   next((b for a, b in zip(_otx, _ptx) if a != b), "")[:18])))
+                # 批注锚点：必须落在原稿对应那一段上（不是新加的清单标题）
+                _anch = [i for i, p in enumerate(_od.paragraphs)
+                         if p._p.findall(".//" + _qn2("w:commentRangeStart"))]
+                check(_NC[1], _anch == [_si, _si + 1],
+                      "锚点段落 %s（应为 %s）" % (_anch, [_si, _si + 1]))
+                import zipfile as _zfn
+                with _zfn.ZipFile(os.path.join(_cout, _f)) as _z:
+                    _cxml = (_z.read("word/comments.xml").decode("utf-8")
+                             if "word/comments.xml" in _z.namelist() else "")
+                _auth = set(re.findall(r'<w:comment [^>]*w:author="([^"]*)"', _cxml))
+                check(_NC[2], len(re.findall(r"<w:comment ", _cxml)) == 2 and _auth == {"SMOKE-TEST"},
+                      "%d 条，作者 %s" % (len(re.findall(r"<w:comment ", _cxml)), _auth))
+
+                # 负向 1：不给原稿 → 必须回退「重建清单」并在文件名与正文同时标注，不得静默
+                _dg = os.path.join(work, "批注无原稿")
+                _df = _run_cmt(_csp, _dg)
+                _dtx = "".join(p.text for p in _dxn.Document(os.path.join(_dg, _df[0])).paragraphs) if _df else ""
+                check(_NC[3], bool(_df) and "降级" in _df[0] and "非原稿" in _dtx,
+                      "%s｜正文标注=%s" % (_df[0] if _df else "无产出", "非原稿" in _dtx))
+
+                # 负向 2：部分条款对不上 → 仍是原稿件，标「-降级-部分」，正文不作重建
+                _psp = os.path.join(work, "cmt-part.json")
+                with open(_psp, "w", encoding="utf-8") as f:
+                    json.dump({"name": "批注版部分", "source": "合同比对A版",
+                               "clauses": _cs + [{"heading": "第九十九条 原稿没有这一段",
+                                                  "original": "原稿中并不存在这段文字",
+                                                  "revised": "改后", "comment": "自检"}]},
+                              f, ensure_ascii=False)
+                _po = os.path.join(work, "批注部分落位")
+                _pf = _run_cmt(_psp, _po, _sd)
+                _ptx2 = ([p.text for p in _dxn.Document(os.path.join(_po, _pf[0])).paragraphs]
+                         if _pf else [])
+                check(_NC[4], bool(_pf) and "-降级-部分" in _pf[0] and _ptx2 == _ptx,
+                      "%s｜段落序列仍等于原稿=%s" % (_pf[0] if _pf else "无产出", _ptx2 == _ptx))
+
+                # 正路 2：.doc 老格式——预读按文件头识别、转 .docx 后再做底
+                _soc = shutil.which("soffice") or shutil.which("libreoffice")
+                if not _soc:
+                    skip(_NC[5], "本机无 LibreOffice：.doc 转换路径未验（缺它时技能降级并标注）")
+                else:
+                    _dd = os.path.join(work, "doc样本")
+                    os.makedirs(_dd, exist_ok=True)
+                    try:
+                        run([_soc, "-env:UserInstallation=file://" + os.path.join(_dd, "lo-profile"),
+                             "--headless", "--convert-to", "doc:MS Word 97", "--outdir", _dd, _sd],
+                            timeout=300)
+                    except Exception:
+                        pass
+                    _docf = os.path.join(_dd, os.path.splitext(os.path.basename(_sd))[0] + ".doc")
+                    if not os.path.exists(_docf):
+                        skip(_NC[5], "LibreOffice 未产出 .doc 样本，转换路径未验")
+                    else:
+                        _do = os.path.join(work, "批注-doc源")
+                        _dff = _run_cmt(_csp, _do, _docf)
+                        _dtx2 = ([p.text for p in _dxn.Document(os.path.join(_do, _dff[0])).paragraphs]
+                                 if _dff else [])
+                        check(_NC[5], _dtx2 == _ptx,
+                              "%s｜段落序列与原稿一致=%s" % (_dff[0] if _dff else "无产出", _dtx2 == _ptx))
+    except Exception as _e:
+        check("原稿就地批注自检", False, repr(_e))
+
     # --- 3.4 法条核验（legal-verify.py ＋ core/legal-articles.json）---
     print("\n[3.4] 法条核验（离线原文库比对）")
     try:
@@ -2202,14 +2323,10 @@ def main():
                   not _badst, "实测 %s" % _badst)
         except Exception as e:
             check("安全机制：登记表可加载（SEC_MATRIX 在位）", False, repr(e))
-        # 每个脚本都在 import 前关掉字节码写入（否则被 import 时在技能目录留 .pyc）
-        leak = []
-        for fn in sorted(os.listdir(HERE)):
-            if not fn.endswith(".py") or fn == "_config.py":
-                continue
-            head = open(os.path.join(HERE, fn), encoding="utf-8").read()[:4000]
-            if "dont_write_bytecode" not in head:
-                leak.append(fn)
+        # 每个脚本都在 import 前关掉字节码写入（否则被 import 时在技能目录留 .pyc）。
+        # **判据取自 check.py 的 bytecode_leaks()，不在本文件另抄一份**：抄一份就是两个副本，
+        # 实测过——本是同一条判据，一边改了另一边没改，两边各报各的"漏写"。
+        leak = _m.bytecode_leaks()
         check("缓存防护：每个脚本在 import 前关闭字节码写入", not leak,
               "漏写: %s" % ", ".join(leak))
 
