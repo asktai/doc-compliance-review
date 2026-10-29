@@ -156,7 +156,12 @@ def build_spec(path):
 
 
 def run(cmd, timeout=600):
-    return subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="ignore", timeout=timeout)
+    # errors="replace"（**不是 ignore**）：被 spawn 的脚本都已自钉 stdout 为 UTF-8，正常不会有
+    # 非法字节；万一真有（子脚本崩在写一半、第三方工具吐 GBK），**ignore 会把字符静默吞掉**，
+    # 断言表现为"匹配不上"，而输出里连替换符都没有，`_garbled_hint` 之类的编码诊断也就无从触发
+    # ——正好落回 12.5.9 说的"报错指错方向"（会被当成判据被删／脚本崩了）。replace 让字节显形。
+    return subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8",
+                          errors="replace", timeout=timeout)
 
 
 def head_lines(text, budget=200, max_lines=3):
