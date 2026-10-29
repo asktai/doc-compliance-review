@@ -208,6 +208,63 @@ def verify_source_manifest(base):
     return []
 
 
+INTEGRITY_REL = os.path.join("scripts", ".integrity.json")
+
+
+def verify_integrity_fresh(base):
+    """出包前断言：**源侧脚本指纹台账与源侧脚本逐条自洽**，否则拒包（v3.26.3）。
+
+    为什么要在出包口守（这是 v3.26.2 漏掉的一环）：指纹台账 `scripts/.integrity.json`
+    会**随包分发**，使用者装完后 `check.py --verify` 就拿它比对脚本。而"重建生成物"
+    这一步（publish.py 的 refresh）只发生在**运行实例**侧，**出包源是开发侧**——两棵
+    不同的树。开发侧台账一旦陈旧（改完脚本忘了 `--sign`），陈旧台账就原样打进包：
+    包内 check.py 报一条"脚本已被修改"的警告，**退出码仍是 0**，产物验收于是照样打钩
+    （假绿）。v3.26.2 的包就是这么出去的：包里 29 个脚本，台账里 smoke-test.py 一行
+    是旧哈希——包能用，但每个装它的人都会先看到一条来路不明的警告。
+
+    为什么拒包而不是自动重签：台账是"作者声明这份包里的脚本是什么"的凭据。自动重签
+    会把任何改动（含误改、误删）一律合法化，等于取消这条防线（12.5.4 防假绿）。
+    改了脚本就显式跑一次 `check.py --sign`，让"我认可这一版"成为一次动作。
+
+    返回错误列表（空＝通过）。
+    """
+    ip = os.path.join(base, INTEGRITY_REL)
+    if not os.path.exists(ip):
+        return ["源缺 %s——它随包分发，使用者靠它验脚本没被改（先跑 check.py --sign）"
+                % INTEGRITY_REL]
+    try:
+        with open(ip, encoding="utf-8") as f:
+            rec = json.load(f)
+    except Exception as e:
+        return ["源 %s 无法解析：%s" % (INTEGRITY_REL, e)]
+    want = (rec or {}).get("sha256")
+    if not isinstance(want, dict) or not want:
+        return ["源 %s 缺 sha256 表（先跑 check.py --sign）" % INTEGRITY_REL]
+    sdir = os.path.join(base, "scripts")
+    stale, missing, unlisted = [], [], []
+    for name in sorted(want):
+        fp = os.path.join(sdir, name)
+        if not os.path.exists(fp):
+            missing.append(name)
+            continue
+        got = hashlib.sha256(open(fp, "rb").read()).hexdigest()
+        if got != want[name]:
+            stale.append(name)
+    for name in sorted(os.listdir(sdir)):
+        if name.endswith(".py") and name != "check.py" and name not in want:
+            unlisted.append(name)
+    errs = []
+    if stale:
+        errs.append("源侧台账陈旧：%s 的哈希与文件不符（改完脚本要跑 check.py --sign；"
+                    "陈旧台账会随包发出，装包的人会先看到一条指纹警告）" % "、".join(stale))
+    if missing:
+        errs.append("源侧台账记着但文件已不在：%s（删脚本也要 --sign 重签）"
+                    % "、".join(missing))
+    if unlisted:
+        errs.append("源侧有脚本未入台账：%s（新增脚本要 --sign 重签）" % "、".join(unlisted))
+    return errs
+
+
 def _zip_write(zf, fp, arc, blank_tools=False, strip_history=False, report=None):
     """把单个文件写入 zip，**条目时间戳固定**，保证可复现构建。
 
@@ -595,6 +652,21 @@ def build(base, outdir, include_private=False, tag=None, keep_tools=False, fmt="
             print("  [FAIL] " + b)
         print("  [x] 源侧版本清单未通过，已中止出包"
               "（在源 version.json 里补回 history 后重跑；包内仍会自动剥离，不必手删）。")
+        for _ext in set(FMT_EXT.values()):
+            _stale = os.path.join(outdir, "%s.%s" % (stem, _ext))
+            if os.path.exists(_stale):
+                os.remove(_stale)
+                print("  [i] 已删除上次残留的 %s（避免误当成新产物）"
+                      % os.path.basename(_stale))
+        return False
+    # 源侧指纹台账自洽断言（v3.26.3）：陈旧台账会随包发出，装包的人先看到一条指纹警告
+    _int_bad = verify_integrity_fresh(base)
+    if _int_bad:
+        for b in _int_bad:
+            print("  [FAIL] " + b)
+        print("  [x] 源侧脚本指纹台账与脚本不自洽，已中止出包"
+              "（在出包源上跑一次 `python scripts/check.py --sign` 后重跑；"
+              "**不要把它改成自动重签**——自动签会把误改一律合法化）。")
         for _ext in set(FMT_EXT.values()):
             _stale = os.path.join(outdir, "%s.%s" % (stem, _ext))
             if os.path.exists(_stale):

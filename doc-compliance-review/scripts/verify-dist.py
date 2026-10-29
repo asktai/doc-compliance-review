@@ -211,6 +211,14 @@ def verify_artifact(path, gate=True, gbk=True, quiet=False):
                 if r.returncode != 0:
                     bad("［%s］解包后跑 check.py 未通过（退出码 %d）：%s"
                         % (label, r.returncode, tail[0][:300]))
+                # **警告也要拦**：check.py 的「警告 N 项」多为指纹不一致、口径漂移这类
+                # 「结构没坏但产物不干净」的问题，退出码仍是 0。只看退出码＝判据漏一半
+                # （12.5.4 假绿的典型形态：信号在，但没读）。
+                mw = re.search(r"警告\s*(\d+)\s*项", out)
+                if mw and int(mw.group(1)) > 0:
+                    warns = [ln.strip() for ln in out.splitlines() if ln.startswith("[W]")]
+                    bad("［%s］解包后跑 check.py 有 %s 项警告（退出码 0 不代表干净）：%s"
+                        % (label, mw.group(1), "；".join(warns[:3])[:300] or "（见完整输出）"))
                 if "\ufffd" in out:
                     bad("［%s］check.py 输出含替换符 U+FFFD——编码链断裂（先修编码，别急着查判据）"
                         % label)

@@ -3,22 +3,40 @@
   "product": "文档合规审查助手AI合同",
   "skill_id": "doc-compliance-review",
   "latest": {
-    "version": "v3.26.2",
+    "version": "v3.26.3",
     "date": "2026-10-29",
-    "summary": "产物验收：出包即解包跑门禁，补上「只验源、不验交付物」的盲区",
+    "summary": "出包口补一道「台账自洽」硬拒：陈旧指纹不再随包发出",
     "changes": [
-      "新增产物验收关卡（pack.py 出包末尾强制）：把刚打好的包解开，在**解出来的副本**上跑 check.py（UTF-8 与 GBK 双环境），不过即删包并退非零；此前发布链只验开发源与运行实例，两者都是「自家的地盘」，产物只是被假定与源一致",
-      "新增 scripts/verify-dist.py：使用者拿到包也能自验——头部与负载指纹自洽、顶层与层级体积合平台上限、沿革不随包（无 VERSION.md／无 history／带分发副本标记）、作者本机工具路径已清空、版本三处（包名／SKILL.md／version.json）自洽、解包后门禁与入口脚本可跑；带 --selftest 变异注入自测（七类注入逐项命中、对照组零误报）",
-      "修「装好的副本跑门禁必红」的根因回归：分包副本（无 history／无 VERSION.md／带标记）跑 check.py 须 0 错，反向塞回沿革须报错；此缺陷此前只在装机后暴露，产物验收缺失是它连存四个版本仍无人知的直接原因",
-      "同步脚本数 29（L0 24）；门禁 0 错 0 警，全量冒烟全绿"
+      "新增出包前断言：源侧脚本指纹台账须与源侧脚本**逐条自洽**，不一致即拒包并删残留产物——陈旧台账会原样打进包，装包的人跑自检时先看到一条「脚本已被修改」的警告，而退出码仍是 0（上一版就带着这样一条警告出去了）",
+      "**拒包而不是自动重签**：台账是「作者声明这份包里的脚本是什么」的凭据，自动重签会把误改、误删一律合法化，等于取消这条防线；改了脚本就显式跑一次签名，让「我认可这一版」成为一次动作",
+      "产物验收加固：解包后跑自检**有警告即判不通过**（此前只看退出码，退出码 0 但有警告照样打钩——信号在，只是没读）",
+      "修「生成物刷新点与出包源不是同一棵树」：指纹台账随包分发，而重建只做在运行实例侧、出包源是开发侧，两侧从此各刷一次",
+      "冒烟新增台账自洽的正、反向两项（改了脚本不重签必须拒包）；全量项数同步"
     ],
     "download_page": "https://github.com/asktai/doc-compliance-review/releases",
     "files": {
-      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.26.2/文档合规审查助手AI合同_v3.26.2_20261029_(doc-compliance-review).skill",
-      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.26.2/文档合规审查助手AI合同_v3.26.2_20261029_(doc-compliance-review).zip"
+      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.26.3/文档合规审查助手AI合同_v3.26.3_20261029_(doc-compliance-review).skill",
+      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.26.3/文档合规审查助手AI合同_v3.26.3_20261029_(doc-compliance-review).zip"
     }
   },
   "history": [
+    {
+      "version": "v3.26.3",
+      "date": "2026-10-29",
+      "summary": "出包口补一道「台账自洽」硬拒：陈旧指纹不再随包发出",
+      "changes": [
+        "新增出包前断言：源侧脚本指纹台账须与源侧脚本**逐条自洽**，不一致即拒包并删残留产物——陈旧台账会原样打进包，装包的人跑自检时先看到一条「脚本已被修改」的警告，而退出码仍是 0（上一版就带着这样一条警告出去了）",
+        "**拒包而不是自动重签**：台账是「作者声明这份包里的脚本是什么」的凭据，自动重签会把误改、误删一律合法化，等于取消这条防线；改了脚本就显式跑一次签名，让「我认可这一版」成为一次动作",
+        "产物验收加固：解包后跑自检**有警告即判不通过**（此前只看退出码，退出码 0 但有警告照样打钩——信号在，只是没读）",
+        "修「生成物刷新点与出包源不是同一棵树」：指纹台账随包分发，而重建只做在运行实例侧、出包源是开发侧，两侧从此各刷一次",
+        "冒烟新增台账自洽的正、反向两项（改了脚本不重签必须拒包）；全量项数同步"
+      ],
+      "download_page": "https://github.com/asktai/doc-compliance-review/releases",
+      "files": {
+        "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.26.3/文档合规审查助手AI合同_v3.26.3_20261029_(doc-compliance-review).skill",
+        "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.26.3/文档合规审查助手AI合同_v3.26.3_20261029_(doc-compliance-review).zip"
+      }
+    },
     {
       "version": "v3.26.2",
       "date": "2026-10-29",
@@ -681,5 +699,5 @@
   ],
   "_维护说明": "出包后请同步更新本文件（latest 段与 history）。真源是 SKILL.md 的 version 与 VERSION.md 的沿革；本文件是'对外公布的清单'，须与真源一致，否则使用者会被引向旧版。",
   "schema": 1,
-  "version": "3.26.2"
+  "version": "3.26.3"
 }

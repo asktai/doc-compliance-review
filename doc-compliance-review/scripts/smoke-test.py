@@ -1759,6 +1759,18 @@ def main():
         _sh4.copytree(_root4, _dst4,
                       ignore=_sh4.ignore_patterns("__pycache__", "_发布包", ".git"))
         # 模拟真实分发包：沿革不随包，先把 VERSION.md 拿掉
+        # 源侧指纹台账自洽（v3.26.3）：台账随包分发，陈旧就会随包发出——装包的人
+        # 跑 check.py 会先看到一条"脚本已被修改"的警告，而退出码是 0（假绿的经典形态）。
+        _if_ok = _pk4.verify_integrity_fresh(_root4)
+        check("出包：源侧台账与脚本自洽时放行（陈旧台账会随包发出）",
+              _if_ok == [], str(_if_ok)[:90])
+        _dirty4 = os.path.join(_dst4, "scripts", "guard.py")
+        _bak4 = open(_dirty4, encoding="utf-8").read()
+        open(_dirty4, "a", encoding="utf-8").write("\n# 冒烟注入：改了脚本但不同步重签台账\n")
+        _if_bad = _pk4.verify_integrity_fresh(_dst4)
+        open(_dirty4, "w", encoding="utf-8").write(_bak4)
+        check("出包：脚本改了却未重签台账须拒包——证明这条断言真在拦（不是恒返空表）",
+              _if_bad != [], "返回：%s" % (str(_if_bad)[:80]))
         _vm4 = os.path.join(_dst4, "VERSION.md")
         _had_vm = os.path.exists(_vm4)
         if _had_vm:
