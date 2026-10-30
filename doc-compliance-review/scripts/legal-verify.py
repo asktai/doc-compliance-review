@@ -103,6 +103,16 @@ _SUB = r"[一二三四五六七八九十]{1,3}"
 CITE_RE = re.compile(r"(《?[^》，。；：、\s（）()]{2,20}?》?)\s*第\s*(" + NUM + r")\s*条"
                      r"(?:\s*之(" + _SUB + r"))?")
 
+# 「旧第X条 → 新第Y条」映射（v3.26.11 · H-08）
+# ----------------------------------------------------------------
+# 库里三部法的 meta.note **早就写着**这种对照（发票办法「旧第二十二条（禁止虚开）→
+# 新第二十一条」、反不正当竞争法「旧第七（商业贿赂）→新第八」等），但核验表**从不输出**它。
+# 于是使用者引旧条号时只读到「疑条号错位或引述失真」，一律理解成「库里没这条」——
+# 把「条号旧了」记成了「库缺条」，直接损害对库的信任。
+# 本正则吃两种写法：「旧第七（商业贿赂）→新第八」（「条」字可省）与「旧第二十二条 → 新第二十一条」。
+_OLDNEW_RE = re.compile(
+    r"旧第\s*(" + NUM + r")\s*条?\s*(?:（[^）]{0,24}）)?\s*[→\-—>]+\s*新第\s*(" + NUM + r")\s*条?")
+
 
 def art_key(no):
     """条号归一为字符串键：「205」「205.1」（＝第二百零五条之一）。
@@ -162,6 +172,28 @@ def parse_no(num, sub=None):
 def norm(s):
     s = unicodedata.normalize("NFKC", s or "")
     return re.sub(r"[\s\u3000]+", "", s)
+
+
+def old_new_map(note):
+    """从 meta.note 抠出「旧第X条 → 新第Y条」对照，返回 {旧号 int: 新号 int}（v3.26.11 · H-08）。
+
+    ## 为什么从人读的 note 里抠，不另建结构化字段
+
+    另建 `"old_no": {"22": "21"}` 要动建库脚本、20 部法的元数据与巡检链；而 note 里这段话
+    **是同一事实的另一种写法，且已经过人工核过一遍**（写它的时候就是在提醒换版）。
+    从它抠出机器可用的对照，比另存一份更不容易漂——铁律 12.2「一概念一处」，两处各存必漂。
+
+    ## 反向核对
+
+    抠出来的 (旧→新) 在 `verify()` 里只作**提示**用，绝不改判、绝不据它补条文：
+    命中只说明「你引的这个号，是这部法改版前的编号」，条文本身仍要靠库里的原文比。
+    """
+    out = {}
+    for m in _OLDNEW_RE.finditer(note or ""):
+        a, b = cn2int(m.group(1)), cn2int(m.group(2))
+        if a and b and a != b:
+            out[a] = b
+    return out
 
 
 def pick_law(name):
@@ -311,15 +343,19 @@ def verify(cites, db, strict=0.72):
         ents = laws.get(law) or {}
         ent = ents.get(art_key(no))
         m = meta.get(law) or {}
+        # 该法有没有「旧条号 → 新条号」对照，本次引的号是否正落在旧号上（v3.26.11 · H-08）
+        no_int = cn2int(art_key(no))
+        new_no = old_new_map(m.get("note")).get(no_int) if no_int else None
         row = {
             "law": law, "no": no, "quote": c["quote"],
             "version": m.get("version", ""), "effective": m.get("effective", ""),
             "pending": m.get("pending"),
-            "status": "", "score": None, "cov": None, "anchor": "", "note": "",
+            "status": "", "cause": "", "score": None, "cov": None, "anchor": "", "note": "",
             "verified": None, "vs": "",
         }
         if ent is None:
             row["status"] = "待核验"
+            row["cause"] = "库外未收录"
             row["note"] = "本库未收录该条（库覆盖 %d 条，非全法典），须人工核现行原文" % sum(
                 len(v) for v in laws.values())
         else:
@@ -340,14 +376,33 @@ def verify(cites, db, strict=0.72):
                     row["status"] = "通过"
                 elif cov >= 0.35:
                     row["status"] = "表述存疑"
+                    row["cause"] = "表述偏差"
                     row["note"] = _join(row["note"],
                                         "引述能落到本条，但用词与原文偏差较大，"
                                         "请对照原文补正或改为转述")
                 else:
                     row["status"] = "待核验"
-                    row["note"] = _join(row["note"],
-                                        "引述内容在本条原文中找不到对应，"
-                                        "疑条号错位或引述失真")
+                    if new_no:
+                        # 已确知是条号旧了，就别说「疑条号错位」——那仍然让人去猜
+                        row["cause"] = "条号疑旧"
+                        row["note"] = _join(
+                            row["note"],
+                            "本库第%s现为「%s」，与你这段引述对不上，很可能就是条号旧了" % (
+                                art_label(no), re.sub(r"[\s|]+", "", ent.get("text") or "")[:26]))
+                    else:
+                        row["cause"] = "引述失真"
+                        row["note"] = _join(row["note"],
+                                            "引述内容在本条原文中找不到对应，"
+                                            "疑引述失真，或摘引了别一条")
+
+        # 旧条号提示：与判定档**独立**——只要该法 meta 写着「旧X→新Y」且本次引的正是 X，
+        # 就把对照摆出来，不论判到哪一档。这一句是使用者最需要的那一行，不能藏在括号里。
+        if new_no:
+            row["note"] = _join(
+                "**引的是旧条号**：第%s为《%s》改版前的编号，现行对应**第%s**（本库按现行版收录）"
+                % (art_label(no), law, art_label(new_no)), row["note"])
+            if row["status"] in ("待核验", "表述存疑"):
+                row["cause"] = "条号疑旧"
         if row["pending"]:
             p = row["pending"]
             row["note"] = (row["note"] + "；" if row["note"] else "") + \
@@ -396,14 +451,27 @@ def render_md(rows, src="", note=""):
     L += ["", "| # | 法律 | 条号 | 判定 | 库内置信 | 匹配度 | 片段覆盖 | 所据版本 | 库里原文（节选） |",
           "|---|---|---|---|---|---|---|---|"]
     for i, r in enumerate(rows, 1):
+        # 「判定」列带成因后缀（v3.26.11 · H-08）：光写「待核验」三个字，使用者分不清是
+        # 「库没收这条」「条号旧了」还是「引述走样」——三件事的处置完全不同，却读成同一件。
+        verdict = r["status"] + ("·" + r["cause"] if r.get("cause") else "")
         L.append("| %d | 《%s》 | 第%s | %s | %s | %s | %s | %s | %s |" % (
-            i, r["law"], art_label(r["no"]), r["status"],
+            i, r["law"], art_label(r["no"]), verdict,
             CONF_LABEL.get(r.get("vs") or "", "库外"),
             ("%.0f%%" % (r["score"] * 100)) if r["score"] is not None else "—",
             ("%.0f%%" % (r["cov"] * 100)) if r.get("cov") is not None else "—",
             r["version"] + ("（%s 施行）" % r["effective"] if r["effective"] else ""),
             (r["anchor"] or "—").replace("|", "｜"),
         ))
+    causes = [r.get("cause") for r in rows if r.get("cause")]
+    if causes:
+        L += ["", "**「待核验／表述存疑」后面那个词是成因，三件事处置完全不同**", "",
+              "| 成因 | 意思 | 该做什么 |",
+              "|---|---|---|",
+              "| **库外未收录** | 库只收高频条号，不是全法典 | 人工查现行原文；**不等于条号错，更不得据此删引** |",
+              "| **条号疑旧** | 你引的号是该法**改版前**的编号，现行对应另一条 | 按上面给的「旧X→新Y」改引新号后重核 |",
+              "| **引述失真** | 条号对，但这段话在本条原文里找不到 | 对照库里原文补正，或改成转述并标明「转述」 |",
+              "| **表述偏差** | 条号对、大意也对，只是用词与原文差得远 | 摘引原文，或明确写「意近」 |",
+              ""]
     notes = [r for r in rows if r["note"]]
     if notes:
         L += ["", "**逐条说明**", ""]
@@ -546,11 +614,11 @@ def _audit_rules(db, root, update=False):
             print("- `%s` 《%s》" % (rel, law))
             if lost or new:
                 print("    少了：%s ｜多了：%s" % (
-                    "、".join("第%d条" % n for n in lost) or "—",
-                    "、".join("第%d条" % n for n in new) or "—"))
+                    "、".join(art_label(n) for n in lost) or "—",
+                    "、".join(art_label(n) for n in new) or "—"))
             if overlap and keep:
                 print("    同组内另有 %s 未变，说明是**个别条号改动**，不是整组重排"
-                      % "、".join("第%d条" % n for n in keep))
+                      % "、".join(art_label(n) for n in keep))
 
     if missing:
         print()
@@ -562,13 +630,13 @@ def _audit_rules(db, root, update=False):
         print()
         print("**整组引用消失**（该文件不再引用这部法；确认是有意删除后 --update）：")
         for rel, law, nos in gone:
-            print("- `%s` 《%s》原引 %s" % (rel, law, "、".join("第%d条" % n for n in nos)))
+            print("- `%s` 《%s》原引 %s" % (rel, law, "、".join(art_label(n) for n in nos)))
 
     if added:
         print()
         print("**整组新增**（该文件开始引用这部法，无基线可比；确认无误后 --update）：")
         for rel, law, nos in added:
-            print("- `%s` 《%s》新引 %s" % (rel, law, "、".join("第%d条" % n for n in nos)))
+            print("- `%s` 《%s》新引 %s" % (rel, law, "、".join(art_label(n) for n in nos)))
 
     if not bad and not gone and not added and not missing:
         print()

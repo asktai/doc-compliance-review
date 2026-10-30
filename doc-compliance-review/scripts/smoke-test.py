@@ -1274,6 +1274,61 @@ def main():
             check("法规检索：按「205之一」精确命中增设条",
                   r_one.returncode == 0 and "第205条之一" in (r_one.stdout or ""),
                   head_lines(r_one.stdout))
+
+            # --- v3.26.11（H-08）：「待核验」拆成因 ---
+            # 病征不是「判错了」，而是**判对了却读不懂**：判词只有「待核验」三个字时，
+            # 使用者一律读成「库里没这条」，于是把「条号旧了」记成「库缺条」，信任被自己的工具消耗掉。
+            # 判据三样：①映射解析得出（防「注记写着、核验不输出」）②四种成因各自可辨 ③不许一刀切误伤。
+            def _row1(out):
+                return [l for l in (out or "").splitlines() if l.startswith("| 1 |")]
+
+            import importlib.util as _ilu8
+            _sp8 = _ilu8.spec_from_file_location("_lv8", lv)
+            _m8 = _ilu8.module_from_spec(_sp8)
+            _sp8.loader.exec_module(_m8)
+            _omap = {k: _m8.old_new_map(((_dbj.get("meta") or {}).get(k) or {}).get("note"))
+                     for k in ("发票管理办法", "反不正当竞争法")}
+            check("法条核验：旧条号映射能从版本注记里解析出来（防「注记写着、核验不输出」）",
+                  _omap.get("发票管理办法", {}).get(22) == 21
+                  and _omap.get("反不正当竞争法", {}).get(7) == 8,
+                  "发票 %s；反不正当竞争 %s" % (_omap.get("发票管理办法"), _omap.get("反不正当竞争法")))
+
+            _case8 = [
+                ("lv-shift1.md", "《发票管理办法》第二十二条规定，任何单位和个人不得虚开发票。\n",
+                 "条号疑旧", "第21条",
+                 "引 2019 版旧条号 → 判「条号疑旧」并直接给出「旧22→新21」"),
+                ("lv-shift2.md", "《反不正当竞争法》第七条规定，经营者不得采用财物或者其他手段贿赂交易相对方的工作人员。\n",
+                 "条号疑旧", "第8条",
+                 "另一部法的旧条号同样识别（旧7→新8）——不能只认一部法"),
+                ("lv-outside.md", "《食品安全法》第一百条规定，食品生产经营者应当建立食品安全追溯体系。\n",
+                 "库外未收录", "",
+                 "真库外条号判「库外未收录」，不得与「条号疑旧」混为一谈"),
+                ("lv-summ.md", "《刑法》第二百零五条规定，虚开增值税专用发票的，构成虚开增值税专用发票罪。\n",
+                 "表述偏差", "",
+                 "罪名式概括判「表述偏差」——大意是对的，说成「引述失真」会冤枉人"),
+            ]
+            for _fn, _txt, _cause, _extra, _name in _case8:
+                _fp = os.path.join(work, _fn)
+                with open(_fp, "w", encoding="utf-8") as f:
+                    f.write(_txt)
+                _r = run([PY, lv, "--file", _fp])
+                _r1 = _row1(_r.stdout)
+                # 成因在「判定」列（表格行里查），改写后的新条号在「逐条说明」里（全文查）——
+                # 两处分开放，是因为判据要钉的正是「判定与解释都得对」，只对一半也算没过。
+                check("法条核验：" + _name,
+                      bool(_r1) and _cause in _r1[0] and (_extra in (_r.stdout or "") if _extra else True),
+                      _r1[0][:130] if _r1 else head_lines(_r.stdout))
+            # 反向：改引现条号后必须判「通过」，且判定列**不带成因后缀**
+            # （只要带了，就说明判据是一刀切挂上去的，不是按成因给的）
+            _nowf = os.path.join(work, "lv-now.md")
+            with open(_nowf, "w", encoding="utf-8") as f:
+                f.write("《发票管理办法》第二十一条规定，开具发票应当按照规定的时限、顺序、栏目，"
+                        "全部联次一次性如实开具。\n")
+            _r_nw = run([PY, lv, "--file", _nowf])
+            _r1nw = _row1(_r_nw.stdout)
+            check("法条核验：改引现条号后判「通过」，判定列不带成因后缀（不许一刀切）",
+                  bool(_r1nw) and "通过" in _r1nw[0] and "·" not in _r1nw[0].split("|")[4],
+                  _r1nw[0][:130] if _r1nw else head_lines(_r_nw.stdout))
     except Exception as e:
         check("法条核验自检", False, repr(e))
 

@@ -1,7 +1,7 @@
 {
  "_说明": "规则库条号引用基线（legal-verify.py --audit-rules 生成）。键＝「文件::法名::条号」，值＝该引用所对应条文的 sha256 与当时版本。换版或改条号后须人工确认每条引用仍对得上，再 --update 刷新。",
- "generated": "2026-10-29 12:06:16",
- "total": 41,
+ "generated": "2026-10-30 16:50:37",
+ "total": 43,
  "cites": {
   "core/01-general-risk-rules.md::刑法::205": {
    "no": "205",
@@ -97,6 +97,16 @@
    "no": "692",
    "sha256": "1331db4e6331666c",
    "version": "2020-05-28 通过"
+  },
+  "core/02-legal-verification-checklist.md::刑法::205": {
+   "no": "205",
+   "sha256": "969903b2eeeceddc",
+   "version": "1997-03-14 修订；经十二个修正案修改，最近为 2023-12-29 修正案（十二）"
+  },
+  "core/02-legal-verification-checklist.md::食品安全法::73": {
+   "no": "73",
+   "sha256": "cc75c4849a89b2df",
+   "version": "2025-09-12 修正"
   },
   "industries/food-rules.md::广告法::17": {
    "no": "17",
