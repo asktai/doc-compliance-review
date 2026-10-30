@@ -10,7 +10,7 @@ import re
 import sys
 
 SRC = "/workspace/dev/DEV-RULES.md"
-OUT = "/workspace/开发规范（铁律）-v1.0.2.md"
+OUT = "/workspace/开发规范（铁律）-v1.0.3.md"
 
 # (原文, 替换, 说明)  —— 顺序敏感，长串在前
 RULES = [
@@ -324,6 +324,13 @@ ROLE_TERMS = [
     ("DEVLOG", "开发日志", "本机日志文件名 → 角色称谓（全局兜底）"),
     ("`_check_doc_consistency`", "文档一致性检查", "同上"),
     ("`_check_subprocess_encoding`", "子进程编码检查", "同上"),
+    # 加粗形态整段换在前，否则裸词先换会留下「**禁用写法清单**」外的加粗标记错位。
+    ("**FORBID 注册表**", "**禁用写法清单**", "本机检查器里的禁用写法注册表名 → 角色称谓"),
+    ("FORBID 注册表", "禁用写法清单", "同上（裸词兜底，12.5.8 表里还有一处未加粗的）"),
+    ("`_check_questionnaire_libraries`", "提问结构检查",
+     "本机检查函数名 → 角色称谓（H-05 收口时漏的一处，扫 12.5.8 表时检出）"),
+    ("`_check_capability_count`", "能力计数检查",
+     "同上（与上一项同处一行，漏一个就还剩一个函数名）"),
 ]
 
 
