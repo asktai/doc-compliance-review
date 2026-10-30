@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-开发规范（铁律）· 全文自检（十六维；**维数以实际输出为准**，本行不写死份数——
+开发规范（铁律）· 全文自检（**维数以实际输出为准**，本行不写死份数——
 第 12 条：同一事实两处写必漂）
 ==============================================================================
-对 `dev/DEV-RULES.md` 做机械自检，覆盖十六个维度：
+对 `dev/DEV-RULES.md` 做机械自检，覆盖以下维度（**加维只往后排，不改既有编号**）：
 
   (1) 结构        条号连续、**条标题格式统一**、章序号连续、章区间声明与覆盖
   (2) 导读表      文首"三条铁律"导读表的条号与名称，须与正文标题一致（双源比对）
@@ -35,7 +35,7 @@
     保持零依赖、写法保守（凡拿不准一律不报），并以注入式负向测试验证过"真拦得住"。
 
 用法
-    python3 maint/tools/check-dev-rules.py                  # 十六维检查
+    python3 maint/tools/check-dev-rules.py                  # 全维检查
     python3 maint/tools/check-dev-rules.py --refs           # 另打印条号引用上下文（供人工复核指向）
     python3 maint/tools/check-dev-rules.py --install-hook   # 安装 pre-commit 钩子（只警告、不阻断）
     python3 maint/tools/check-dev-rules.py --quiet          # 只输出结论行
@@ -1172,7 +1172,7 @@ def install_hook():
     shutil.copyfile(HOOK_SRC, HOOK_DST)
     os.chmod(HOOK_DST, 0o755)
     print("[OK] 已安装 pre-commit 钩子 → %s（只警告、不阻断）" % HOOK_DST)
-    print("     一档：提交涉及 DEV-RULES.md → 自动跑本脚本（十六维自检）。")
+    print("     一档：提交涉及 DEV-RULES.md → 自动跑本脚本（全维自检）。")
     print("     二档：提交涉及守卫本体（check-dev-rules.py／smoke-dev-rules.py）")
     print("          → 自动跑 maint/tools/smoke-dev-rules.py 全量冒烟，")
     print("            用注入测试证明守卫**仍然拦得住**（铁律 16.2）。")
@@ -1333,7 +1333,13 @@ def check_closure_table(s):
                 header = [c.strip() for c in l.strip().strip("|").split("|")]
             elif re.match(r"^\|\s*\d+\s*\|", l):
                 rows.append((i + 1, l))
-        elif rows:
+        elif header is not None:
+            # 2026-10-30 修（**读数越界**，此前让「表体删空」用例失效）：
+            # 原条件 `elif rows: break`——只有已收到数据行才断。于是表体被删空时
+            # rows 始终为空，循环一路扫到文件末尾，把后面**别的表**的 `| 数字 |` 行
+            # （如 28.1 门禁三要件表 `| 1 | 有断言 |`）当成 24.3 的续表收进来，
+            # 于是"表体为空"报不出来，反而报"第 1/2/3 条落点不合四态"。
+            # 表头之后紧接表体，中间不隔空行；故**表头一旦定位，遇非表格行即为表末**。
             break
         i += 1
 
@@ -1568,6 +1574,109 @@ def check_online_md(s):
             "`maint/tools/make-online-md.py`，否则上传的是旧内容%s" % (diff, where))
 
 
+# ── (17) 正文零实现名 · 对照表路径真实 ─────────────────────────────────────
+# 2026-10-30 结构性改造。此前规范是**两份**：源（含本机路径）＋ 对外派生版（全角色称谓），
+# 靠"改了源记得重跑生成器"维持一致。实测靠不住——派生件的版本行没跟上文件名（v1.0.3 内文
+# 仍写 v1.0.2）、三份对外版并存无人标当前版、台账漏登最新那份，最后生成器把输出路径写死在
+# 源码里，一次没改就先跑，把已交付的 v1.0.2 整个覆盖掉（那份不在版本控制里，只能靠旧源＋旧
+# 生成器重建）。根因不是手滑：**93.8% 逐字相同的两份文件，差异散在 92 个变更块里**，任何一处
+# 漏改都不会被发现。
+# 现改为**一份正文**：正文一律角色称谓，两端通用、对外直接给这一份；角色到本机落点的映射
+# 集中在同目录的实现对照表。本维守这个新结构的两头：
+#   A. 正文不许把路径写回去（否则"一份"又退化成"一种写法两份维护"）；
+#   B. 对照表写的路径必须真存在（否则读者顺着表去找，找不到）。
+# **判据刻意从窄**：只认清单里的实现名与本机路径前缀；示例代码（`shell=True`、`urlopen`）、
+# 平台通用文件名（`SKILL.md`／`VERSION.md`）、通用目录建议名（`samples/`）一律不算——
+# 它们既是真实材料，也不是"读者照着找会落空"的东西。
+IMPL_NAMES = (
+    "maint/", "dist/", "doc-compliance-review",
+    "DEVLOG", "OPEN-ISSUES", "CHANGELOG.md",
+    "pack.py", "check.py", "publish.py", "version.py",
+    "smoke-test", "make-docx", "gen-ledger", "make-online-md",
+    "check-dev-rules", "check-separation", "meta-smoke", "sync-clause-refs",
+    "build-legal-db",
+)
+IMPL_TABLE = os.path.join(DEV, "DEV-RULES.实现对照.md")
+
+
+def check_impl_table(s):
+    head("(17) 正文零实现名 · 对照表路径真实")
+
+    # ── A 正文不得含本机实现名 ──
+    # `dev/` 单列并**要求前有空白或反引号**：正文卷首与 12.1.1 要写出对照表的文件名
+    # `DEV-RULES.实现对照.md`，裸子串匹配不会命中它（大小写不同），但若日后有人写
+    # `dev/DEV-RULES.md` 就会命中——那正是要抓的。
+    hits = []
+    for i, l in enumerate(s.splitlines(), 1):
+        for w in IMPL_NAMES:
+            if w in l:
+                hits.append("第 %d 行含 `%s`：%s" % (i, w, l.strip()[:44]))
+                break
+    if hits:
+        for h in hits:
+            err("正文出现本机实现名（应改角色称谓，落点写进实现对照表）——" + h)
+    else:
+        info("正文零本机实现名（%d 项清单全未命中）——同一份文件可原样对外"
+             % len(IMPL_NAMES))
+
+    # ── B 对照表内路径须真实存在 ──
+    if not os.path.exists(IMPL_TABLE):
+        err("实现对照表缺失：%s——正文卷首与 12.1.1 都指向它，缺了每一处角色称谓都无落点"
+            % IMPL_TABLE)
+        return
+    tbl = open(IMPL_TABLE, encoding="utf-8").read()
+    fenced = in_fence_lines(tbl)
+    cands = set()
+    for i, line in enumerate(tbl.splitlines(), 1):
+        if i in fenced:
+            continue
+        for c in re.findall(r"`([^`\n]+)`", line):
+            c = c.strip()
+            # 排除：空、含空格（是句子不是路径）、命令行参数、代码片段（`# net-tier: L0`）
+            if not c or " " in c or c.startswith("--") or c.startswith("#"):
+                continue
+            if "/" in c or re.match(r"^[\w\-.·]+\.(md|py|json|zip)$", c):
+                cands.add(c)
+
+    PREFIX = {"maint/": DEV + "/maint/", "dev/": DEV + "/", "dist/": DIST + "/",
+              "doc-compliance-review/": SKILL + "/",
+              "scripts/": SKILL + "/scripts/",
+              "~/.codebuddy/skills/": RUN + "/"}
+    SEARCH = [DEV, os.path.join(DEV, "maint"), os.path.join(DEV, "maint", "tools"),
+              os.path.join(DEV, "maint", "scratch"), SKILL,
+              os.path.join(SKILL, "scripts"), os.path.join(SKILL, "core"),
+              os.path.join(SKILL, "assets"), os.path.join(SKILL, "samples"),
+              DIST, "/workspace"]
+    exts = {".skill", ".zip", ".py", ".md", ".json"}
+    missing = []
+    for c in sorted(cands):
+        if c in exts:
+            continue
+        p = c if c.startswith("/") else None
+        if p is None:
+            for k, v in PREFIX.items():
+                if c.startswith(k):
+                    p = v + c[len(k):]
+                    break
+        if p is None:
+            for d in SEARCH:
+                if os.path.exists(os.path.join(d, c)):
+                    p = os.path.join(d, c)
+                    break
+            else:
+                if re.match(r"^[\w\-.·]+\.(md|py|json)$", c):
+                    missing.append("%s（各搜索目录均无）" % c)
+                continue
+        if not os.path.exists(p):
+            missing.append("%s → %s" % (c, p))
+    if missing:
+        for m in missing:
+            err("实现对照表里的路径不存在：%s（改名或删除后未同步本表——两处不一致时"
+                "以正文的角色为准，改表，不得反过来改正文迁就路径）" % m)
+    else:
+        info("对照表 %d 项路径引用全部真实存在" % len(cands))
+
+
 def main():
     global QUIET, RULES
     args = sys.argv[1:]
@@ -1601,6 +1710,7 @@ def main():
     check_online_md(s)
     check_promise(s)
     check_open_issues(s)
+    check_impl_table(s)
     print("=" * 62)
     if ERRS:
         print("结果：错误 %d 项，警告 %d 项 —— **未通过**" % (len(ERRS), len(WARNS)))

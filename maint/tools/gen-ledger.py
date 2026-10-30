@@ -28,10 +28,10 @@ OUT = os.path.join(ROOT, "产出物台账.md")
 WS_ROOT = ROOT
 # 包外产出物登记规则（工作区根下的 *.md，不入 dist/ 但属对外交付）：
 # (文件名 glob, 台账标签, 状态文字)
-EXTRA_ARTS = [
-    ("技能开发规范（通用铁律）-v*.md", "技能开发规范（通用铁律）", "**发布**（对外分发）"),
-    ("开发规范（铁律）-v*.md", "开发规范（铁律）· 对外发布版", "**发布**（对外分发）"),
-]
+# 2026-10-30：原登记两条「包外规范对外发布版」。当日改为**规范只有一份**——正文明文两端
+# 通用（角色称谓＋同目录实现对照表），对外直接给 `dev/DEV-RULES.md`，不再派生带版本号的
+# 发布副本。故两条规则一并撤除；机制保留，日后有包外产出物仍可在此加一条。
+EXTRA_ARTS = []
 
 CST = timezone(timedelta(hours=8))
 
@@ -175,7 +175,7 @@ def build(no_files=False):
         f1 = f"`dist/{sk[0]['file']}`" if sk else "—"
         f2 = f"`dist/{zp[0]['file']}`" if zp else "—"
         A(f"| 文档合规审查技能（分发包） | {latest} | **在役** | {f1}（.skill）<br>{f2}（.zip） |")
-    A(f"| 开发规范（铁律）· 开发侧维护版 | {dev_ver or '—'} | **在役**（开发侧，不外流） | `dev/DEV-RULES.md` |")
+    A(f"| 开发规范（铁律）· 唯一版 | {dev_ver or '—'} | **在役**（一份两端通用：正文角色称谓、对外直接给这一份；实现落点见同目录对照表） | `dev/DEV-RULES.md` |")
     if skill_ver and latest and skill_ver != latest:
         A(f"| 技能本体（工作副本） | {skill_ver} | 注意：与最新包 {latest} 不一致 | `dev/doc-compliance-review/` |")
     elif skill_ver:

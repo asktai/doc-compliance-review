@@ -42,6 +42,7 @@ CRIPPLES = [
     (12, "元规则", "check_meta_rules(s)"),
     (13, "落实总表", "check_closure_table(s)"),
     (15, "承诺措辞", "check_promise(s)"),
+    (17, "正文零实现名", "check_impl_table(s)"),
 ]
 
 TAG = "元自测"
