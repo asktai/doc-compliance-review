@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# net-tier: L3  门禁自检类：文件内出现网络关键字，但自身不发起联网
+# net-tier: E3  门禁自检类：文件内出现网络关键字，但自身不发起联网
 """
 文档合规审查助手AI合同 · 端到端冒烟测试（smoke-test）
 ===============================================================
@@ -298,17 +298,17 @@ def _inject_gate_tests(tmp):
         open(fp, "w", encoding="utf-8").write(t.replace(old, new, 1))
         return True
 
-    # ① 安全引擎门禁：给一个接触文档的 L0 脚本偷塞联网调用 → ERR 里必须点名"L0 档"
+    # ① 安全引擎门禁：给一个接触文档的 E0 脚本偷塞联网调用 → ERR 里必须点名"E0 档"
     #    注：注入点故意用 `import sys as _sys`（每个脚本都有的一行），不挑业务 import，
     #    否则换个脚本就"注入点未命中"——那种失败是测试自己脆，不是门禁失效。
     ok_hit = rewrite("preprocess.py", "import sys as _sys",
                      "import sys as _sys\nimport urllib.request")
     if ok_hit:
         bad, errs, _ = run_gate("net_tiers")
-        hit = any("L0 档" in m and "preprocess.py" in m for m in errs)
-        out.append(("反向注入①：L0 档脚本偷加 urllib → 安全引擎门禁必须拦下",
+        hit = any("E0 档" in m and "preprocess.py" in m for m in errs)
+        out.append(("反向注入①：E0 档脚本偷加 urllib → 安全引擎门禁必须拦下",
                     hit,
-                    "已报 L0 越界" if hit else ("未报；" + (bad or "errs=%s" % errs))))
+                    "已报 E0 越界" if hit else ("未报；" + (bad or "errs=%s" % errs))))
         rewrite("preprocess.py", "import sys as _sys\nimport urllib.request",
                 "import sys as _sys")
     else:
@@ -2340,15 +2340,15 @@ def main():
         # ── 安全引擎：联网按「**数据出域**」分四档（第 26 条）──────────────────
         # 不再写「脚本全部不联网」——那是把**手段当目的**。红线是"文档不出域"，
         # 不是"没有 urllib"；一刀切会把「法规库失效巡检」一起废掉，而它不联网根本做不成。
-        # 档位真源**只有一个**：每个脚本文件头那行 `# net-tier: Ln`。
+        # 档位真源**只有一个**：每个脚本文件头那行 `# net-tier: En`。
         # check.py 与此处都从它派生，**谁都不另立清单**——两份清单必漂（第 12 条）。
-        #   L0 接触文档 → 零网络库（唯一的一刀切，切在这里）｜L1 在线只读公开信息 → 须可关
-        #   L2 不联网就用不成 → 须显式调用           ｜L3 门禁自检 → 自身不联网
+        #   E0 接触文档 → 零网络库（唯一的一刀切，切在这里）｜E1 在线只读公开信息 → 须可关
+        #   E2 不联网就用不成 → 须显式调用           ｜E3 门禁自检 → 自身不联网
         # 关键字集**故意用宽的**（不带 `import`）：与客户可复现的那条 grep 命令同口径。
         # 窄集（"import urllib"）会少命中一个文件——同一句话两套答案，正是"写死预期"的危险处。
         net_ks = ("requests", "urllib", "socket", "http.client", "aiohttp", "httpx",
                   "curl", "wget", "Invoke-WebRequest", "smtplib", "urlopen(")
-        tier_re = re.compile(r"^#[ \t]*net-tier:[ \t]*(L[0-3])\b", re.M)
+        tier_re = re.compile(r"^#[ \t]*net-tier:[ \t]*(E[0-3])\b", re.M)
         # 行首匹配真正的 import 语句；检查器自持的关键字清单是行中间的字符串，不会自指命中。
         imp_re = re.compile(r"^[ \t]*(?:import|from)[ \t]+(?:urllib|requests|socket"
                             r"|http\.client|aiohttp|httpx|smtplib|ftplib|xmlrpc)\b", re.M)
@@ -2366,30 +2366,30 @@ def main():
         no_tag = sorted(n for n, t in tiers.items() if t is None)
         check("安全引擎：全部 %d 个脚本均已定档（新增脚本须先定档再入库）" % len(tiers),
               not no_tag, "缺标: %s" % ", ".join(no_tag))
-        check("安全引擎：档位取值只许 L0—L3", set(tiers.values()) <= {"L0", "L1", "L2", "L3"},
+        check("安全引擎：档位取值只许 E0—E3", set(tiers.values()) <= {"E0", "E1", "E2", "E3"},
               "非法: %s" % sorted(set(t for t in tiers.values() if t)))
-        bad = [n for n in by("L0") if any(k in srcs[n] for k in net_ks)]
-        check("安全引擎：L0 档（接触文档）%d 个脚本零网络库" % len(by("L0")),
+        bad = [n for n in by("E0") if any(k in srcs[n] for k in net_ks)]
+        check("安全引擎：E0 档（接触文档）%d 个脚本零网络库" % len(by("E0")),
               not bad, "越界: %s" % ", ".join(bad))
         # 判据反证（**不落盘**，直接喂样本）：证明上面那条不是"永远绿"
-        check("安全引擎判据：L0 样本含 import socket 须被抓出（否则门禁形同虚设）",
+        check("安全引擎判据：E0 样本含 import socket 须被抓出（否则门禁形同虚设）",
               imp_re.search("import os\nimport socket\n") is not None)
         check("安全引擎判据：检查器自持的关键字清单不得被误判为 import（行首正则的自指防护）",
               imp_re.search('KS = ("import urllib", "import requests",)') is None)
-        dead = [n for n in by("L1") + by("L2")
+        dead = [n for n in by("E1") + by("E2")
                 if not (imp_re.search(srcs[n]) or call_re.search(srcs[n]))]
-        check("安全引擎：L1／L2 档确实接有联网路径（档位不许是空头标签）", not dead,
+        check("安全引擎：E1／E2 档确实接有联网路径（档位不许是空头标签）", not dead,
               "无联网路径: %s" % ", ".join(dead))
-        bad3 = [n for n in by("L3") if imp_re.search(srcs[n])]
-        check("安全引擎：L3 档（门禁自检）只持关键字清单、不许真 import", not bad3,
+        bad3 = [n for n in by("E3") if imp_re.search(srcs[n])]
+        check("安全引擎：E3 档（门禁自检）只持关键字清单、不许真 import", not bad3,
               "真 import: %s" % ", ".join(bad3))
         # 文档名单与代码自标逐档一致——25.2 的事故形态就是"文档一套、代码一套，无人比对"
         doc_t = {}
         for line in open(os.path.join(os.path.dirname(HERE), "SECURITY.md"), encoding="utf-8"):
-            mm = re.match(r"[ \t]*(L[0-3])[ \t]*:[ \t]*([A-Za-z0-9_.\- ]+)$", line)
+            mm = re.match(r"[ \t]*(E[0-3])[ \t]*:[ \t]*([A-Za-z0-9_.\- ]+)$", line)
             if mm and all(x.endswith(".py") for x in mm.group(2).split()):
                 doc_t[mm.group(1)] = sorted(mm.group(2).split())
-        diff = [t for t in ("L0", "L1", "L2", "L3") if doc_t.get(t) != by(t)]
+        diff = [t for t in ("E0", "E1", "E2", "E3") if doc_t.get(t) != by(t)]
         check("安全引擎：SECURITY.md 档位名单与脚本自标逐档一致（文档不得与代码分家）",
               not diff, "不一致档位: %s" % ", ".join(diff))
         # ── 安全机制登记表（第 27 条）──────────────────────────────────────

@@ -3,24 +3,40 @@
  "product": "文档合规审查助手AI合同",
  "skill_id": "doc-compliance-review",
  "latest": {
-  "version": "v3.26.11",
+  "version": "v3.26.12",
   "date": "2026-10-30",
-  "summary": "「待核验」拆成三种成因（库外未收录／条号疑旧／引述失真），并直接输出该法的「旧X→新Y」条号映射",
+  "summary": "联网档位 L0—L3 改称 E0—E3（E＝Egress 数据出域），终结「L」一字母既指条款风险等级又指出域档位的读混",
   "changes": [
-   "核验表「判定」列改为带成因：`待核验·库外未收录`、`待核验·条号疑旧`、`待核验·引述失真`、`表述存疑·表述偏差`。成因与判定档分开存（`cause` 字段），判定档仍是四档不变，下游判断零改动。",
-   "从该法 `meta.note` 解析「旧第X条 → 新第Y条」对照，只要引的正是旧号就把映射摆在说明最前面——这一句比判定档本身有用，因为它直接告诉你该改引哪条。",
-   "《发票管理办法》旧第 22 条（2019 版禁虚开）现在判定为`待核验·条号疑旧`并给出「现行对应第21条」；《反不正当竞争法》旧第 7 条同理给「第8条」。",
-   "四种成因在核验表底部各配一句「该做什么／绝不能做什么」——尤其「库外未收录」一行写明**不得据此删引**。",
-   "修 `--audit-rules` 一处从未被执行过的分支：打印「整组新增」时用 `%d` 格式化条号，遇「205.1」这类小数条号即抛异常。该分支此前因基线覆盖全量而恒不触发，等于从未验过。",
-   "核心文档 `02-legal-verification-checklist.md` 升 V3.7.2：新增「待核验不是一种病，是三种」一节；食品安全法行补入第 73 条（该条已于上一版入库，清单当时漏列）。",
-   "冒烟 242 → 248 项：新增 6 项，含「两部法的旧条号都要识别」（只认一部即为读数不全）与「改引现条号必须判通过且判定列不带成因」（防一刀切误伤）。"
+   "档位字母 `L0—L3` 改为 `E0—E3`：`E` 取 Egress（数据出域）之意，数字越大允许的出域越多，**E0 即零出域**。",
+   "改字母的理由不是审美：本项目里 `L1/L2/L3` 同时是**条款风险等级**（写在通用风险规则与 9 个行业库，`L3@food` 这类标识已成体系），说「L3 条款」会被听成「L3 档位」。风险等级不动——换它等于全行业库换号。",
+   "改动面：29 个脚本的 `# net-tier:` 自标、门禁的档位判据与文案、SECURITY.md／README.md／SKILL.md 的全部档位表述。",
+   "**档位计数与分配一个没变**：E0 24 个（接触文档，零网络库）／E1 1 个（查更新，默认关）／E2 2 个（法规抓取与时效巡检）／E3 2 个（门禁自检），共 29 个，门禁与 SECURITY.md 双向一致。",
+   "历史记录（版本沿革表、开发日志）按〔述史〕保留原字母不改写，另在沿革表顶部加换算说明——改历史等于篡改，但读者必须能对上号。",
+   "安全文档补一句字母含义：`E` 是 Egress（出域），不是等级高低；并写明为什么改档位而不改风险等级。"
   ],
   "files": {
-   "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.26.11/文档合规审查助手AI合同_v3.26.11_20261030_(doc-compliance-review).skill",
-   "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.26.11/文档合规审查助手AI合同_v3.26.11_20261030_(doc-compliance-review).zip"
+   "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.26.12/文档合规审查助手AI合同_v3.26.12_20261030_(doc-compliance-review).skill",
+   "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.26.12/文档合规审查助手AI合同_v3.26.12_20261030_(doc-compliance-review).zip"
   }
  },
  "history": [
+  {
+   "version": "v3.26.12",
+   "date": "2026-10-30",
+   "summary": "联网档位 L0—L3 改称 E0—E3（E＝Egress 数据出域），终结「L」一字母既指条款风险等级又指出域档位的读混",
+   "changes": [
+    "档位字母 `L0—L3` 改为 `E0—E3`：`E` 取 Egress（数据出域）之意，数字越大允许的出域越多，**E0 即零出域**。",
+    "改字母的理由不是审美：本项目里 `L1/L2/L3` 同时是**条款风险等级**（写在通用风险规则与 9 个行业库，`L3@food` 这类标识已成体系），说「L3 条款」会被听成「L3 档位」。风险等级不动——换它等于全行业库换号。",
+    "改动面：29 个脚本的 `# net-tier:` 自标、门禁的档位判据与文案、SECURITY.md／README.md／SKILL.md 的全部档位表述。",
+    "**档位计数与分配一个没变**：E0 24 个（接触文档，零网络库）／E1 1 个（查更新，默认关）／E2 2 个（法规抓取与时效巡检）／E3 2 个（门禁自检），共 29 个，门禁与 SECURITY.md 双向一致。",
+    "历史记录（版本沿革表、开发日志）按〔述史〕保留原字母不改写，另在沿革表顶部加换算说明——改历史等于篡改，但读者必须能对上号。",
+    "安全文档补一句字母含义：`E` 是 Egress（出域），不是等级高低；并写明为什么改档位而不改风险等级。"
+   ],
+   "files": {
+    "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.26.12/文档合规审查助手AI合同_v3.26.12_20261030_(doc-compliance-review).skill",
+    "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.26.12/文档合规审查助手AI合同_v3.26.12_20261030_(doc-compliance-review).zip"
+   }
+  },
   {
    "version": "v3.26.11",
    "date": "2026-10-30",
@@ -834,5 +850,5 @@
  ],
  "_维护说明": "出包后请同步更新本文件（latest 段与 history）。真源是 SKILL.md 的 version 与 VERSION.md 的沿革；本文件是'对外公布的清单'，须与真源一致，否则使用者会被引向旧版。",
  "schema": 1,
- "version": "3.26.11"
+ "version": "3.26.12"
 }

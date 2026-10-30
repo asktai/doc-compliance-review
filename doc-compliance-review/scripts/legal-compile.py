@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# net-tier: L0  接触文档内容 → 绝对离线，不得引入任何网络库
+# net-tier: E0  接触文档内容 → 绝对离线，不得引入任何网络库
 """法规汇编撰写 —— legal-articles.json 的第三个消费者
 
 三个消费者的分工

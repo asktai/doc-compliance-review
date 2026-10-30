@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# net-tier: L3  门禁自检类：文件内出现网络关键字，但自身不发起联网
+# net-tier: E3  门禁自检类：文件内出现网络关键字，但自身不发起联网
 """
 文档合规审查助手AI合同 · 结构校验与环境自检（Python 版）
 ==================================================================
@@ -365,10 +365,10 @@ def check_config():
 
 # ── 安全引擎：联网分四档（DEV-RULES.md 第 26 条）──────────────────────────
 # 口径：**按「数据出域」分档，不按「有没有 urllib」一刀切**。
-# 真源是**每个脚本文件头那行 `# net-tier: Ln`**——不在本文件另立登记表。
+# 真源是**每个脚本文件头那行 `# net-tier: En`**——不在本文件另立登记表。
 # 同一事实两处写必漂（第 12 条）：中央登记表一定与代码分家，写在代码里则改档必须动那个文件。
 # 本检查器只做三件事：**读标记 → 与实测比对 → 与 SECURITY.md 双向咬合**。
-NET_TIER_RE = re.compile(r"^#[ \t]*net-tier:[ \t]*(L[0-3])\b", re.M)
+NET_TIER_RE = re.compile(r"^#[ \t]*net-tier:[ \t]*(E[0-3])\b", re.M)
 # 行首匹配真正的 import 语句；检查器自己持有的"关键字清单"是行中间的字符串，不会自指命中。
 NET_IMPORT_RE = re.compile(
     r"^[ \t]*(?:import|from)[ \t]+(?:urllib|requests|socket|http\.client|aiohttp|httpx"
@@ -378,10 +378,10 @@ NET_CALL_RE = re.compile(
     r"urlopen\(|requests\.(?:get|post|put)\(|socket\.(?:socket|create_connection)\("
     r"|(?:PARSE|_PARSE|parse)\.fetch\(", re.M)
 TIER_MEANING = {
-    "L0": "接触文档内容 → 绝对离线（零网络库）",
-    "L1": "在线只读公开信息 → 须可关、离线静默降级",
-    "L2": "不联网就用不成 → 须显式调用、离线明示降级",
-    "L3": "门禁自检类 → 自身不发起联网",
+    "E0": "接触文档内容 → 绝对离线（零网络库）",
+    "E1": "在线只读公开信息 → 须可关、离线静默降级",
+    "E2": "不联网就用不成 → 须显式调用、离线明示降级",
+    "E3": "门禁自检类 → 自身不发起联网",
 }
 
 
@@ -411,7 +411,7 @@ def _doc_net_tiers():
         return None
     out = {}
     for line in _read(p).splitlines():
-        mm = re.match(r"[ \t]*(L[0-3])[ \t]*:[ \t]*([A-Za-z0-9_.\- ]+)$", line)
+        mm = re.match(r"[ \t]*(E[0-3])[ \t]*:[ \t]*([A-Za-z0-9_.\- ]+)$", line)
         if mm and all(x.endswith(".py") for x in mm.group(2).split()):
             out[mm.group(1)] = mm.group(2).split()
     return out or None
@@ -424,8 +424,8 @@ def check_net_tiers():
     那句话把**手段当成了目的**。红线是「使用者的文档不出域」，不是「有没有 urllib」——
     一刀切禁联网会连「法规库失效巡检」一起废掉，而它不联网根本做不成，
     恰是产品最值钱的部分。故分四档，并且：
-      · **L0 仍然一刀切**，但切在「**接触文档**」上，不切在「联网」上——这是唯一该切的地方；
-      · **L2 承认「不联网就用不成」**，代价换到别处补：须显式调用、离线须明示降级；
+      · **E0 仍然一刀切**，但切在「**接触文档**」上，不切在「联网」上——这是唯一该切的地方；
+      · **E2 承认「不联网就用不成」**，代价换到别处补：须显式调用、离线须明示降级；
       · 分档若只写在文档里就成了漂亮话，故**档位写在代码里**，且文档名单与代码**双向比对**——
         任一侧偷改当场报错（25.2 的事故形态：文档写一套、代码做一套，无人比对）。
     """
@@ -440,7 +440,7 @@ def check_net_tiers():
         tiers = {n: t for n, t in tiers.items() if t}
     bad = sorted("%s=%s" % (n, t) for n, t in tiers.items() if t not in TIER_MEANING)
     if bad:
-        err("档位取值非法（只许 L0—L3）：%s" % "、".join(bad))
+        err("档位取值非法（只许 E0—E3）：%s" % "、".join(bad))
         return
 
     imp_hit, call_hit = set(), set()
@@ -452,23 +452,23 @@ def check_net_tiers():
             call_hit.add(n)
     by = lambda t: sorted(n for n, v in tiers.items() if v == t)  # noqa: E731
 
-    # ① L0（接触文档）：**唯一保留的一刀切**——零网络库
-    bad_l0 = [n for n in by("L0") if n in imp_hit]
+    # ① E0（接触文档）：**唯一保留的一刀切**——零网络库
+    bad_l0 = [n for n in by("E0") if n in imp_hit]
     if bad_l0:
-        err("L0 档（接触文档内容）脚本含网络库 import：%s。文档一经手就不得有任何出网路径——"
+        err("E0 档（接触文档内容）脚本含网络库 import：%s。文档一经手就不得有任何出网路径——"
             "要么删掉，要么先改档并在 SECURITY.md 写明理由（第 26 条）" % "、".join(bad_l0))
         return
-    # ② L1/L2：标了"会联网"就得真有联网路径——**档位不许是空头标签**
-    online = by("L1") + by("L2")
+    # ② E1/E2：标了"会联网"就得真有联网路径——**档位不许是空头标签**
+    online = by("E1") + by("E2")
     dead = [n for n in online if n not in (imp_hit | call_hit)]
     if dead:
-        err("标为在线档却找不到任何联网路径：%s——档位不能是空头标签，要么接上实现，要么改回 L0"
+        err("标为在线档却找不到任何联网路径：%s——档位不能是空头标签，要么接上实现，要么改回 E0"
             % "、".join(dead))
         return
-    # ③ L3：门禁自检类只许持有"网络关键字清单"，不许真 import
-    bad_l3 = [n for n in by("L3") if n in imp_hit]
+    # ③ E3：门禁自检类只许持有"网络关键字清单"，不许真 import
+    bad_l3 = [n for n in by("E3") if n in imp_hit]
     if bad_l3:
-        err("L3 档（门禁自检类）不该真 import 网络库：%s；它只应持有用于检查别人的关键字清单"
+        err("E3 档（门禁自检类）不该真 import 网络库：%s；它只应持有用于检查别人的关键字清单"
             % "、".join(bad_l3))
         return
     # ④ 与 SECURITY.md 双向咬合（文档一套代码一套，正是 25.2 的事故形态）
@@ -476,15 +476,15 @@ def check_net_tiers():
     if doc is None:
         err("SECURITY.md 缺机读档位块（NET-TIERS）——名单无法与代码比对，改一处就分家（25.2）")
         return
-    for t in ("L0", "L1", "L2", "L3"):
+    for t in ("E0", "E1", "E2", "E3"):
         a, b = by(t), sorted(doc.get(t) or [])
         if a != b:
             err("SECURITY.md 的 %s 档名单与脚本自标不一致：文档 %s／代码 %s；两处须同步"
                 % (t, b, a))
             return
-    info("安全引擎：联网分四档——L0 %d 个（接触文档，零网络库）／L1 %d 个（在线只读公开信息，可关）"
-         "／L2 %d 个（不联网就用不成，须显式调用）／L3 %d 个（门禁自检，自身不联网）；"
-         "名单与 SECURITY.md 双向一致" % (len(by("L0")), len(by("L1")), len(by("L2")), len(by("L3"))))
+    info("安全引擎：联网分四档——E0 %d 个（接触文档，零网络库）／E1 %d 个（在线只读公开信息，可关）"
+         "／E2 %d 个（不联网就用不成，须显式调用）／E3 %d 个（门禁自检，自身不联网）；"
+         "名单与 SECURITY.md 双向一致" % (len(by("E0")), len(by("E1")), len(by("E2")), len(by("E3"))))
 
 
 # 真正的"带 shell 的调用"，而非 `shell=True` 这个子串（后者会让检查器自指命中）。
@@ -506,12 +506,12 @@ EXEC_BYPASS_RE = re.compile(r"ExecutionPolicy\s+(Bypass|Unrestricted|RemoteSigne
 
 
 def _sec_doc_no_net():
-    """数据层：文档不出网——接触文档的 L0 档零网络库（与 26.5.2 同一判据，不另写一套）"""
+    """数据层：文档不出网——接触文档的 E0 档零网络库（与 26.5.2 同一判据，不另写一套）"""
     tiers = _net_tiers()
-    l0 = [n for n, v in tiers.items() if v == "L0"]
+    l0 = [n for n, v in tiers.items() if v == "E0"]
     bad = [n for n in l0 if NET_IMPORT_RE.search(_read(os.path.join(HERE, n)))]
     return (not bad,
-            "L0 档 %d 个脚本零网络库" % len(l0) if not bad else "越界 %s" % ", ".join(bad))
+            "E0 档 %d 个脚本零网络库" % len(l0) if not bad else "越界 %s" % ", ".join(bad))
 
 
 def _sec_map_isolated():
@@ -645,7 +645,7 @@ def _sec_fingerprint():
 #     实测删光 `check_security()` 里的私有库整段，登记表照样报"逐条落实"。
 SEC_MATRIX = (
     ("M1", "文档不出网（接触文档的脚本零出网路径）", "数据层",
-     ("数据出域", "L0"), _sec_doc_no_net, None, "机械"),
+     ("数据出域", "E0"), _sec_doc_no_net, None, "机械"),
     ("M2", "映射表隔离（默认落本机隔离目录）", "数据层",
      ("映射表", "隔离目录"), _sec_map_isolated, None, "机械"),
     ("M3", "私有库默认不打进发布包", "数据层",
@@ -781,7 +781,7 @@ def _check_online_gate(data=None):
     """只守一件事：出厂配置**不得默认联网**。
 
     分档由 `check_net_tiers()` 管（谁可以联网、谁绝不能），这里只管"默认行为"——
-    **可联网 ≠ 会自动联网**。L1 的 `version.py` 允许联网查更新，但出厂必须关着，
+    **可联网 ≠ 会自动联网**。E1 的 `version.py` 允许联网查更新，但出厂必须关着，
     要人显式开口（`--check-online`）才发请求（19.4.5 与 25.4.3）。
     """
     if data is None:
@@ -1867,13 +1867,13 @@ def check_net_tier_consistency():
     sec = _read(sec_p)
     n_py = len([f for f in os.listdir(os.path.join(ROOT, "scripts"))
                 if f.endswith(".py")])
-    # 真源档位计数（从 T1 结构化行抽：L0 ... 18 个脚本 ... L1 ... 1 个 ... L2 ... 2 个 ... L3 ... 2 个）
+    # 真源档位计数（从 T1 结构化行抽：E0 ... 18 个脚本 ... E1 ... 1 个 ... E2 ... 2 个 ... E3 ... 2 个）
     tier = {}
-    mt = re.search(r"L0[^\n]*?(\d+)\s*个脚本[^\n]*?L1[^\n]*?(\d+)\s*个[^\n]*?"
-                   r"L2[^\n]*?(\d+)\s*个[^\n]*?L3[^\n]*?(\d+)\s*个", sec, re.S)
+    mt = re.search(r"E0[^\n]*?(\d+)\s*个脚本[^\n]*?E1[^\n]*?(\d+)\s*个[^\n]*?"
+                   r"E2[^\n]*?(\d+)\s*个[^\n]*?E3[^\n]*?(\d+)\s*个", sec, re.S)
     if mt:
-        tier = {"L0": int(mt.group(1)), "L1": int(mt.group(2)),
-                "L2": int(mt.group(3)), "L3": int(mt.group(4))}
+        tier = {"E0": int(mt.group(1)), "E1": int(mt.group(2)),
+                "E2": int(mt.group(3)), "E3": int(mt.group(4))}
     stale, wrong = [], []
     for rel in ("README.md", "SKILL.md", "安装使用教程.md",
                 "文档合规审查助手AI合同提示词版.md"):
@@ -1881,15 +1881,15 @@ def check_net_tier_consistency():
         if not os.path.exists(p):
             continue
         t = _read(p)
-        # 旧两档口径：只说「仅检查更新会联网」且整篇未提 L2（四档）→ 必然漏了失效巡检
-        if re.search(r"仅[「\"']?检查更新[」\"']?(这一个动作)?会联网", t) and "L2" not in t:
-            stale.append("%s 仍是两档旧口径（只提检查更新会联网，未提 L2 失效巡检）" % rel)
+        # 旧两档口径：只说「仅检查更新会联网」且整篇未提 E2（四档）→ 必然漏了失效巡检
+        if re.search(r"仅[「\"']?检查更新[」\"']?(这一个动作)?会联网", t) and "E2" not in t:
+            stale.append("%s 仍是两档旧口径（只提检查更新会联网，未提 E2 失效巡检）" % rel)
         # 出现「N 个脚本」但不等于真实数
         for m in re.finditer(r"(\d+)\s*个脚本", t):
             if int(m.group(1)) != n_py:
                 wrong.append("%s 写 %s 个脚本（真实 %d）" % (rel, m.group(1), n_py))
-        # 若文档声称四档（含 L2），则四档计数须与真源一致（防止手填数字漂）
-        if tier and "L2" in t:
+        # 若文档声称四档（含 E2），则四档计数须与真源一致（防止手填数字漂）
+        if tier and "E2" in t:
             for code, val in tier.items():
                 for mm in re.finditer(r"%s[^\n]{0,20}?(\d+)\s*个" % code, t):
                     if int(mm.group(1)) != val:

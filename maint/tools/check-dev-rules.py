@@ -1632,7 +1632,7 @@ def check_impl_table(s):
             continue
         for c in re.findall(r"`([^`\n]+)`", line):
             c = c.strip()
-            # 排除：空、含空格（是句子不是路径）、命令行参数、代码片段（`# net-tier: L0`）
+            # 排除：空、含空格（是句子不是路径）、命令行参数、代码片段（`# net-tier: E0`）
             if not c or " " in c or c.startswith("--") or c.startswith("#"):
                 continue
             if "/" in c or re.match(r"^[\w\-.·]+\.(md|py|json|zip)$", c):

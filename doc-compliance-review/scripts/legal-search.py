@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# net-tier: L0  接触文档内容 → 绝对离线，不得引入任何网络库
+# net-tier: E0  接触文档内容 → 绝对离线，不得引入任何网络库
 """法规检索（要件呈现）—— legal-articles.json 的第二个消费者
 
 与 legal-verify.py 的分工

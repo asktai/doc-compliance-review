@@ -1,6 +1,6 @@
 # 数据安全声明（一页版）｜ Data Security Statement
 
-**文档合规审查助手AI合同· doc-compliance-review** ｜ 版本：v3.26.11 ｜ 作者：胡皓 ｜ 2026-10-29
+**文档合规审查助手AI合同· doc-compliance-review** ｜ 版本：v3.26.12 ｜ 作者：胡皓 ｜ 2026-10-29
 
 > 本文可供**客户 IT / 法务 / 合规部门**审阅留档，是数据安全的**完整版**；`SKILL.md` 第十二节为其常驻摘要（四条要点＋脱敏口径），二者口径一致。
 
@@ -12,7 +12,7 @@
 
 | 编号 | 承诺 |
 |---|---|
-| **C1** | **文档数据不进入任何网络请求，也不进入任何 AI 模型的训练 / 微调 / 评测语料。** 本技能不收集、不上传、不缓存、不回传任何文档内容。**联网按「数据出域」分四档，不按"有没有联网"一刀切**（v3.23.5 起 `scripts/` 下共 **29 个脚本**）：**L0 绝对离线 24 个**——凡接触文档正文、脱敏映射表或私有规则的脚本，**零网络库、零出网路径**；这是唯一保留的一刀切，但它切在「**接触文档**」上，不切在「联网」上。**L1 在线只读 1 个**——`version.py` 查更新，只 GET 一份公开版本清单，**默认关闭**（须显式 `--check-online`）。**L2 不联网就用不成 2 个**——`legal-parse.py` 抓公开法规页、`freshness-patrol.py` 调它做法规库失效巡检；**法条是否已修订，不联网无从得知**，故这一档必须能联网，代价换到别处补：**须显式调用**、**不出现在审查链路上**、离线时明示降级而非静默假成功。**L3 门禁自检 2 个**——`check.py`、`smoke-test.py` 持有网络关键字清单用于检查别人，自身不发起联网。**四档同一条红线：任何一档的请求里都不含文档内容、文件名、映射表或私有规则。** 联网本身不是风险，**带着文档出去才是**——所以这里承诺的是"文档不出域"，不是"不联网"。逐档名单与自检命令见第五节。 |
+| **C1** | **文档数据不进入任何网络请求，也不进入任何 AI 模型的训练 / 微调 / 评测语料。** 本技能不收集、不上传、不缓存、不回传任何文档内容。**联网按「数据出域」分四档，不按"有没有联网"一刀切**（v3.23.5 起 `scripts/` 下共 **29 个脚本**）：**E0 绝对离线 24 个**——凡接触文档正文、脱敏映射表或私有规则的脚本，**零网络库、零出网路径**；这是唯一保留的一刀切，但它切在「**接触文档**」上，不切在「联网」上。**E1 在线只读 1 个**——`version.py` 查更新，只 GET 一份公开版本清单，**默认关闭**（须显式 `--check-online`）。**E2 不联网就用不成 2 个**——`legal-parse.py` 抓公开法规页、`freshness-patrol.py` 调它做法规库失效巡检；**法条是否已修订，不联网无从得知**，故这一档必须能联网，代价换到别处补：**须显式调用**、**不出现在审查链路上**、离线时明示降级而非静默假成功。**E3 门禁自检 2 个**——`check.py`、`smoke-test.py` 持有网络关键字清单用于检查别人，自身不发起联网。**四档同一条红线：任何一档的请求里都不含文档内容、文件名、映射表或私有规则。** 联网本身不是风险，**带着文档出去才是**——所以这里承诺的是"文档不出域"，不是"不联网"。逐档名单与自检命令见第五节。 |
 | **C2** | **不改动原始文件。** 原件只读、永远留存；全部交付物均为新建文件。 |
 | **C3** | **最小必要。** 只读取必要范围；脱敏只脱必要类别；凡数据出域，**先脱敏**。 |
 | **C4** | **脱敏可逆、映射表隔离。** 映射表（含真实值的明文对照表）默认只落**本机隔离目录** `~/.dcr-maps/`，**不随交付物外发**；可 `--irreversible` 选择不生成映射表。 |
@@ -65,7 +65,7 @@
 
 | 编号 | 措施 | 说明 |
 |---|---|---|
-| **T1** | 联网分级（安全引擎） | 不按"有没有 urllib"一刀切，按**数据出域**分四档：`L0` 接触文档的 **24 个脚本零网络库**；`L1` **1 个**（查更新，默认关）；`L2` **2 个**（法规抓取／失效巡检，**不联网做不成**，故允许联网但须显式调用、且不在审查链路上）；`L3` **2 个**（门禁自检，自身不联网）。**任何一档都不携带文档内容出网**。依赖仅标准库＋ `python-docx`/`openpyxl`/`Pillow`；除"审查判断"（模型层，由平台决定）与"法规时效巡检"（L2）外**全部环节可离线完成**，关掉在线项后功能不降级 |
+| **T1** | 联网分级（安全引擎） | 不按"有没有 urllib"一刀切，按**数据出域**分四档：`E0` 接触文档的 **24 个脚本零网络库**；`E1` **1 个**（查更新，默认关）；`E2` **2 个**（法规抓取／失效巡检，**不联网做不成**，故允许联网但须显式调用、且不在审查链路上）；`E3` **2 个**（门禁自检，自身不联网）。**任何一档都不携带文档内容出网**。依赖仅标准库＋ `python-docx`/`openpyxl`/`Pillow`；除"审查判断"（模型层，由平台决定）与"法规时效巡检"（E2）外**全部环节可离线完成**，关掉在线项后功能不降级 |
 | **T2** | 无缓存留痕 | 脚本禁止生成 `__pycache__`；`check.py --clean` 可清残留 |
 | **T3** | 脚本防篡改 | `check.py --sign` 建指纹基线、`--verify` 校验，被改动即告警 |
 | **T4** | 无执行策略绕过 | 校验用纯 Python `check.py`，不需要 PowerShell 执行策略绕过参数 |
@@ -77,14 +77,19 @@
 
 **联网档位自检（两问两答）。**
 
+> **档位的 `E` 是 Egress（数据出域）**，不是「等级高低」——数字越大，允许的出域越多；**E0 为零出域**。
+> 2026-10-30 起由 `L0—L3` 改为 `E0—E3`：本项目里 `L` 已用于**条款风险等级**（`L1/L2/L3`，见通用风险规则），
+> 同一个字母指两件事，读者必然把「L3 条款」读成「L3 档位」。改字母而不是改风险等级，是因为风险等级
+> 写在全部行业规则库里（`L3@food` 这类标识已成体系），换它等于换号全库。
+
 **问一：每个脚本属于哪一档？** 下面是**当前全部 29 个脚本的逐一定档**（与脚本源码里的自标一一对应，
 `check.py` 每次自检都会拿它与代码比对，**改一边不动另一边当场报错**）：
 
 ```
-L0: _config.py desensitize.py detect-tools.py dist-mode.py gb9704.py guard.py harden-dir.py imbalance.py legal-compile.py legal-crosscheck.py legal-search.py legal-verify.py local-only.py make-docx.py make-header.py pack.py preprocess.py rule-baseline.py sample-baseline.py set-workdir.py structure.py tpl-engine.py verify-dist.py verify.py
-L1: version.py
-L2: freshness-patrol.py legal-parse.py
-L3: check.py smoke-test.py
+E0: _config.py desensitize.py detect-tools.py dist-mode.py gb9704.py guard.py harden-dir.py imbalance.py legal-compile.py legal-crosscheck.py legal-search.py legal-verify.py local-only.py make-docx.py make-header.py pack.py preprocess.py rule-baseline.py sample-baseline.py set-workdir.py structure.py tpl-engine.py verify-dist.py verify.py
+E1: version.py
+E2: freshness-patrol.py legal-parse.py
+E3: check.py smoke-test.py
 ```
 
 一次命令即可复核（输出应当与上面四行**逐字相同**）：
@@ -98,7 +103,7 @@ python scripts/check.py | grep "安全引擎"                              # 看
 清空 `config.json` 的 `update` 段后跑 `python scripts/version.py --notice`，**零输出、退出码 0** 即证明默认不发请求。
 
 若改用"搜网络关键字"的办法（更原始，但客户 IT 爱用），**判据不要看总数，要看档位**：
-命中名单里**只要出现任何一个 L0 档脚本，就是问题**；出现在 L1／L2／L3 档则属正常。
+命中名单里**只要出现任何一个 E0 档脚本，就是问题**；出现在 E1／E2／E3 档则属正常。
 
 ```bash
 python -c "import pathlib; ks=('requests','urllib','socket','http.client','aiohttp','httpx','curl','wget','Invoke-WebRequest','smtplib'); print(sorted(f.name for f in pathlib.Path('scripts').glob('*.py') if any(k in f.read_text(encoding='utf-8',errors='ignore') for k in ks)))"

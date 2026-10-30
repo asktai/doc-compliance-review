@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# net-tier: L0  接触文档内容 → 绝对离线，不得引入任何网络库
+# net-tier: E0  接触文档内容 → 绝对离线，不得引入任何网络库
 import sys as _sys
 
 # 输出编码保护：非 UTF-8 终端（Windows GBK 控制台、重定向到文件时）print 中文会抛
