@@ -3776,6 +3776,56 @@ def _walk(base, exts):
                 yield os.path.join(r, x)
 
 
+def check_type_numbering():
+    """交付物类型编号咬合守卫（v3.32.1 加）：三处 10 类清单必须同号同名。
+
+    背景（事故留痕）：v3.27.0 重排编号（默认两类 1、2 置前）后，SKILL 第三节清单
+    的 2/5 没跟上（2 写成批注版、5 写成报告），与 1.0.2 清单、make-docx.py 文件头、
+    安装使用教程、提示词版全部相反；另有多处「4 批注版」「1、3 走原稿级修订」等
+    旧编号残留。两处同题不同号，用户按哪处作答都有一半概率拿错件。
+    守卫对三处清单各抽「编号 → 类型名」映射，互相比对——
+    任何一处漂移（改名单没改号、互换两行只改一行）即红。
+    """
+    md = _read(os.path.join(ROOT, "scripts", "make-docx.py"))
+    sk = _read(os.path.join(ROOT, "SKILL.md"))
+    if not md or not sk:
+        return
+
+    def pairs(text, rx):
+        out = {}
+        for n, name in re.findall(rx, text):
+            n = int(n)
+            if 1 <= n <= 10 and n not in out:
+                out[n] = name
+        return out
+
+    # 真源①：make-docx.py 文件头清单（`1) 修订版（首选）  2) 审查意见报告 …`）
+    src_engine = pairs(md, r"(\d{1,2})\)\s*(修订版|审查意见报告|清洁版|红线标记修订版|审查意见批注版|原文脱敏版|原文照录版|文件比对报告|新旧比对|模板版)")
+    # 真源②：SKILL 1.0.2 开场清单第 8 题（`1 修订版（默认） ｜ 2 审查意见报告 …`）
+    src_list = pairs(sk, r"(\d{1,2})\s+(修订版|审查意见报告|清洁版|红线标记修订版|审查意见批注版|原文脱敏版|原文照录版|文件比对报告|新旧比对|模板版)")
+    # 真源③：SKILL 第三节交付物清单（`2.  审查意见报告 —— …`）
+    _m3 = re.search(r"```\s*\n(\s*【Qn · 交付物类型.*?)```", sk, re.S)
+    src_sec = pairs(_m3.group(1), r"(\d{1,2})\.\s+(修订版|审查意见报告|清洁版|红线标记修订版|审查意见批注版|原文脱敏版|原文照录版|文件比对报告|新旧比对|模板版)") if _m3 else {}
+
+    if len(src_engine) != 10:
+        err("类型编号咬合：make-docx.py 文件头清单只解析出 %d 类（应为 10 类）——清单被改形" % len(src_engine))
+        return
+    if len(src_list) != 10:
+        err("类型编号咬合：SKILL 1.0.2 清单第 8 题只解析出 %d 类（应为 10 类）——清单被改形" % len(src_list))
+        return
+    if len(src_sec) != 10:
+        err("类型编号咬合：SKILL 第三节交付物清单只解析出 %d 类（应为 10 类）——清单被改形" % len(src_sec))
+        return
+    for label, got in (("SKILL 1.0.2 清单", src_list), ("SKILL 第三节清单", src_sec)):
+        diff = {n: (src_engine[n], got[n]) for n in sorted(src_engine) if got.get(n) != src_engine[n]}
+        if diff:
+            bad = "；".join("第%d类 真源=%s/该处=%s" % (n, a, b) for n, (a, b) in diff.items())
+            err("类型编号咬合：%s 与 make-docx.py 文件头不一致（%s）——"
+                "两处同题不同号，用户按号作答会拿错件" % (label, bad))
+            return
+    info("类型编号咬合：make-docx 文件头 ↔ SKILL 1.0.2 清单 ↔ SKILL 第三节清单，10 类同号同名")
+
+
 def main():
     ap = argparse.ArgumentParser(description="文档合规审查助手AI合同 · 结构与环境自检（Python 版，替代 check.ps1）")
     ap.add_argument("--sign", action="store_true", help="生成/刷新脚本完整性指纹")
@@ -3809,6 +3859,7 @@ def main():
         check_smoke_count()
         check_doc_number_caliber()
         _check_doc_consistency()
+        check_type_numbering()
         _check_pseudo_controls()
         _check_menu_entries()
         check_package_fields()

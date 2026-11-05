@@ -3,7 +3,7 @@
   "product": "文档合规审查助手AI合同",
   "skill_id": "doc-compliance-review",
   "latest": {
-    "version": "v3.32.0",
+    "version": "v3.32.1",
     "date": "2026-11-05",
     "summary": "精要总结入口与交付物导图收口：产物隔离到 _精要总结/、同源改由门禁断言、导图形态菜单统一为 SVG/HTML/PNG 三种＋MD 大纲附加",
     "changes": [
@@ -14,11 +14,22 @@
       "附带修掉一项真缺陷：快速档用一条 skip 顶掉全量档四条 check，两档项数不守恒（265／270），会让 check_smoke_count 在别处误报「装完即红」；现已逐条对齐，台账分键记 total_full／total_fast 并由 check.py 断言相等。冒烟 271 项。"
     ],
     "files": {
-      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.32.0/文档合规审查助手AI合同_v3.32.0_20261105_(doc-compliance-review).skill",
-      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.32.0/文档合规审查助手AI合同_v3.32.0_20261105_(doc-compliance-review).zip"
+      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.32.1/文档合规审查助手AI合同_v3.32.1_20261105_(doc-compliance-review).skill",
+      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.32.1/文档合规审查助手AI合同_v3.32.1_20261105_(doc-compliance-review).zip"
     }
   },
   "history": [
+    {
+      "version": "v3.32.1",
+      "date": "2026-11-05",
+      "summary": "交付物类型编号冲突修复：SKILL 第三节清单 2/5 写反改回真源口径，扫除 v3.26.16/v3.27.0 重编号残留旧号，新增三清单编号咬合守卫；纯文档与注释，零行为变更。",
+      "changes": [
+        "SKILL 第三节交付物清单 2/5 名称互换改回（2 审查意见报告、5 审查意见批注版），与 1.0.2 清单/make-docx 文件头/教程/提示词版对齐。",
+        "顺带扫除重编号残留：SKILL 样式档位适用类 1、3、5、6、7→1、3、4、6、7，原稿级修订 1、3→1、4，抬头五类注记；make-docx.py 九处注释「4 批注版」「3 红线版」等旧号；smoke-test 一处打印标签。",
+        "新增门禁守卫 check_type_numbering：make-docx 文件头 ↔ SKILL 1.0.2 清单 ↔ SKILL 第三节清单三处 10 类映射逐号比对，漂移即红（注入旧冲突实测拦截）。",
+        "脚本行为零改动，产物字节级不变。"
+      ]
+    },
     {
       "version": "v3.32.0",
       "date": "2026-11-05",
@@ -1011,5 +1022,5 @@
   ],
   "_维护说明": "出包后请同步更新本文件（latest 段与 history）。真源是 SKILL.md 的 version 与 VERSION.md 的沿革；本文件是'对外公布的清单'，须与真源一致，否则使用者会被引向旧版。",
   "schema": 1,
-  "version": "3.32.0"
+  "version": "3.32.1"
 }

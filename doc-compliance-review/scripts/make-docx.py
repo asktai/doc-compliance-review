@@ -29,7 +29,7 @@
     类型／审查人／轮次／时间写入 **docx 核心属性**（资源管理器右键「属性」即见）与文件名。
     1、4 另在标题上挂 **1 条「这是什么文件」批注 ＋ 每处修改 1 条意见批注**；
     3、6、7 **零批注**（可能对外发出或纯原文转录，不夹带内部审查意见）。
-    4 批注版走原稿路线时正文即原稿，同样不加抬头；只有降级重建形态才是新写文书。
+    5 批注版走原稿路线时正文即原稿，同样不加抬头；只有降级重建形态才是新写文书。
     报告类（5、8、9、10）是本技能新写的文书，标题与报告免责声明属文书固有内容，不适用此节。
   · 类型 8（文件比对报告）：比对**两份文件 / 两个版本**（如对方回稿 ↔ 我方上版），
     输入 spec.compare{a_text,b_text,a_label,b_label}，或命令行 --cmp-a/--cmp-b 指定文本文件；
@@ -68,7 +68,7 @@
                 可用 --out 覆盖；--subdir 建子文件夹）
   （--ts 建议由 AI 传入准确时间，勿依赖本机时钟）
   --types 可用 slug（tracked/redline/clean/report/reportc/masked/original/diff/compare/template）或中文类型名。
-  --source-docx <原稿.docx>：半档C 排版保真，对 1修订版/4批注版/5清洁版/3红线版/6脱敏版/7照录版 生效；
+  --source-docx <原稿.docx>：半档C 排版保真，对 1修订版/5批注版/3清洁版/4红线版/6脱敏版/7照录版 生效；
                             1、3 在原稿既有 run 之间插修订痕迹（w:ins/w:del 或红线格式），
                             4 只挂批注、正文一字不改，5、6、7 只做段落级替换文字；均保留原稿版式。
                              **格式预读**：按文件头判断真实格式（不看扩展名）——.docx 直接用；
@@ -353,7 +353,7 @@ def set_meta(doc, spec, slug, fallback=""):
                 doc.custom_properties["dcr-source-kind"] = CURRENT_SRC_KIND
         if fallback:
             # 两种降级不能混为一谈：完全没落到原稿（重建）vs 部分条款没落位（仍是原稿件）
-            # 4 批注版的落位与否看 COMMENT_FALLBACK（tracked/redline 用 REV_FALLBACK），
+            # 5 批注版的落位与否看 COMMENT_FALLBACK（tracked/redline 用 REV_FALLBACK），
             # 措辞也随类型变：批注版「没落位」＝这条意见没挂上，不是正文没改。
             _is_cm = (slug == "reportc")
             _st = COMMENT_FALLBACK if _is_cm else REV_FALLBACK
@@ -397,7 +397,7 @@ def add_delivery_note(doc, runs, slug, spec=None):
 
 
 def _note_text(c):
-    """一条审查意见的批注正文：4 批注版与 1／3 的条款批注共用同一份措辞（一概念一处）。"""
+    """一条审查意见的批注正文：5 批注版与 1／4 的条款批注共用同一份措辞（一概念一处）。"""
     if not (c.get("rating") or c.get("comment") or c.get("basis") or c.get("revised")):
         return ""
     return ("【评级】%s\n【风险描述】%s\n【法律依据】%s\n【修改建议】%s"
@@ -420,7 +420,7 @@ def add_clause_note(doc, runs, c):
     """条款标题上挂 1 条审查意见批注；无实质意见时不挂。
 
     锚点只能取条款标题：修订版的正文文字都在 w:ins／w:del 里，取不到可锚定的 run。
-    措辞与 4 批注版共用 _note_text（同一份「评级／风险描述／法律依据／修改建议」口径），
+    措辞与 5 批注版共用 _note_text（同一份「评级／风险描述／法律依据／修改建议」口径），
     避免同一条意见在两类交付物里长得不一样。
     """
     if not runs or not can_comment(doc):
@@ -509,7 +509,7 @@ def doc_trackchanges(spec):
     return doc
 
 def doc_redline(spec):
-    """3 红线标记修订版：同 tracked 的呈现口径，痕迹用删除线/下划线而非 Word 修订。
+    """4 红线标记修订版：同 tracked 的呈现口径，痕迹用删除线/下划线而非 Word 修订。
 
     有原稿 .docx 时同样走原稿级修订（痕迹是格式标记，不依赖 Word 修订功能）。
     """
@@ -576,7 +576,7 @@ def doc_report(spec):
     return doc
 
 def doc_report_comments(spec):
-    """4 审查意见批注版：**原稿就地批注**——正文保持原稿一字不改，意见以 Word 批注锚定到对应条款。
+    """5 审查意见批注版：**原稿就地批注**——正文保持原稿一字不改，意见以 Word 批注锚定到对应条款。
 
     有可读原稿时走 from_source_docx_comment（原稿做底，段落／run 格式／版式全不动）；
     无原稿、原稿打不开或一条都定位不到时，才回退下面「重建清单」形态——它是**新写文书**，
@@ -868,7 +868,7 @@ def from_source_docx(spec, kind):
 
 # ---------- 半档 C 结束 ----------
 
-# ---------- 半档 C·修订：以原稿做底注入修订痕迹（1 修订版 / 3 红线版） ----------
+# ---------- 半档 C·修订：以原稿做底注入修订痕迹（1 修订版 / 4 红线版） ----------
 # 与上面「半档 C」的区别：那一档是**整段换字**（供 5/6/7），这一档是**在既有 run 之间插痕迹**
 # （供 1/4）。前提是原稿段落与条款对得上：按 heading／原文片段定位；定位不到的逐处跳过，
 # **绝不猜** —— 猜错会把修订痕迹打到不相干的条款上，比降级严重得多。
@@ -1124,7 +1124,7 @@ def _rev_find_span(cur, o):
 def from_source_docx_rev(spec, kind):
     """原稿级修订：以原稿 docx 为底，把 clauses 的修订注入为痕迹。
 
-    kind=tracked（1 修订版）／redline（3 红线版）。
+    kind=tracked（1 修订版）／redline（4 红线版）。
     原稿格式由 prepare_source 预读（.doc 会先转 .docx）。
     成功返回 doc；返回 None 表示降级（原因已写入 REV_FALLBACK["reason"]）。
     """
@@ -1207,7 +1207,7 @@ COMMENT_FALLBACK = {"reason": "", "hit": 0, "miss": 0}   # 供主流程读取并
 
 
 def from_source_docx_comment(spec):
-    """4 批注版·原稿就地批注：以原稿为底，**正文一字不改**，每条意见挂成 Word 批注。
+    """5 批注版·原稿就地批注：以原稿为底，**正文一字不改**，每条意见挂成 Word 批注。
 
     成功返回 doc（原稿件，段落序列与原稿完全一致）；返回 None 表示降级，原因写入
     COMMENT_FALLBACK["reason"]，调用方回退「重建清单」形态并显式标注「非原稿批注」。
