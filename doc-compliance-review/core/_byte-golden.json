@@ -1,0 +1,634 @@
+{
+  "_说明": "字节级回归基线（reviewer=GOLDEN、ts=20260101-0000、9 类 × 全格式）。重构期间每阶段须一致——默认档位产物不许有任何改动。OOXML 按解包后成员内容哈希比对（zip 时间戳每次不同，对整文件哈希是假信号），其余按整文件哈希。重生成 python /tmp/gen-golden.py gen；比对 check",
+  "reviewer": "GOLDEN",
+  "ts": "20260101-0000",
+  "count": 51,
+  "digests": {
+    "设备采购合同_原文照录版-准原稿B_GOLDEN_r1_20260101-0000.docx": {
+      "kind": "ooxml",
+      "members": {
+        "[Content_Types].xml": "66c84fb7a6aa3c4ead49f895e4a7044df1fb57de1ed76d09b2686e91f5bed5b4",
+        "_rels/.rels": "a9ae57efe9186f07d48303bcac5d54c7e359bf3f503939c03ad2954e5c59a5c4",
+        "customXml/_rels/item1.xml.rels": "1ca6c9a64edcebe24ee703a54403611b322d96da33371779e742d2d3f7ed7a6c",
+        "customXml/item1.xml": "a86086ffc5d8e83ebd6c71a55d1d2efaa31b137977f5f3a752366e1023612144",
+        "customXml/itemProps1.xml": "c542307b13ec29a8b546217bb37936ab4822e044b265d2952985ec3d6afed24e",
+        "docProps/app.xml": "be664981c3141cddfc59362beb287ebf20d0773660e2dd6faac5968a5930a081",
+        "docProps/core.xml": "39e28d0691c7e9c0b7836a0ff33e37bdfbf813db8668207f57ceed08d29e8d86",
+        "docProps/thumbnail.jpeg": "96367138dc44ce09bf2c8f0f8e49348a1478d2c5c0af69bbc2bbc38b63cdcead",
+        "word/_rels/document.xml.rels": "1e7f0eb144a98e199249314f61ff32a8de2a27e56d8e9ee6b524e1c6b235d377",
+        "word/document.xml": "233a5508bdbb7f4ed1991667380e9072eab024372b7655031f43d7be40b2c9f2",
+        "word/fontTable.xml": "79385fb7f60247507ecaffc292e9ebd52ea0657b8634f629ba6fccc54011d6bb",
+        "word/numbering.xml": "70976f19cbcd896e51890859fe6ecb3467a5a7ad0c040160fedc5a1993cb09ce",
+        "word/settings.xml": "51a0d348fe85965c66e4748a03c3c0d055d78455514f03cb121c334af7d73689",
+        "word/styles.xml": "02d71a68ddb92c055e84526d6a9e45700be3872781ababf759241694bc30e384",
+        "word/stylesWithEffects.xml": "463ae0928cf0d84775dbf8cf18d6c3029f6707c81bf590f6d6dd8757a5e93f15",
+        "word/theme/theme1.xml": "e3a8ab7db9ca7afca56f5f2820a56e8b660016c647773555b060b0a02ac76941",
+        "word/webSettings.xml": "349d36de7434d09f86987ff671d8814964a0588c1e630c06e562cda7e75e9f95"
+      }
+    },
+    "设备采购合同_原文照录版-准原稿B_GOLDEN_r1_20260101-0000.html": {
+      "kind": "file",
+      "sha256": "6a9359f8b5fda41cbaa61a7d952442b7f86074c0f15a7b1c7f68b512ff6f08be"
+    },
+    "设备采购合同_原文照录版-准原稿B_GOLDEN_r1_20260101-0000.md": {
+      "kind": "file",
+      "sha256": "37012e809c1355bbfd173a2ce48ebec9bd9b850b277b578cedebe9eff5d45d36"
+    },
+    "设备采购合同_原文照录版-准原稿B_GOLDEN_r1_20260101-0000.xlsx": {
+      "kind": "ooxml",
+      "members": {
+        "[Content_Types].xml": "ba5af858089dd3357b4e4408a86694ff0a62ec37f21ef57a3a09544dc0ab18c4",
+        "_rels/.rels": "c545941ba36c15fcdce4ae4568c663f3ced1a2226ad5082d3fd66b178bfac11a",
+        "docProps/app.xml": "209fca6b00afe72a5029754b94be5953d8f16d96f67130325566b9366ad4ccc5",
+        "docProps/core.xml": "f4ad71e3e1f9de145b0977e80f1d0bf0e9b53084150d163decdfe5d016317c91",
+        "xl/_rels/workbook.xml.rels": "26ad8fcc38d41229833e624496df364492772697ad2e5d6696e1738f05ba225f",
+        "xl/styles.xml": "017a42024cc673d61ae44a796710f7ac1f9012ad9966b71efe59d4c420e6e5ea",
+        "xl/theme/theme1.xml": "d15e8ebf78ef7b9720839d7ae8fdc81a7df5bc24706d8e137df61a5683c358d9",
+        "xl/workbook.xml": "3c346608c620a8f598f14815612fad341440231d55530a8313077b2fadb0bd4c",
+        "xl/worksheets/sheet1.xml": "783ab8912faf1128df9ed877f6d4aa7b23380c6874592a7ed399a7614f47b961"
+      }
+    },
+    "设备采购合同_原文脱敏版_GOLDEN_r1_20260101-0000.docx": {
+      "kind": "ooxml",
+      "members": {
+        "[Content_Types].xml": "66c84fb7a6aa3c4ead49f895e4a7044df1fb57de1ed76d09b2686e91f5bed5b4",
+        "_rels/.rels": "a9ae57efe9186f07d48303bcac5d54c7e359bf3f503939c03ad2954e5c59a5c4",
+        "customXml/_rels/item1.xml.rels": "1ca6c9a64edcebe24ee703a54403611b322d96da33371779e742d2d3f7ed7a6c",
+        "customXml/item1.xml": "a86086ffc5d8e83ebd6c71a55d1d2efaa31b137977f5f3a752366e1023612144",
+        "customXml/itemProps1.xml": "c542307b13ec29a8b546217bb37936ab4822e044b265d2952985ec3d6afed24e",
+        "docProps/app.xml": "be664981c3141cddfc59362beb287ebf20d0773660e2dd6faac5968a5930a081",
+        "docProps/core.xml": "70118b38e3dc688e3c646af5c6334e26e0a70315a853bb8fb290980a49df34cc",
+        "docProps/thumbnail.jpeg": "96367138dc44ce09bf2c8f0f8e49348a1478d2c5c0af69bbc2bbc38b63cdcead",
+        "word/_rels/document.xml.rels": "1e7f0eb144a98e199249314f61ff32a8de2a27e56d8e9ee6b524e1c6b235d377",
+        "word/document.xml": "233a5508bdbb7f4ed1991667380e9072eab024372b7655031f43d7be40b2c9f2",
+        "word/fontTable.xml": "79385fb7f60247507ecaffc292e9ebd52ea0657b8634f629ba6fccc54011d6bb",
+        "word/numbering.xml": "70976f19cbcd896e51890859fe6ecb3467a5a7ad0c040160fedc5a1993cb09ce",
+        "word/settings.xml": "51a0d348fe85965c66e4748a03c3c0d055d78455514f03cb121c334af7d73689",
+        "word/styles.xml": "02d71a68ddb92c055e84526d6a9e45700be3872781ababf759241694bc30e384",
+        "word/stylesWithEffects.xml": "463ae0928cf0d84775dbf8cf18d6c3029f6707c81bf590f6d6dd8757a5e93f15",
+        "word/theme/theme1.xml": "e3a8ab7db9ca7afca56f5f2820a56e8b660016c647773555b060b0a02ac76941",
+        "word/webSettings.xml": "349d36de7434d09f86987ff671d8814964a0588c1e630c06e562cda7e75e9f95"
+      }
+    },
+    "设备采购合同_原文脱敏版_GOLDEN_r1_20260101-0000.html": {
+      "kind": "file",
+      "sha256": "1c1ae975ddadc2102ed94b5f6a865cef743fae3632115ef5373428e79475604f"
+    },
+    "设备采购合同_原文脱敏版_GOLDEN_r1_20260101-0000.md": {
+      "kind": "file",
+      "sha256": "1d04287fe56038b31b06c75734e5cbcc7557c9fc2ebed475fc2d8e29d20456c3"
+    },
+    "设备采购合同_原文脱敏版_GOLDEN_r1_20260101-0000.xlsx": {
+      "kind": "ooxml",
+      "members": {
+        "[Content_Types].xml": "ba5af858089dd3357b4e4408a86694ff0a62ec37f21ef57a3a09544dc0ab18c4",
+        "_rels/.rels": "c545941ba36c15fcdce4ae4568c663f3ced1a2226ad5082d3fd66b178bfac11a",
+        "docProps/app.xml": "209fca6b00afe72a5029754b94be5953d8f16d96f67130325566b9366ad4ccc5",
+        "docProps/core.xml": "f4ad71e3e1f9de145b0977e80f1d0bf0e9b53084150d163decdfe5d016317c91",
+        "xl/_rels/workbook.xml.rels": "26ad8fcc38d41229833e624496df364492772697ad2e5d6696e1738f05ba225f",
+        "xl/styles.xml": "017a42024cc673d61ae44a796710f7ac1f9012ad9966b71efe59d4c420e6e5ea",
+        "xl/theme/theme1.xml": "d15e8ebf78ef7b9720839d7ae8fdc81a7df5bc24706d8e137df61a5683c358d9",
+        "xl/workbook.xml": "36d94ccce532952dbaddfbaa369ee2251a52b499bffe5dfa40b2baa0b10eae1c",
+        "xl/worksheets/sheet1.xml": "783ab8912faf1128df9ed877f6d4aa7b23380c6874592a7ed399a7614f47b961"
+      }
+    },
+    "设备采购合同_审查意见批注版-准原稿B_GOLDEN_r1_20260101-0000.docx": {
+      "kind": "ooxml",
+      "members": {
+        "[Content_Types].xml": "a61e2cb9fb6b6ba9eb602e45251b9bc7a0a7687d424544e6acadf64957255d9d",
+        "_rels/.rels": "a9ae57efe9186f07d48303bcac5d54c7e359bf3f503939c03ad2954e5c59a5c4",
+        "customXml/_rels/item1.xml.rels": "1ca6c9a64edcebe24ee703a54403611b322d96da33371779e742d2d3f7ed7a6c",
+        "customXml/item1.xml": "a86086ffc5d8e83ebd6c71a55d1d2efaa31b137977f5f3a752366e1023612144",
+        "customXml/itemProps1.xml": "c542307b13ec29a8b546217bb37936ab4822e044b265d2952985ec3d6afed24e",
+        "docProps/app.xml": "be664981c3141cddfc59362beb287ebf20d0773660e2dd6faac5968a5930a081",
+        "docProps/core.xml": "a91fa9ae670eb7dd81863c0e05380480913774f3ebdb661c5425c565c5fb158b",
+        "docProps/thumbnail.jpeg": "96367138dc44ce09bf2c8f0f8e49348a1478d2c5c0af69bbc2bbc38b63cdcead",
+        "word/_rels/document.xml.rels": "790a2e312a7996b0aac152e7e7c07dfa1abe2c654ca834da764ee737ff6afb70",
+        "word/comments.xml": "6f6420b3c162cd5cfe2937aa5e4b2be9f6c70138a6d664729cdcea0b670b5491",
+        "word/document.xml": "1238ed81158cfa2e9e53f6a62d34ead0f81c89c75b0e5e7e4de28b5a5885a3b4",
+        "word/fontTable.xml": "79385fb7f60247507ecaffc292e9ebd52ea0657b8634f629ba6fccc54011d6bb",
+        "word/numbering.xml": "70976f19cbcd896e51890859fe6ecb3467a5a7ad0c040160fedc5a1993cb09ce",
+        "word/settings.xml": "51a0d348fe85965c66e4748a03c3c0d055d78455514f03cb121c334af7d73689",
+        "word/styles.xml": "02d71a68ddb92c055e84526d6a9e45700be3872781ababf759241694bc30e384",
+        "word/stylesWithEffects.xml": "463ae0928cf0d84775dbf8cf18d6c3029f6707c81bf590f6d6dd8757a5e93f15",
+        "word/theme/theme1.xml": "e3a8ab7db9ca7afca56f5f2820a56e8b660016c647773555b060b0a02ac76941",
+        "word/webSettings.xml": "349d36de7434d09f86987ff671d8814964a0588c1e630c06e562cda7e75e9f95"
+      }
+    },
+    "设备采购合同_审查意见批注版-准原稿B_GOLDEN_r1_20260101-0000.html": {
+      "kind": "file",
+      "sha256": "499ef2c0ecaf0a2860e82e3a5afa8fb4f561b3b256e7c429fe07eb72ee75c842"
+    },
+    "设备采购合同_审查意见批注版-准原稿B_GOLDEN_r1_20260101-0000.md": {
+      "kind": "file",
+      "sha256": "d169e8473e7d961f650d04aadbe67d03f196aa19e05559ad8735ff894225e605"
+    },
+    "设备采购合同_审查意见批注版-准原稿B_GOLDEN_r1_20260101-0000.xlsx": {
+      "kind": "ooxml",
+      "members": {
+        "[Content_Types].xml": "ba5af858089dd3357b4e4408a86694ff0a62ec37f21ef57a3a09544dc0ab18c4",
+        "_rels/.rels": "c545941ba36c15fcdce4ae4568c663f3ced1a2226ad5082d3fd66b178bfac11a",
+        "docProps/app.xml": "209fca6b00afe72a5029754b94be5953d8f16d96f67130325566b9366ad4ccc5",
+        "docProps/core.xml": "f4ad71e3e1f9de145b0977e80f1d0bf0e9b53084150d163decdfe5d016317c91",
+        "xl/_rels/workbook.xml.rels": "26ad8fcc38d41229833e624496df364492772697ad2e5d6696e1738f05ba225f",
+        "xl/styles.xml": "017a42024cc673d61ae44a796710f7ac1f9012ad9966b71efe59d4c420e6e5ea",
+        "xl/theme/theme1.xml": "d15e8ebf78ef7b9720839d7ae8fdc81a7df5bc24706d8e137df61a5683c358d9",
+        "xl/workbook.xml": "efe473bafa36233fdaf2b4eb2f7f314a277cc79e45c50fba0da0266b3af5eb16",
+        "xl/worksheets/sheet1.xml": "32aa4978ab8fa64f51ea01956d227c913d115102ca61adeacd473b151aba6312"
+      }
+    },
+    "设备采购合同_审查意见报告_GOLDEN_r1_20260101-0000.docx": {
+      "kind": "ooxml",
+      "members": {
+        "[Content_Types].xml": "66c84fb7a6aa3c4ead49f895e4a7044df1fb57de1ed76d09b2686e91f5bed5b4",
+        "_rels/.rels": "a9ae57efe9186f07d48303bcac5d54c7e359bf3f503939c03ad2954e5c59a5c4",
+        "customXml/_rels/item1.xml.rels": "1ca6c9a64edcebe24ee703a54403611b322d96da33371779e742d2d3f7ed7a6c",
+        "customXml/item1.xml": "a86086ffc5d8e83ebd6c71a55d1d2efaa31b137977f5f3a752366e1023612144",
+        "customXml/itemProps1.xml": "c542307b13ec29a8b546217bb37936ab4822e044b265d2952985ec3d6afed24e",
+        "docProps/app.xml": "be664981c3141cddfc59362beb287ebf20d0773660e2dd6faac5968a5930a081",
+        "docProps/core.xml": "cff28268028abda5d60989affe0c74e5ba779a7aef1ec00acbcfc3e15bf58588",
+        "docProps/thumbnail.jpeg": "96367138dc44ce09bf2c8f0f8e49348a1478d2c5c0af69bbc2bbc38b63cdcead",
+        "word/_rels/document.xml.rels": "1e7f0eb144a98e199249314f61ff32a8de2a27e56d8e9ee6b524e1c6b235d377",
+        "word/document.xml": "f23bf6c6331faab99b70e2979205b6bb56c8724947b7c782b633f774a39e0f3c",
+        "word/fontTable.xml": "79385fb7f60247507ecaffc292e9ebd52ea0657b8634f629ba6fccc54011d6bb",
+        "word/numbering.xml": "70976f19cbcd896e51890859fe6ecb3467a5a7ad0c040160fedc5a1993cb09ce",
+        "word/settings.xml": "51a0d348fe85965c66e4748a03c3c0d055d78455514f03cb121c334af7d73689",
+        "word/styles.xml": "02d71a68ddb92c055e84526d6a9e45700be3872781ababf759241694bc30e384",
+        "word/stylesWithEffects.xml": "463ae0928cf0d84775dbf8cf18d6c3029f6707c81bf590f6d6dd8757a5e93f15",
+        "word/theme/theme1.xml": "e3a8ab7db9ca7afca56f5f2820a56e8b660016c647773555b060b0a02ac76941",
+        "word/webSettings.xml": "349d36de7434d09f86987ff671d8814964a0588c1e630c06e562cda7e75e9f95"
+      }
+    },
+    "设备采购合同_审查意见报告_GOLDEN_r1_20260101-0000.html": {
+      "kind": "file",
+      "sha256": "ac15be158d898d28f2a4f9d7542c6d06357eab138323ce0a1dbfdac9b8ff270f"
+    },
+    "设备采购合同_审查意见报告_GOLDEN_r1_20260101-0000.md": {
+      "kind": "file",
+      "sha256": "20e78e33c73ac4533ce9cad53fd174edb677219debf1eac3c88b2a3136df8eca"
+    },
+    "设备采购合同_审查意见报告_GOLDEN_r1_20260101-0000.pptx": {
+      "kind": "ooxml",
+      "members": {
+        "[Content_Types].xml": "4d45bdca7e7bc836ea9a2f4f261dffe5a7cd8cc2a19791033e97c0f31710cfc9",
+        "_rels/.rels": "694cc89ebda975bfb74644f943f86114504d64d5a6b2e420304f58ba494f0e11",
+        "docProps/app.xml": "77fbd43c41b96be9a40d41a267cd83108a274ee5860675dfb543828472d76867",
+        "docProps/core.xml": "8dee71d407626816b235f0e931a1b8796e4330fc93c4e49b1ea681882d2ee008",
+        "docProps/thumbnail.jpeg": "116f9aa8ea038e39ef47ee99a23592ab569cf77feafecd0a30e222369e931d25",
+        "ppt/_rels/presentation.xml.rels": "433aa0f2f785d4864cfe18c3c5ed432931da915b3678d6861b3ce3f4c2d6fc1e",
+        "ppt/presProps.xml": "b42af61236cda9ea4d781f60908296da476489b2828df32fc9625d996808087b",
+        "ppt/presentation.xml": "ec44797f63d16673afe8aa377b15b6ecf7852ca5355cb69526a2e40c1c4d6d7a",
+        "ppt/printerSettings/printerSettings1.bin": "d7768f87e07d29634782e448ece1cddd05a52b9499254222b1190bc8f6dc579e",
+        "ppt/slideLayouts/_rels/slideLayout1.xml.rels": "7c1f290acd6ca3ce664fe95aaf0b129bbb3cbf2b75c8d09905a2821641981027",
+        "ppt/slideLayouts/_rels/slideLayout10.xml.rels": "7c1f290acd6ca3ce664fe95aaf0b129bbb3cbf2b75c8d09905a2821641981027",
+        "ppt/slideLayouts/_rels/slideLayout11.xml.rels": "7c1f290acd6ca3ce664fe95aaf0b129bbb3cbf2b75c8d09905a2821641981027",
+        "ppt/slideLayouts/_rels/slideLayout2.xml.rels": "7c1f290acd6ca3ce664fe95aaf0b129bbb3cbf2b75c8d09905a2821641981027",
+        "ppt/slideLayouts/_rels/slideLayout3.xml.rels": "7c1f290acd6ca3ce664fe95aaf0b129bbb3cbf2b75c8d09905a2821641981027",
+        "ppt/slideLayouts/_rels/slideLayout4.xml.rels": "7c1f290acd6ca3ce664fe95aaf0b129bbb3cbf2b75c8d09905a2821641981027",
+        "ppt/slideLayouts/_rels/slideLayout5.xml.rels": "7c1f290acd6ca3ce664fe95aaf0b129bbb3cbf2b75c8d09905a2821641981027",
+        "ppt/slideLayouts/_rels/slideLayout6.xml.rels": "7c1f290acd6ca3ce664fe95aaf0b129bbb3cbf2b75c8d09905a2821641981027",
+        "ppt/slideLayouts/_rels/slideLayout7.xml.rels": "7c1f290acd6ca3ce664fe95aaf0b129bbb3cbf2b75c8d09905a2821641981027",
+        "ppt/slideLayouts/_rels/slideLayout8.xml.rels": "7c1f290acd6ca3ce664fe95aaf0b129bbb3cbf2b75c8d09905a2821641981027",
+        "ppt/slideLayouts/_rels/slideLayout9.xml.rels": "7c1f290acd6ca3ce664fe95aaf0b129bbb3cbf2b75c8d09905a2821641981027",
+        "ppt/slideLayouts/slideLayout1.xml": "25c93a2f186df69897585729d52fc610349e29dcf0b5b6080160df6490698709",
+        "ppt/slideLayouts/slideLayout10.xml": "1f8304c9d6c08ff9bd41b639d0c7e866b6515f61e6081c9ccc89ed8d0f8b4194",
+        "ppt/slideLayouts/slideLayout11.xml": "355ac266c2671b83b662759afb0ee0ecfb7cdd6ec936019ecef60dbc95c14dac",
+        "ppt/slideLayouts/slideLayout2.xml": "5f800acd9e43b9b438c987bd71cf0966b27ad02ce8df14df80708510cbd700be",
+        "ppt/slideLayouts/slideLayout3.xml": "e83a85b737e1447051ac7fd9bbaaba4ac1b4210cfc630cdcfcdbc191fdb141d1",
+        "ppt/slideLayouts/slideLayout4.xml": "1ebe316051a0caaac0e972989a7591e66d1fbb4a0764fe984c31a4ab5b6554bf",
+        "ppt/slideLayouts/slideLayout5.xml": "3df8e6f498622ef440f5568a2c967c97f47c74b46b47a976304c7b7c9ab54c74",
+        "ppt/slideLayouts/slideLayout6.xml": "18e5b26c6f7c30dabe0b294faf38b2d2ef60ae778fbba9c3fe71f6560143a402",
+        "ppt/slideLayouts/slideLayout7.xml": "e4d86b009a8ca6ca9ecfadc97c68b7123b60544df09a7ea42864a4f5f74ce09c",
+        "ppt/slideLayouts/slideLayout8.xml": "950b9d16468d58fe59a8c0aeb17a03b7d18a9f5bbeac438e38a2248462a72cbe",
+        "ppt/slideLayouts/slideLayout9.xml": "4e9439878755a7faea188d684939b2fb7d26b7e09086e792789f9137ca353e15",
+        "ppt/slideMasters/_rels/slideMaster1.xml.rels": "52e5efa51d86e5426d78ad9b143b863e71d00c269f6494e759cf0b3adc900116",
+        "ppt/slideMasters/slideMaster1.xml": "44cc65956f47c1cf689803dcc7a1d9225c93d3fd90754a9f85e2bdcea27565bc",
+        "ppt/slides/_rels/slide1.xml.rels": "c56574a33fad9499b4afedfd47a59b0bc3bc892a903840b64a04b7c59b25b005",
+        "ppt/slides/_rels/slide10.xml.rels": "c56574a33fad9499b4afedfd47a59b0bc3bc892a903840b64a04b7c59b25b005",
+        "ppt/slides/_rels/slide2.xml.rels": "c56574a33fad9499b4afedfd47a59b0bc3bc892a903840b64a04b7c59b25b005",
+        "ppt/slides/_rels/slide3.xml.rels": "c56574a33fad9499b4afedfd47a59b0bc3bc892a903840b64a04b7c59b25b005",
+        "ppt/slides/_rels/slide4.xml.rels": "c56574a33fad9499b4afedfd47a59b0bc3bc892a903840b64a04b7c59b25b005",
+        "ppt/slides/_rels/slide5.xml.rels": "c56574a33fad9499b4afedfd47a59b0bc3bc892a903840b64a04b7c59b25b005",
+        "ppt/slides/_rels/slide6.xml.rels": "c56574a33fad9499b4afedfd47a59b0bc3bc892a903840b64a04b7c59b25b005",
+        "ppt/slides/_rels/slide7.xml.rels": "c56574a33fad9499b4afedfd47a59b0bc3bc892a903840b64a04b7c59b25b005",
+        "ppt/slides/_rels/slide8.xml.rels": "c56574a33fad9499b4afedfd47a59b0bc3bc892a903840b64a04b7c59b25b005",
+        "ppt/slides/_rels/slide9.xml.rels": "c56574a33fad9499b4afedfd47a59b0bc3bc892a903840b64a04b7c59b25b005",
+        "ppt/slides/slide1.xml": "72f21702a7c2531f4764ac4f9858409c290fd1bd063c793209862fe55a7740d5",
+        "ppt/slides/slide10.xml": "36bced6814806465785cc5923a609bbe28d3732bb221bed807f50a5445a11355",
+        "ppt/slides/slide2.xml": "d56d84a63ba766c190b1a2f4b5acb0654bb8af0b0f7fa6a7a0f995be63757b89",
+        "ppt/slides/slide3.xml": "add0b7912c0ae8a96e612064d555b90b7c367126d049edf712543faae4777097",
+        "ppt/slides/slide4.xml": "42a81005b6cb3b5115783ace7a469662dba28f8378ad1b8454e0cb2fd5a83695",
+        "ppt/slides/slide5.xml": "19bc29b2b91c3b06a8e9558d18f6c10de7ab869619b667b7af0c5a49db635c84",
+        "ppt/slides/slide6.xml": "c207ab72ee4376f59e564ee68532457275fc6fb1a9938d87871adb25d53213c8",
+        "ppt/slides/slide7.xml": "968f47f3b39e549f0d9ca77d7010c793dca003f4000a8b2deec2ad78f5a385e8",
+        "ppt/slides/slide8.xml": "a105fc42eb246d331e2d088c812da8bf8617404153c5fae55d00dfb986767bb1",
+        "ppt/slides/slide9.xml": "67ac303b84b5ba3f8ce41b816ac9b7bb5522c5da616a93813d684a1b19dabcd6",
+        "ppt/tableStyles.xml": "0e7ac03251337ecbaf6c8ca13619db1caeda5c90c4e3210d45d6c3f5df4de103",
+        "ppt/theme/theme1.xml": "4c3412087e8fa20cf5642f42e69f1e733881c28611a2bdd4622654ee313d214e",
+        "ppt/viewProps.xml": "f2e3578e8a2a2607ca7f850d99f2cbe5f22806084c8e519bb754388ed7ebdb69"
+      }
+    },
+    "设备采购合同_审查意见报告_GOLDEN_r1_20260101-0000.xlsx": {
+      "kind": "ooxml",
+      "members": {
+        "[Content_Types].xml": "ba5af858089dd3357b4e4408a86694ff0a62ec37f21ef57a3a09544dc0ab18c4",
+        "_rels/.rels": "c545941ba36c15fcdce4ae4568c663f3ced1a2226ad5082d3fd66b178bfac11a",
+        "docProps/app.xml": "209fca6b00afe72a5029754b94be5953d8f16d96f67130325566b9366ad4ccc5",
+        "docProps/core.xml": "f4ad71e3e1f9de145b0977e80f1d0bf0e9b53084150d163decdfe5d016317c91",
+        "xl/_rels/workbook.xml.rels": "26ad8fcc38d41229833e624496df364492772697ad2e5d6696e1738f05ba225f",
+        "xl/styles.xml": "017a42024cc673d61ae44a796710f7ac1f9012ad9966b71efe59d4c420e6e5ea",
+        "xl/theme/theme1.xml": "d15e8ebf78ef7b9720839d7ae8fdc81a7df5bc24706d8e137df61a5683c358d9",
+        "xl/workbook.xml": "efe473bafa36233fdaf2b4eb2f7f314a277cc79e45c50fba0da0266b3af5eb16",
+        "xl/worksheets/sheet1.xml": "32aa4978ab8fa64f51ea01956d227c913d115102ca61adeacd473b151aba6312"
+      }
+    },
+    "设备采购合同_审查意见报告_思维导图_GOLDEN_r1_20260101-0000.html": {
+      "kind": "file",
+      "sha256": "9821a5ac7c669f9773b8eedc3c1b67ae8c06a9f96c11850a13002de81cba3129"
+    },
+    "设备采购合同_审查意见报告_思维导图_GOLDEN_r1_20260101-0000.png": {
+      "kind": "file",
+      "sha256": "34495c8ab6e0fa964584f0f882aa6aceab836b14b8d56021840105208a711191"
+    },
+    "设备采购合同_审查意见报告_思维导图_GOLDEN_r1_20260101-0000.svg": {
+      "kind": "file",
+      "sha256": "78e9d528a65e808bcbc5d4311ebd7d45459b96b789407c0f9d5a1a97dab8403b"
+    },
+    "设备采购合同_文件比对报告_GOLDEN_r1_20260101-0000.docx": {
+      "kind": "ooxml",
+      "members": {
+        "[Content_Types].xml": "66c84fb7a6aa3c4ead49f895e4a7044df1fb57de1ed76d09b2686e91f5bed5b4",
+        "_rels/.rels": "a9ae57efe9186f07d48303bcac5d54c7e359bf3f503939c03ad2954e5c59a5c4",
+        "customXml/_rels/item1.xml.rels": "1ca6c9a64edcebe24ee703a54403611b322d96da33371779e742d2d3f7ed7a6c",
+        "customXml/item1.xml": "a86086ffc5d8e83ebd6c71a55d1d2efaa31b137977f5f3a752366e1023612144",
+        "customXml/itemProps1.xml": "c542307b13ec29a8b546217bb37936ab4822e044b265d2952985ec3d6afed24e",
+        "docProps/app.xml": "be664981c3141cddfc59362beb287ebf20d0773660e2dd6faac5968a5930a081",
+        "docProps/core.xml": "a3cf24bef73fa3f53f1f07a13ea8a2a5405fd04c7429b074b5913e5cdbfcbc38",
+        "docProps/thumbnail.jpeg": "96367138dc44ce09bf2c8f0f8e49348a1478d2c5c0af69bbc2bbc38b63cdcead",
+        "word/_rels/document.xml.rels": "1e7f0eb144a98e199249314f61ff32a8de2a27e56d8e9ee6b524e1c6b235d377",
+        "word/document.xml": "a4a7ea609f61ad71422359098966b058972c3a6b4b1961533e6f1bcedd81990a",
+        "word/fontTable.xml": "79385fb7f60247507ecaffc292e9ebd52ea0657b8634f629ba6fccc54011d6bb",
+        "word/numbering.xml": "70976f19cbcd896e51890859fe6ecb3467a5a7ad0c040160fedc5a1993cb09ce",
+        "word/settings.xml": "51a0d348fe85965c66e4748a03c3c0d055d78455514f03cb121c334af7d73689",
+        "word/styles.xml": "02d71a68ddb92c055e84526d6a9e45700be3872781ababf759241694bc30e384",
+        "word/stylesWithEffects.xml": "463ae0928cf0d84775dbf8cf18d6c3029f6707c81bf590f6d6dd8757a5e93f15",
+        "word/theme/theme1.xml": "e3a8ab7db9ca7afca56f5f2820a56e8b660016c647773555b060b0a02ac76941",
+        "word/webSettings.xml": "349d36de7434d09f86987ff671d8814964a0588c1e630c06e562cda7e75e9f95"
+      }
+    },
+    "设备采购合同_文件比对报告_GOLDEN_r1_20260101-0000.html": {
+      "kind": "file",
+      "sha256": "756e2b5bd442324698ce8ffa333604102588ed333f39dec6a6685efe16bee4dc"
+    },
+    "设备采购合同_文件比对报告_GOLDEN_r1_20260101-0000.md": {
+      "kind": "file",
+      "sha256": "f89ad40e585428fb67584680ae851280d85e12188a4efd7b68017034fbf89930"
+    },
+    "设备采购合同_文件比对报告_GOLDEN_r1_20260101-0000.pptx": {
+      "kind": "ooxml",
+      "members": {
+        "[Content_Types].xml": "badf1a6e897ff7002d91360eb5f49e00f59f84285a72a2bbc0a38949266a38e3",
+        "_rels/.rels": "694cc89ebda975bfb74644f943f86114504d64d5a6b2e420304f58ba494f0e11",
+        "docProps/app.xml": "77fbd43c41b96be9a40d41a267cd83108a274ee5860675dfb543828472d76867",
+        "docProps/core.xml": "8dee71d407626816b235f0e931a1b8796e4330fc93c4e49b1ea681882d2ee008",
+        "docProps/thumbnail.jpeg": "116f9aa8ea038e39ef47ee99a23592ab569cf77feafecd0a30e222369e931d25",
+        "ppt/_rels/presentation.xml.rels": "7cedb42825980b1882e75c1bb3a1a74ac06ef8c3159c01e8796e75cf081efbec",
+        "ppt/presProps.xml": "b42af61236cda9ea4d781f60908296da476489b2828df32fc9625d996808087b",
+        "ppt/presentation.xml": "28f6cd93d93748f47f5f64dc4c72eaba44489b7ebd0c7268411d1b1eb5019e5e",
+        "ppt/printerSettings/printerSettings1.bin": "d7768f87e07d29634782e448ece1cddd05a52b9499254222b1190bc8f6dc579e",
+        "ppt/slideLayouts/_rels/slideLayout1.xml.rels": "7c1f290acd6ca3ce664fe95aaf0b129bbb3cbf2b75c8d09905a2821641981027",
+        "ppt/slideLayouts/_rels/slideLayout10.xml.rels": "7c1f290acd6ca3ce664fe95aaf0b129bbb3cbf2b75c8d09905a2821641981027",
+        "ppt/slideLayouts/_rels/slideLayout11.xml.rels": "7c1f290acd6ca3ce664fe95aaf0b129bbb3cbf2b75c8d09905a2821641981027",
+        "ppt/slideLayouts/_rels/slideLayout2.xml.rels": "7c1f290acd6ca3ce664fe95aaf0b129bbb3cbf2b75c8d09905a2821641981027",
+        "ppt/slideLayouts/_rels/slideLayout3.xml.rels": "7c1f290acd6ca3ce664fe95aaf0b129bbb3cbf2b75c8d09905a2821641981027",
+        "ppt/slideLayouts/_rels/slideLayout4.xml.rels": "7c1f290acd6ca3ce664fe95aaf0b129bbb3cbf2b75c8d09905a2821641981027",
+        "ppt/slideLayouts/_rels/slideLayout5.xml.rels": "7c1f290acd6ca3ce664fe95aaf0b129bbb3cbf2b75c8d09905a2821641981027",
+        "ppt/slideLayouts/_rels/slideLayout6.xml.rels": "7c1f290acd6ca3ce664fe95aaf0b129bbb3cbf2b75c8d09905a2821641981027",
+        "ppt/slideLayouts/_rels/slideLayout7.xml.rels": "7c1f290acd6ca3ce664fe95aaf0b129bbb3cbf2b75c8d09905a2821641981027",
+        "ppt/slideLayouts/_rels/slideLayout8.xml.rels": "7c1f290acd6ca3ce664fe95aaf0b129bbb3cbf2b75c8d09905a2821641981027",
+        "ppt/slideLayouts/_rels/slideLayout9.xml.rels": "7c1f290acd6ca3ce664fe95aaf0b129bbb3cbf2b75c8d09905a2821641981027",
+        "ppt/slideLayouts/slideLayout1.xml": "25c93a2f186df69897585729d52fc610349e29dcf0b5b6080160df6490698709",
+        "ppt/slideLayouts/slideLayout10.xml": "1f8304c9d6c08ff9bd41b639d0c7e866b6515f61e6081c9ccc89ed8d0f8b4194",
+        "ppt/slideLayouts/slideLayout11.xml": "355ac266c2671b83b662759afb0ee0ecfb7cdd6ec936019ecef60dbc95c14dac",
+        "ppt/slideLayouts/slideLayout2.xml": "5f800acd9e43b9b438c987bd71cf0966b27ad02ce8df14df80708510cbd700be",
+        "ppt/slideLayouts/slideLayout3.xml": "e83a85b737e1447051ac7fd9bbaaba4ac1b4210cfc630cdcfcdbc191fdb141d1",
+        "ppt/slideLayouts/slideLayout4.xml": "1ebe316051a0caaac0e972989a7591e66d1fbb4a0764fe984c31a4ab5b6554bf",
+        "ppt/slideLayouts/slideLayout5.xml": "3df8e6f498622ef440f5568a2c967c97f47c74b46b47a976304c7b7c9ab54c74",
+        "ppt/slideLayouts/slideLayout6.xml": "18e5b26c6f7c30dabe0b294faf38b2d2ef60ae778fbba9c3fe71f6560143a402",
+        "ppt/slideLayouts/slideLayout7.xml": "e4d86b009a8ca6ca9ecfadc97c68b7123b60544df09a7ea42864a4f5f74ce09c",
+        "ppt/slideLayouts/slideLayout8.xml": "950b9d16468d58fe59a8c0aeb17a03b7d18a9f5bbeac438e38a2248462a72cbe",
+        "ppt/slideLayouts/slideLayout9.xml": "4e9439878755a7faea188d684939b2fb7d26b7e09086e792789f9137ca353e15",
+        "ppt/slideMasters/_rels/slideMaster1.xml.rels": "52e5efa51d86e5426d78ad9b143b863e71d00c269f6494e759cf0b3adc900116",
+        "ppt/slideMasters/slideMaster1.xml": "44cc65956f47c1cf689803dcc7a1d9225c93d3fd90754a9f85e2bdcea27565bc",
+        "ppt/slides/_rels/slide1.xml.rels": "c56574a33fad9499b4afedfd47a59b0bc3bc892a903840b64a04b7c59b25b005",
+        "ppt/slides/_rels/slide10.xml.rels": "c56574a33fad9499b4afedfd47a59b0bc3bc892a903840b64a04b7c59b25b005",
+        "ppt/slides/_rels/slide11.xml.rels": "c56574a33fad9499b4afedfd47a59b0bc3bc892a903840b64a04b7c59b25b005",
+        "ppt/slides/_rels/slide2.xml.rels": "c56574a33fad9499b4afedfd47a59b0bc3bc892a903840b64a04b7c59b25b005",
+        "ppt/slides/_rels/slide3.xml.rels": "c56574a33fad9499b4afedfd47a59b0bc3bc892a903840b64a04b7c59b25b005",
+        "ppt/slides/_rels/slide4.xml.rels": "c56574a33fad9499b4afedfd47a59b0bc3bc892a903840b64a04b7c59b25b005",
+        "ppt/slides/_rels/slide5.xml.rels": "c56574a33fad9499b4afedfd47a59b0bc3bc892a903840b64a04b7c59b25b005",
+        "ppt/slides/_rels/slide6.xml.rels": "c56574a33fad9499b4afedfd47a59b0bc3bc892a903840b64a04b7c59b25b005",
+        "ppt/slides/_rels/slide7.xml.rels": "c56574a33fad9499b4afedfd47a59b0bc3bc892a903840b64a04b7c59b25b005",
+        "ppt/slides/_rels/slide8.xml.rels": "c56574a33fad9499b4afedfd47a59b0bc3bc892a903840b64a04b7c59b25b005",
+        "ppt/slides/_rels/slide9.xml.rels": "c56574a33fad9499b4afedfd47a59b0bc3bc892a903840b64a04b7c59b25b005",
+        "ppt/slides/slide1.xml": "70fd63e771c29d94679e5272233e8479fdcc6a6f13a5ee7fd78a4b6ae53cdee1",
+        "ppt/slides/slide10.xml": "255d128cf4a0ed8714fca029357a16b2fac6921462e01cdac49c72ccd8672ee8",
+        "ppt/slides/slide11.xml": "19adcdae919bbcff961bf70e86246bfaa23968f43769bf8f626eff30ba82b369",
+        "ppt/slides/slide2.xml": "72ecf4b6175bba564606a53e8d6dd010b5c9cc83f048d803c1f5167ff456e94a",
+        "ppt/slides/slide3.xml": "eebc4aeabb48d22ee6eae471e6737ae5af23a83efaeb2b7e37b33a081c9d0785",
+        "ppt/slides/slide4.xml": "55661dbf18e464756700615d364e8647a10ee9d205e602d9b8c465bb0ecaf634",
+        "ppt/slides/slide5.xml": "ed0657c6f855bfa3125cacc00f31006701e5f4f9bf8ea878b89b31b3c4f5379f",
+        "ppt/slides/slide6.xml": "6d72e430be44c68503006bf80b190f2ab4c7a84082aa25fa21e26d690217f33d",
+        "ppt/slides/slide7.xml": "c7448a8aa51b420f22aaffde8a2e12e2f75e3742375a93d25baf615d94391174",
+        "ppt/slides/slide8.xml": "7b9aea1b136659f3143d88a290849e0299d1354d730a42475d08ba20464e2981",
+        "ppt/slides/slide9.xml": "3aec8e2b6d8053c20724a1b2ca74edf21775248f7bbbdd78336b767c1422606f",
+        "ppt/tableStyles.xml": "0e7ac03251337ecbaf6c8ca13619db1caeda5c90c4e3210d45d6c3f5df4de103",
+        "ppt/theme/theme1.xml": "4c3412087e8fa20cf5642f42e69f1e733881c28611a2bdd4622654ee313d214e",
+        "ppt/viewProps.xml": "f2e3578e8a2a2607ca7f850d99f2cbe5f22806084c8e519bb754388ed7ebdb69"
+      }
+    },
+    "设备采购合同_文件比对报告_GOLDEN_r1_20260101-0000.xlsx": {
+      "kind": "ooxml",
+      "members": {
+        "[Content_Types].xml": "ba5af858089dd3357b4e4408a86694ff0a62ec37f21ef57a3a09544dc0ab18c4",
+        "_rels/.rels": "c545941ba36c15fcdce4ae4568c663f3ced1a2226ad5082d3fd66b178bfac11a",
+        "docProps/app.xml": "209fca6b00afe72a5029754b94be5953d8f16d96f67130325566b9366ad4ccc5",
+        "docProps/core.xml": "f4ad71e3e1f9de145b0977e80f1d0bf0e9b53084150d163decdfe5d016317c91",
+        "xl/_rels/workbook.xml.rels": "26ad8fcc38d41229833e624496df364492772697ad2e5d6696e1738f05ba225f",
+        "xl/styles.xml": "017a42024cc673d61ae44a796710f7ac1f9012ad9966b71efe59d4c420e6e5ea",
+        "xl/theme/theme1.xml": "d15e8ebf78ef7b9720839d7ae8fdc81a7df5bc24706d8e137df61a5683c358d9",
+        "xl/workbook.xml": "e1370668f091678e6d09fde5547b4abfdadec805f185b6a80af7e344780fa1f6",
+        "xl/worksheets/sheet1.xml": "b74367ebe43f10a76796d1d8a61cd669468ab5c0a15205f4026ea3a860c19419"
+      }
+    },
+    "设备采购合同_文件比对报告_思维导图_GOLDEN_r1_20260101-0000.html": {
+      "kind": "file",
+      "sha256": "91bd0e7619e350a0f187b6e97589cb847d417b54eb377c32cd9b80c77bdf0d2e"
+    },
+    "设备采购合同_文件比对报告_思维导图_GOLDEN_r1_20260101-0000.png": {
+      "kind": "file",
+      "sha256": "1ba877ea4ef27da83dcfcfd2a561b23b2f16b6fd1c966886ec312d5bb73c8b17"
+    },
+    "设备采购合同_文件比对报告_思维导图_GOLDEN_r1_20260101-0000.svg": {
+      "kind": "file",
+      "sha256": "1f77fdd3e7842a7e0c7bc24289272ad55da670b79ebe17daf7e3e2543af597e1"
+    },
+    "设备采购合同_新旧比对_GOLDEN_r1_20260101-0000.docx": {
+      "kind": "ooxml",
+      "members": {
+        "[Content_Types].xml": "66c84fb7a6aa3c4ead49f895e4a7044df1fb57de1ed76d09b2686e91f5bed5b4",
+        "_rels/.rels": "a9ae57efe9186f07d48303bcac5d54c7e359bf3f503939c03ad2954e5c59a5c4",
+        "customXml/_rels/item1.xml.rels": "1ca6c9a64edcebe24ee703a54403611b322d96da33371779e742d2d3f7ed7a6c",
+        "customXml/item1.xml": "a86086ffc5d8e83ebd6c71a55d1d2efaa31b137977f5f3a752366e1023612144",
+        "customXml/itemProps1.xml": "c542307b13ec29a8b546217bb37936ab4822e044b265d2952985ec3d6afed24e",
+        "docProps/app.xml": "be664981c3141cddfc59362beb287ebf20d0773660e2dd6faac5968a5930a081",
+        "docProps/core.xml": "b075a3e57a2ad6e7cfc943605d14206dcdc6f2c364ecd10b9ac6fe02ea6989c1",
+        "docProps/thumbnail.jpeg": "96367138dc44ce09bf2c8f0f8e49348a1478d2c5c0af69bbc2bbc38b63cdcead",
+        "word/_rels/document.xml.rels": "1e7f0eb144a98e199249314f61ff32a8de2a27e56d8e9ee6b524e1c6b235d377",
+        "word/document.xml": "c9eb1674b5018af4fd0008fc4c33c2de5888881778dade3645fdfa1869dadc8b",
+        "word/fontTable.xml": "79385fb7f60247507ecaffc292e9ebd52ea0657b8634f629ba6fccc54011d6bb",
+        "word/numbering.xml": "70976f19cbcd896e51890859fe6ecb3467a5a7ad0c040160fedc5a1993cb09ce",
+        "word/settings.xml": "51a0d348fe85965c66e4748a03c3c0d055d78455514f03cb121c334af7d73689",
+        "word/styles.xml": "02d71a68ddb92c055e84526d6a9e45700be3872781ababf759241694bc30e384",
+        "word/stylesWithEffects.xml": "463ae0928cf0d84775dbf8cf18d6c3029f6707c81bf590f6d6dd8757a5e93f15",
+        "word/theme/theme1.xml": "e3a8ab7db9ca7afca56f5f2820a56e8b660016c647773555b060b0a02ac76941",
+        "word/webSettings.xml": "349d36de7434d09f86987ff671d8814964a0588c1e630c06e562cda7e75e9f95"
+      }
+    },
+    "设备采购合同_新旧比对_GOLDEN_r1_20260101-0000.html": {
+      "kind": "file",
+      "sha256": "19858bd74748cc649ca7177cc9a87e140919fd09150cea6edf45f83aec3ad015"
+    },
+    "设备采购合同_新旧比对_GOLDEN_r1_20260101-0000.md": {
+      "kind": "file",
+      "sha256": "41200d812c622e4c26b32c93190b1e4af89a0aee4e951b72851037abf590b476"
+    },
+    "设备采购合同_新旧比对_GOLDEN_r1_20260101-0000.pptx": {
+      "kind": "ooxml",
+      "members": {
+        "[Content_Types].xml": "4fe3d4242e2381b4ffb17bd406ef039c3e2df196c8d17accec064c9feb2ed29d",
+        "_rels/.rels": "694cc89ebda975bfb74644f943f86114504d64d5a6b2e420304f58ba494f0e11",
+        "docProps/app.xml": "77fbd43c41b96be9a40d41a267cd83108a274ee5860675dfb543828472d76867",
+        "docProps/core.xml": "8dee71d407626816b235f0e931a1b8796e4330fc93c4e49b1ea681882d2ee008",
+        "docProps/thumbnail.jpeg": "116f9aa8ea038e39ef47ee99a23592ab569cf77feafecd0a30e222369e931d25",
+        "ppt/_rels/presentation.xml.rels": "df8ecc5057e7fbb63fa56b4ce4f3da272bc20002079c48b757ee0f588ea2e48c",
+        "ppt/presProps.xml": "b42af61236cda9ea4d781f60908296da476489b2828df32fc9625d996808087b",
+        "ppt/presentation.xml": "0d9a25f336c580af04ad33963ec1b2ad74720369272e2db34ac9cb1fd466140c",
+        "ppt/printerSettings/printerSettings1.bin": "d7768f87e07d29634782e448ece1cddd05a52b9499254222b1190bc8f6dc579e",
+        "ppt/slideLayouts/_rels/slideLayout1.xml.rels": "7c1f290acd6ca3ce664fe95aaf0b129bbb3cbf2b75c8d09905a2821641981027",
+        "ppt/slideLayouts/_rels/slideLayout10.xml.rels": "7c1f290acd6ca3ce664fe95aaf0b129bbb3cbf2b75c8d09905a2821641981027",
+        "ppt/slideLayouts/_rels/slideLayout11.xml.rels": "7c1f290acd6ca3ce664fe95aaf0b129bbb3cbf2b75c8d09905a2821641981027",
+        "ppt/slideLayouts/_rels/slideLayout2.xml.rels": "7c1f290acd6ca3ce664fe95aaf0b129bbb3cbf2b75c8d09905a2821641981027",
+        "ppt/slideLayouts/_rels/slideLayout3.xml.rels": "7c1f290acd6ca3ce664fe95aaf0b129bbb3cbf2b75c8d09905a2821641981027",
+        "ppt/slideLayouts/_rels/slideLayout4.xml.rels": "7c1f290acd6ca3ce664fe95aaf0b129bbb3cbf2b75c8d09905a2821641981027",
+        "ppt/slideLayouts/_rels/slideLayout5.xml.rels": "7c1f290acd6ca3ce664fe95aaf0b129bbb3cbf2b75c8d09905a2821641981027",
+        "ppt/slideLayouts/_rels/slideLayout6.xml.rels": "7c1f290acd6ca3ce664fe95aaf0b129bbb3cbf2b75c8d09905a2821641981027",
+        "ppt/slideLayouts/_rels/slideLayout7.xml.rels": "7c1f290acd6ca3ce664fe95aaf0b129bbb3cbf2b75c8d09905a2821641981027",
+        "ppt/slideLayouts/_rels/slideLayout8.xml.rels": "7c1f290acd6ca3ce664fe95aaf0b129bbb3cbf2b75c8d09905a2821641981027",
+        "ppt/slideLayouts/_rels/slideLayout9.xml.rels": "7c1f290acd6ca3ce664fe95aaf0b129bbb3cbf2b75c8d09905a2821641981027",
+        "ppt/slideLayouts/slideLayout1.xml": "25c93a2f186df69897585729d52fc610349e29dcf0b5b6080160df6490698709",
+        "ppt/slideLayouts/slideLayout10.xml": "1f8304c9d6c08ff9bd41b639d0c7e866b6515f61e6081c9ccc89ed8d0f8b4194",
+        "ppt/slideLayouts/slideLayout11.xml": "355ac266c2671b83b662759afb0ee0ecfb7cdd6ec936019ecef60dbc95c14dac",
+        "ppt/slideLayouts/slideLayout2.xml": "5f800acd9e43b9b438c987bd71cf0966b27ad02ce8df14df80708510cbd700be",
+        "ppt/slideLayouts/slideLayout3.xml": "e83a85b737e1447051ac7fd9bbaaba4ac1b4210cfc630cdcfcdbc191fdb141d1",
+        "ppt/slideLayouts/slideLayout4.xml": "1ebe316051a0caaac0e972989a7591e66d1fbb4a0764fe984c31a4ab5b6554bf",
+        "ppt/slideLayouts/slideLayout5.xml": "3df8e6f498622ef440f5568a2c967c97f47c74b46b47a976304c7b7c9ab54c74",
+        "ppt/slideLayouts/slideLayout6.xml": "18e5b26c6f7c30dabe0b294faf38b2d2ef60ae778fbba9c3fe71f6560143a402",
+        "ppt/slideLayouts/slideLayout7.xml": "e4d86b009a8ca6ca9ecfadc97c68b7123b60544df09a7ea42864a4f5f74ce09c",
+        "ppt/slideLayouts/slideLayout8.xml": "950b9d16468d58fe59a8c0aeb17a03b7d18a9f5bbeac438e38a2248462a72cbe",
+        "ppt/slideLayouts/slideLayout9.xml": "4e9439878755a7faea188d684939b2fb7d26b7e09086e792789f9137ca353e15",
+        "ppt/slideMasters/_rels/slideMaster1.xml.rels": "52e5efa51d86e5426d78ad9b143b863e71d00c269f6494e759cf0b3adc900116",
+        "ppt/slideMasters/slideMaster1.xml": "44cc65956f47c1cf689803dcc7a1d9225c93d3fd90754a9f85e2bdcea27565bc",
+        "ppt/slides/_rels/slide1.xml.rels": "c56574a33fad9499b4afedfd47a59b0bc3bc892a903840b64a04b7c59b25b005",
+        "ppt/slides/_rels/slide2.xml.rels": "c56574a33fad9499b4afedfd47a59b0bc3bc892a903840b64a04b7c59b25b005",
+        "ppt/slides/_rels/slide3.xml.rels": "c56574a33fad9499b4afedfd47a59b0bc3bc892a903840b64a04b7c59b25b005",
+        "ppt/slides/_rels/slide4.xml.rels": "c56574a33fad9499b4afedfd47a59b0bc3bc892a903840b64a04b7c59b25b005",
+        "ppt/slides/_rels/slide5.xml.rels": "c56574a33fad9499b4afedfd47a59b0bc3bc892a903840b64a04b7c59b25b005",
+        "ppt/slides/_rels/slide6.xml.rels": "c56574a33fad9499b4afedfd47a59b0bc3bc892a903840b64a04b7c59b25b005",
+        "ppt/slides/_rels/slide7.xml.rels": "c56574a33fad9499b4afedfd47a59b0bc3bc892a903840b64a04b7c59b25b005",
+        "ppt/slides/slide1.xml": "0ddd36db65fbc8d5a9ed5750fd8949683d0bd310ab6e76ef628db43b1ba60cf5",
+        "ppt/slides/slide2.xml": "5331cc7ef67dcf70ba0949910e6234469ceaa8ccdd3d77dea8587c1c6c913db1",
+        "ppt/slides/slide3.xml": "b98919493d505c1cfbc889fd23d5ae61dea216f6e2609deffff1716c5d6adf55",
+        "ppt/slides/slide4.xml": "764709b076706a6b7b680b2eb2da85ade563ff06c8669b02638e8fadacae05c7",
+        "ppt/slides/slide5.xml": "09a7fe481d362e90fc04e1e33e4cfbc5054d827c5761b04f1d0fab72ef7024aa",
+        "ppt/slides/slide6.xml": "c611fc88baa3708c19b945e613776658de0957bdb528341ea02904b85e9ea4b2",
+        "ppt/slides/slide7.xml": "aa422b00723699569fdd510d44a88e7a348904f88640ef2c2614887bfa6ae1a6",
+        "ppt/tableStyles.xml": "0e7ac03251337ecbaf6c8ca13619db1caeda5c90c4e3210d45d6c3f5df4de103",
+        "ppt/theme/theme1.xml": "4c3412087e8fa20cf5642f42e69f1e733881c28611a2bdd4622654ee313d214e",
+        "ppt/viewProps.xml": "f2e3578e8a2a2607ca7f850d99f2cbe5f22806084c8e519bb754388ed7ebdb69"
+      }
+    },
+    "设备采购合同_新旧比对_GOLDEN_r1_20260101-0000.xlsx": {
+      "kind": "ooxml",
+      "members": {
+        "[Content_Types].xml": "ba5af858089dd3357b4e4408a86694ff0a62ec37f21ef57a3a09544dc0ab18c4",
+        "_rels/.rels": "c545941ba36c15fcdce4ae4568c663f3ced1a2226ad5082d3fd66b178bfac11a",
+        "docProps/app.xml": "209fca6b00afe72a5029754b94be5953d8f16d96f67130325566b9366ad4ccc5",
+        "docProps/core.xml": "f4ad71e3e1f9de145b0977e80f1d0bf0e9b53084150d163decdfe5d016317c91",
+        "xl/_rels/workbook.xml.rels": "26ad8fcc38d41229833e624496df364492772697ad2e5d6696e1738f05ba225f",
+        "xl/styles.xml": "017a42024cc673d61ae44a796710f7ac1f9012ad9966b71efe59d4c420e6e5ea",
+        "xl/theme/theme1.xml": "d15e8ebf78ef7b9720839d7ae8fdc81a7df5bc24706d8e137df61a5683c358d9",
+        "xl/workbook.xml": "6d05cd1ea27985547a5872786055178e52257121820034136064bb0822404430",
+        "xl/worksheets/sheet1.xml": "a88cb92f8e734e2d11f16f373fc5812ba01bf58a7c8af0b89db0f9bb487400fe"
+      }
+    },
+    "设备采购合同_新旧比对_思维导图_GOLDEN_r1_20260101-0000.html": {
+      "kind": "file",
+      "sha256": "ca70e1922239105fd4887f148e3793b57924c9fd1338c2f23fbf07f57f451c12"
+    },
+    "设备采购合同_新旧比对_思维导图_GOLDEN_r1_20260101-0000.png": {
+      "kind": "file",
+      "sha256": "0970beec5072b92323a100dd2b8ae961be5057a7e80d497ec098798c67d533ac"
+    },
+    "设备采购合同_新旧比对_思维导图_GOLDEN_r1_20260101-0000.svg": {
+      "kind": "file",
+      "sha256": "0ea054b89a653b8289cdf442f27f5dfc122146079248977168cb79f548db9431"
+    },
+    "设备采购合同_模板版_GOLDEN_r1_20260101-0000.docx": {
+      "kind": "ooxml",
+      "members": {
+        "[Content_Types].xml": "a61e2cb9fb6b6ba9eb602e45251b9bc7a0a7687d424544e6acadf64957255d9d",
+        "_rels/.rels": "a9ae57efe9186f07d48303bcac5d54c7e359bf3f503939c03ad2954e5c59a5c4",
+        "customXml/_rels/item1.xml.rels": "1ca6c9a64edcebe24ee703a54403611b322d96da33371779e742d2d3f7ed7a6c",
+        "customXml/item1.xml": "a86086ffc5d8e83ebd6c71a55d1d2efaa31b137977f5f3a752366e1023612144",
+        "customXml/itemProps1.xml": "c542307b13ec29a8b546217bb37936ab4822e044b265d2952985ec3d6afed24e",
+        "docProps/app.xml": "be664981c3141cddfc59362beb287ebf20d0773660e2dd6faac5968a5930a081",
+        "docProps/core.xml": "fb3579f7635bb73ca09c94b7830f50e70f73e1880b9f0022236708d2e3ee29e0",
+        "docProps/thumbnail.jpeg": "96367138dc44ce09bf2c8f0f8e49348a1478d2c5c0af69bbc2bbc38b63cdcead",
+        "word/_rels/document.xml.rels": "790a2e312a7996b0aac152e7e7c07dfa1abe2c654ca834da764ee737ff6afb70",
+        "word/comments.xml": "484a0d775cbc8a8e224db8168cad178e9ce6503363c6a8b3c684901813153e53",
+        "word/document.xml": "45863c9ff6b25249af0588aa6e353496df1ffee0526d15d0356e8e2cc75c6243",
+        "word/fontTable.xml": "79385fb7f60247507ecaffc292e9ebd52ea0657b8634f629ba6fccc54011d6bb",
+        "word/numbering.xml": "70976f19cbcd896e51890859fe6ecb3467a5a7ad0c040160fedc5a1993cb09ce",
+        "word/settings.xml": "51a0d348fe85965c66e4748a03c3c0d055d78455514f03cb121c334af7d73689",
+        "word/styles.xml": "02d71a68ddb92c055e84526d6a9e45700be3872781ababf759241694bc30e384",
+        "word/stylesWithEffects.xml": "463ae0928cf0d84775dbf8cf18d6c3029f6707c81bf590f6d6dd8757a5e93f15",
+        "word/theme/theme1.xml": "e3a8ab7db9ca7afca56f5f2820a56e8b660016c647773555b060b0a02ac76941",
+        "word/webSettings.xml": "349d36de7434d09f86987ff671d8814964a0588c1e630c06e562cda7e75e9f95"
+      }
+    },
+    "设备采购合同_模板版_GOLDEN_r1_20260101-0000.html": {
+      "kind": "file",
+      "sha256": "3e9dec5640b56b189aa631838c53f18e81fe2278be5206aa24f482442dc04fb5"
+    },
+    "设备采购合同_模板版_GOLDEN_r1_20260101-0000.md": {
+      "kind": "file",
+      "sha256": "2a044ee7af2fd0722990a1dc7ecfa60ec98d98cf050615ffcffaeaa04fb4dbc2"
+    },
+    "设备采购合同_模板版_GOLDEN_r1_20260101-0000.xlsx": {
+      "kind": "ooxml",
+      "members": {
+        "[Content_Types].xml": "ba5af858089dd3357b4e4408a86694ff0a62ec37f21ef57a3a09544dc0ab18c4",
+        "_rels/.rels": "c545941ba36c15fcdce4ae4568c663f3ced1a2226ad5082d3fd66b178bfac11a",
+        "docProps/app.xml": "209fca6b00afe72a5029754b94be5953d8f16d96f67130325566b9366ad4ccc5",
+        "docProps/core.xml": "f4ad71e3e1f9de145b0977e80f1d0bf0e9b53084150d163decdfe5d016317c91",
+        "xl/_rels/workbook.xml.rels": "26ad8fcc38d41229833e624496df364492772697ad2e5d6696e1738f05ba225f",
+        "xl/styles.xml": "017a42024cc673d61ae44a796710f7ac1f9012ad9966b71efe59d4c420e6e5ea",
+        "xl/theme/theme1.xml": "d15e8ebf78ef7b9720839d7ae8fdc81a7df5bc24706d8e137df61a5683c358d9",
+        "xl/workbook.xml": "4c06e43e287b5127d98200225d09d504c9862ae9ff0d3272913e452b32497909",
+        "xl/worksheets/sheet1.xml": "4836bccd4ea2e20a096e67a6bb3c9cd0841a4f4b09186e6b920e81ead2ba5052"
+      }
+    },
+    "设备采购合同_模板版_思维导图_GOLDEN_r1_20260101-0000.html": {
+      "kind": "file",
+      "sha256": "8a7c767176584bfa8671dcbbce7d5e3d3db537b79cb268389611dcfddec88db5"
+    },
+    "设备采购合同_模板版_思维导图_GOLDEN_r1_20260101-0000.png": {
+      "kind": "file",
+      "sha256": "b128148cf70da42a5ef05679df9124963aa8fb1ea2aafe10d768f466e5693d66"
+    },
+    "设备采购合同_模板版_思维导图_GOLDEN_r1_20260101-0000.svg": {
+      "kind": "file",
+      "sha256": "2c474c047b95e96a01560ca43cc4f177c79bb5f81ac672a8d14b3db352d27fd1"
+    },
+    "设备采购合同_清洁版-准原稿B_GOLDEN_r1_20260101-0000.docx": {
+      "kind": "ooxml",
+      "members": {
+        "[Content_Types].xml": "66c84fb7a6aa3c4ead49f895e4a7044df1fb57de1ed76d09b2686e91f5bed5b4",
+        "_rels/.rels": "a9ae57efe9186f07d48303bcac5d54c7e359bf3f503939c03ad2954e5c59a5c4",
+        "customXml/_rels/item1.xml.rels": "1ca6c9a64edcebe24ee703a54403611b322d96da33371779e742d2d3f7ed7a6c",
+        "customXml/item1.xml": "a86086ffc5d8e83ebd6c71a55d1d2efaa31b137977f5f3a752366e1023612144",
+        "customXml/itemProps1.xml": "c542307b13ec29a8b546217bb37936ab4822e044b265d2952985ec3d6afed24e",
+        "docProps/app.xml": "be664981c3141cddfc59362beb287ebf20d0773660e2dd6faac5968a5930a081",
+        "docProps/core.xml": "95d4e71b49e4563eb3d9e068c01a8f988bb5faaedf72c21c7e15083dadcb59c8",
+        "docProps/thumbnail.jpeg": "96367138dc44ce09bf2c8f0f8e49348a1478d2c5c0af69bbc2bbc38b63cdcead",
+        "word/_rels/document.xml.rels": "1e7f0eb144a98e199249314f61ff32a8de2a27e56d8e9ee6b524e1c6b235d377",
+        "word/document.xml": "59ded803682f28248eb27034a1e125f7ca4465fd322def296652174e9cef2bd5",
+        "word/fontTable.xml": "79385fb7f60247507ecaffc292e9ebd52ea0657b8634f629ba6fccc54011d6bb",
+        "word/numbering.xml": "70976f19cbcd896e51890859fe6ecb3467a5a7ad0c040160fedc5a1993cb09ce",
+        "word/settings.xml": "51a0d348fe85965c66e4748a03c3c0d055d78455514f03cb121c334af7d73689",
+        "word/styles.xml": "02d71a68ddb92c055e84526d6a9e45700be3872781ababf759241694bc30e384",
+        "word/stylesWithEffects.xml": "463ae0928cf0d84775dbf8cf18d6c3029f6707c81bf590f6d6dd8757a5e93f15",
+        "word/theme/theme1.xml": "e3a8ab7db9ca7afca56f5f2820a56e8b660016c647773555b060b0a02ac76941",
+        "word/webSettings.xml": "349d36de7434d09f86987ff671d8814964a0588c1e630c06e562cda7e75e9f95"
+      }
+    },
+    "设备采购合同_清洁版-准原稿B_GOLDEN_r1_20260101-0000.html": {
+      "kind": "file",
+      "sha256": "29fe46c304d38a180e5a321f5ba8b95fc3ee71b51cd40cc21f654544ab0999ed"
+    },
+    "设备采购合同_清洁版-准原稿B_GOLDEN_r1_20260101-0000.md": {
+      "kind": "file",
+      "sha256": "5d7547c87abbcbe5fbea67698011378db4f6fea4db2511e20bce7be005068758"
+    },
+    "设备采购合同_清洁版-准原稿B_GOLDEN_r1_20260101-0000.xlsx": {
+      "kind": "ooxml",
+      "members": {
+        "[Content_Types].xml": "ba5af858089dd3357b4e4408a86694ff0a62ec37f21ef57a3a09544dc0ab18c4",
+        "_rels/.rels": "c545941ba36c15fcdce4ae4568c663f3ced1a2226ad5082d3fd66b178bfac11a",
+        "docProps/app.xml": "209fca6b00afe72a5029754b94be5953d8f16d96f67130325566b9366ad4ccc5",
+        "docProps/core.xml": "f4ad71e3e1f9de145b0977e80f1d0bf0e9b53084150d163decdfe5d016317c91",
+        "xl/_rels/workbook.xml.rels": "26ad8fcc38d41229833e624496df364492772697ad2e5d6696e1738f05ba225f",
+        "xl/styles.xml": "017a42024cc673d61ae44a796710f7ac1f9012ad9966b71efe59d4c420e6e5ea",
+        "xl/theme/theme1.xml": "d15e8ebf78ef7b9720839d7ae8fdc81a7df5bc24706d8e137df61a5683c358d9",
+        "xl/workbook.xml": "68c49963acd94857b1132c31b0d7a6c756ee5d236b3d3a6fdeac85e7cd46b069",
+        "xl/worksheets/sheet1.xml": "0218d42da2360d82cf51e9962b9bef54489a271648851c9994ce2a2c289ac988"
+      }
+    },
+    "设备采购合同_红线标记修订版-准原稿B_GOLDEN_r1_20260101-0000.docx": {
+      "kind": "ooxml",
+      "members": {
+        "[Content_Types].xml": "a61e2cb9fb6b6ba9eb602e45251b9bc7a0a7687d424544e6acadf64957255d9d",
+        "_rels/.rels": "a9ae57efe9186f07d48303bcac5d54c7e359bf3f503939c03ad2954e5c59a5c4",
+        "customXml/_rels/item1.xml.rels": "1ca6c9a64edcebe24ee703a54403611b322d96da33371779e742d2d3f7ed7a6c",
+        "customXml/item1.xml": "a86086ffc5d8e83ebd6c71a55d1d2efaa31b137977f5f3a752366e1023612144",
+        "customXml/itemProps1.xml": "c542307b13ec29a8b546217bb37936ab4822e044b265d2952985ec3d6afed24e",
+        "docProps/app.xml": "be664981c3141cddfc59362beb287ebf20d0773660e2dd6faac5968a5930a081",
+        "docProps/core.xml": "6468bcc1dac1e03542ae9ba1b48121f2ac19ab4bfe2fc0deafc9dd183e45d2e9",
+        "docProps/thumbnail.jpeg": "96367138dc44ce09bf2c8f0f8e49348a1478d2c5c0af69bbc2bbc38b63cdcead",
+        "word/_rels/document.xml.rels": "790a2e312a7996b0aac152e7e7c07dfa1abe2c654ca834da764ee737ff6afb70",
+        "word/comments.xml": "82407542d719ea9c8ebc9a4118a45e2405e267bac31e4fecbf14c5a5915f0520",
+        "word/document.xml": "ffcd5b7c9a587f39347fd2f5d38eacb04f1579842ed3410456b4eb02a37c900d",
+        "word/fontTable.xml": "79385fb7f60247507ecaffc292e9ebd52ea0657b8634f629ba6fccc54011d6bb",
+        "word/numbering.xml": "70976f19cbcd896e51890859fe6ecb3467a5a7ad0c040160fedc5a1993cb09ce",
+        "word/settings.xml": "51a0d348fe85965c66e4748a03c3c0d055d78455514f03cb121c334af7d73689",
+        "word/styles.xml": "02d71a68ddb92c055e84526d6a9e45700be3872781ababf759241694bc30e384",
+        "word/stylesWithEffects.xml": "463ae0928cf0d84775dbf8cf18d6c3029f6707c81bf590f6d6dd8757a5e93f15",
+        "word/theme/theme1.xml": "e3a8ab7db9ca7afca56f5f2820a56e8b660016c647773555b060b0a02ac76941",
+        "word/webSettings.xml": "349d36de7434d09f86987ff671d8814964a0588c1e630c06e562cda7e75e9f95"
+      }
+    },
+    "设备采购合同_红线标记修订版-准原稿B_GOLDEN_r1_20260101-0000.html": {
+      "kind": "file",
+      "sha256": "914d1b649feb95b92f0d05a4260bca7f89885901751c779d602f236090c73118"
+    },
+    "设备采购合同_红线标记修订版-准原稿B_GOLDEN_r1_20260101-0000.md": {
+      "kind": "file",
+      "sha256": "cf1d7ba8dcf752f75b8a4264f7a336df4b7573a33ba68338d8e0fad348b5c774"
+    },
+    "设备采购合同_红线标记修订版-准原稿B_GOLDEN_r1_20260101-0000.xlsx": {
+      "kind": "ooxml",
+      "members": {
+        "[Content_Types].xml": "ba5af858089dd3357b4e4408a86694ff0a62ec37f21ef57a3a09544dc0ab18c4",
+        "_rels/.rels": "c545941ba36c15fcdce4ae4568c663f3ced1a2226ad5082d3fd66b178bfac11a",
+        "docProps/app.xml": "209fca6b00afe72a5029754b94be5953d8f16d96f67130325566b9366ad4ccc5",
+        "docProps/core.xml": "f4ad71e3e1f9de145b0977e80f1d0bf0e9b53084150d163decdfe5d016317c91",
+        "xl/_rels/workbook.xml.rels": "26ad8fcc38d41229833e624496df364492772697ad2e5d6696e1738f05ba225f",
+        "xl/styles.xml": "017a42024cc673d61ae44a796710f7ac1f9012ad9966b71efe59d4c420e6e5ea",
+        "xl/theme/theme1.xml": "d15e8ebf78ef7b9720839d7ae8fdc81a7df5bc24706d8e137df61a5683c358d9",
+        "xl/workbook.xml": "68c49963acd94857b1132c31b0d7a6c756ee5d236b3d3a6fdeac85e7cd46b069",
+        "xl/worksheets/sheet1.xml": "0218d42da2360d82cf51e9962b9bef54489a271648851c9994ce2a2c289ac988"
+      }
+    }
+  }
+}

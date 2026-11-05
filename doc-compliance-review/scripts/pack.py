@@ -58,9 +58,11 @@ _sys.dont_write_bytecode = True
 **分隔符一律下划线**；封装格式**默认同时出 `.skill` 与 `.zip` 两种**。
 
 各段均**自动读取，不靠手填**，避免"版本升了文件名还写着旧号"：
-产品名取 `SKILL.md` frontmatter 的 `display_name`，版本号取 `version`（统一补小写 `v`），
-日期为**打包当天**（紧凑写 `%Y%m%d`），括号段取 `name`（**slug**，小写字母/数字/连字符）。
-`display_name_en`（英文可读名）仍属出包必填字段——平台展示要用，但**不进文件名**。
+产品名取 `SKILL.md` frontmatter 的 `name`（**中文技能名**，平台面板显示用的也是它），
+版本号取 `version`（统一补小写 `v`），
+日期为**打包当天**（紧凑写 `%Y%m%d`），括号段取 `slug`（**ASCII 标识**，小写字母/数字/`.`/`_`/`-`）。
+`display_name` 是 `name` 的同值兼容位，`display_name_en`（英文可读名）仍属出包必填字段
+——平台展示要用，但**不进文件名**。
 
 > 注：文件名含成对半角括号，属合法文件名；在终端里操作记得加引号或用转义。
 > `.skill` 全小写（V3.11.9 起；此前为大写 `.Skill`，因部分系统扩展名匹配大小写敏感，
@@ -68,9 +70,15 @@ _sys.dont_write_bytecode = True
 - `.zip` ＝纯 ZIP，与开放平台（open.workbuddy.cn）实测口径一致（**平台官方收 zip、≤3 MB**）。
 
 用法：
-  python pack.py <技能根目录> [--out <发布包目录，默认 <根>/_发布包>]
+  python pack.py <技能根目录> --out <发布包目录>
                              [--include-private] [--tag <版本标签，默认读 SKILL.md>]
                              [--keep-tools] [--format skill|zip|both]
+
+`--out` **必填，且必须在技能根之外**（这两个条件都不设默认、不做兜底）：
+技能目录只放技能本体，发布件出到根外。历史教训——`--out` 曾默认为 `<根>/_发布包`，
+于是每打一次包就在技能目录里多一份产物，实测在两处各堆到 20 余 MB 而无人察觉，
+直到装环境时才发现「技能目录 32 MB，其中 28 MB 是历史发布件」。
+静默给默认值的失败方式太安静：它不报错，只是让目录慢慢变胖。
 """
 import os, re, sys, json, hashlib, zipfile, argparse, datetime
 
@@ -442,7 +450,8 @@ SKILL_FMT_VER = 1
 #   · 版本号 **带小写 v** 前缀（`v1.7.0`，不是 `V1.7.0`、也不是裸 `1.7.0`）
 #     ——2026-10-14（v1.32.0）由大写 V 统一改为小写 v，与铁律 19.2／15.2 同步。
 #   · 日期 **紧凑 8 位**（`%Y%m%d`，如 20260928）
-#   · 技能 ID 用 **半角括号**包裹，内容为 **slug**（`name` 字段，小写字母/数字/连字符）
+#   · 技能 ID 用 **半角括号**包裹，内容为 **slug**（`slug` 字段，ASCII 小写字母/数字/`.`/`_`/`-`）
+#     ——2026-10-30 起 `name` 改承担中文显示名，slug 独立成字段；旧包括号段仍取 name（当时是 slug）
 #   · 分隔符一律 **下划线**
 #   · 封装格式默认同时出 `.skill` 与 `.zip` 两种（见 `--format`，默认 both）
 # 段序、分隔符与大小写一律以本常量为准，**不要在别处另行拼装文件名**。
@@ -469,20 +478,22 @@ def package_stem(base, tag, date=None):
         └─产品名─┘ └版本号┘ └─日期─┘ └────技能ID（slug）────┘ └封装┘
 
     各段取值：
-      · 产品名 ← frontmatter 的 `display_name`（去引号、去文件名非法字符）
+      · 产品名 ← frontmatter 的 `name`（**中文技能名**，去引号、去文件名非法字符）；
+                 `display_name` 仅作同值兼容位，`name` 缺时才回退到它
       · 版本号 ← tag（`read_skill_version` 自动读 `version`，**统一补小写 v**，不靠手填）
       · 日期   ← 打包当天，**紧凑写**（`%Y%m%d`，如 20260928）；
                  可用 `date` 参数（命令行 `--date`）覆盖，供复现某日包或 CI 固定日期
-      · 技能ID ← frontmatter 的 `name`（slug，小写字母/数字/连字符），**配半角括号置末**
-                 ——2026-09-29 起由英文可读名改为 slug，与平台/目录名保持同一套标识
+      · 技能ID ← frontmatter 的 `slug`（ASCII，小写字母/数字/`.`/`_`/`-`），**配半角括号置末**
+                 ——2026-10-30 起 `name` 改承担**中文显示名**（平台面板读它），
+                 slug 独立成字段承担目录名与包内标识，二者分工见铁律第 21 条
       · 英文名 `display_name_en` **仍读取**但**不进文件名**（平台展示用；保留在 pack.py 的
                  `_fm_field` 调用里，`check.py` 的出包必填字段守卫仍会校验它，守卫不削弱）
     四段一并返回，供 .skill 头部元数据复用——**不要从文件名反解**：
     产品名可能含空格、中点或与分隔符同形的字符，按 `_` 切会错位，
     一律以本函数的返回值为准（slug 段本身不含空格，可安全切）。
     """
-    product = _fm_field(base, "display_name") or _fm_field(base, "name") or SKILL_DIR
-    sid = _fm_field(base, "name") or SKILL_DIR
+    product = _fm_field(base, "name") or _fm_field(base, "display_name") or SKILL_DIR
+    sid = _fm_field(base, "slug") or SKILL_DIR
     en = _fm_field(base, "display_name_en") or sid
     product = _safe_name(product) or SKILL_DIR
     en = _safe_name(en) or sid
@@ -792,7 +803,11 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser(
         description="生成唯一的发布 zip（上架版结构：第一层为技能目录 %s）" % SKILL_DIR)
     ap.add_argument("base", help="技能根目录（含 SKILL.md）")
-    ap.add_argument("--out", help="输出目录，默认 <根>/_发布包")
+    ap.add_argument("--out", required=True,
+                    help="输出目录（**必填**，且必须在技能根之外）。不设默认值："
+                         "旧默认 `<根>/_发布包` 会让发布件在技能目录里越堆越多，"
+                         "且不报错、只是目录慢慢变胖。"
+                         "规范分发目录恒为 /workspace/dist；落在 /workspace/dev 开发树内会被拦截。")
     ap.add_argument("--include-private", action="store_true",
                     help="将 private/ 一并打入包内（默认排除；内含企业内控口径，慎用）")
     ap.add_argument("--tag", default=None, help="版本标签（默认自动读 SKILL.md frontmatter）")
@@ -811,6 +826,41 @@ if __name__ == "__main__":
     if a.keep_tools:
         print("[注意] --keep-tools 已启用：config.json 的工具路径将**原样入包**，"
               "确认这些路径对接收方有效。")
-    ok = build(a.base, a.out or os.path.join(a.base, "_发布包"), a.include_private,
+    # `--out` 必填之外还有一道：**不许落在技能根之内**。
+    # 只把默认值删掉是不够的——有人手填 `--out .` 或 `--out _发布包` 照样会堆回去，
+    # 而堆回去的失败方式极安静（不报错、只让目录变胖）。故按路径实算判定，不按字面。
+    _base = os.path.realpath(a.base)
+    _out = os.path.realpath(a.out)
+    try:
+        _inside = os.path.commonpath([_base, _out]) == _base
+    except ValueError:          # 不同盘符等无从比较的情形，按「不在根内」处理
+        _inside = False
+    if _inside:
+        print("[错误] --out 不得位于技能根之内：%s" % _out)
+        print("       技能根：%s" % _base)
+        print("       技能目录只放技能本体；发布件出到根外（如单独的 dist/ 目录）。")
+        print("       此限制不是洁癖：发布件堆进技能目录后不报错、只让目录变胖，")
+        print("       实测曾堆到「技能目录 32 MB，其中 28 MB 是历史发布件」才被发现。")
+        sys.exit(1)
+    # 第二道护栏：**不许落在开发工作树 /workspace/dev 之内**（v3.26.19 加）。
+    # 真实踩坑：曾手跑 `pack.py ... --out /workspace/dev/dist`，把发布包丢进开发侧深目录，
+    # 使用者只在规范分发目录 /workspace/dist 里找——于是"包出了却找不到"。
+    # 规范分发目录恒为 /workspace/dist（与 publish.py 的 DIST 一致）；凡经 `publish.py --pack`
+    # 出包，--out 本就传 /workspace/dist，不受此限制影响。此处只拦"手填到 dev 树内"的情形，
+    # 让错误在出包口当场响亮报出，而不是静默产出一个没人会去翻的包。
+    _dev_tree = os.path.realpath("/workspace/dev")
+    try:
+        _in_dev = os.path.commonpath([_dev_tree, _out]) == _dev_tree
+    except ValueError:          # 不同盘符等无从比较的情形，按「不在 dev 树内」处理
+        _in_dev = False
+    if _in_dev:
+        print("[错误] --out 不得位于开发工作树之内：%s" % _out)
+        print("       发布包应落到规范分发目录：%s" % os.path.realpath("/workspace/dist"))
+        print("       开发工作树（%s）里的包使用者不会去翻，等于\"出了却找不到\"。" % _dev_tree)
+        print("       正确做法：直接 `python3 /workspace/dev/publish.py --pack`")
+        print("       （它会把包出到 %s 并自动刷台账），或显式 `--out %s`。"
+              % (os.path.realpath("/workspace/dist"), os.path.realpath("/workspace/dist")))
+        sys.exit(1)
+    ok = build(a.base, a.out, a.include_private,
                a.tag or read_skill_version(a.base), a.keep_tools, a.format, a.date)
     sys.exit(0 if ok else 1)

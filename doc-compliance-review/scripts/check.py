@@ -282,6 +282,64 @@ def check_id_group_whitelist():
         info("规则ID组字母白名单：三脚本一致，%d 组覆盖完整" % len(wl))
 
 
+def check_ai_tells_rules():
+    """去AI味规则库咬合（v3.32.0）：core/ai-tells.json（机器真源）↔ core/03-ai-tells.md（人读版）。
+
+    两份文件各写一遍必然分家（铁律第 12 条同型风险），故四条断言：
+      ① json 可解析、规则组 ID ⊆ {A,B,C,D,X}、severity ∈ {high,mid,low}、正则全部可编译；
+      ② md 的「规则组数／条数」与 json 实算一致（md 写死数字须与真源同步）;
+      ③ md 五个组标题（### A · …）与 json 组 ID/名称咬合；
+      ④ json 里的规则条数与「条数：N 条」声明一致。
+    另与 scripts/ai-tells.py 的白名单常量咬合（引擎端 load_rules 的 ID 集须一致）。
+    """
+    jp = os.path.join(ROOT, "core", "ai-tells.json")
+    mp = os.path.join(ROOT, "core", "03-ai-tells.md")
+    if not (os.path.exists(jp) and os.path.exists(mp)):
+        err("去AI味规则库：core/ai-tells.json 与 core/03-ai-tells.md 须同时存在（机器真源＋人读版）")
+        return
+    try:
+        d = json.loads(_read(jp))
+        groups = d.get("groups") or []
+        n_rules = sum(len(g.get("patterns", [])) for g in groups)
+        for g in groups:
+            if g.get("id") not in ("A", "B", "C", "D", "X"):
+                err("去AI味规则库：组 ID %r 越界（白名单 A/B/C/D/X）" % g.get("id"))
+            if g.get("severity") not in ("high", "mid", "low"):
+                err("去AI味规则库：组 %s severity 非法" % g.get("id"))
+            for pat in g.get("patterns", []):
+                try:
+                    re.compile(pat["pattern"])
+                except re.error as e:
+                    err("去AI味规则库：组 %s 正则编译失败 %r（%s）" % (g.get("id"), pat["pattern"], e))
+    except Exception as e:  # noqa: BLE001
+        err("去AI味规则库：ai-tells.json 解析失败（%s）" % e)
+        return
+    mdsrc = _read(mp)
+    m = re.search(r"规则组数[：:]\s*(\d+)\s*组\s*[／/]\s*\*\*?规则条数\*?\*?[：:]\s*(\d+)\s*条", mdsrc)
+    if not m:
+        err("去AI味规则库：03-ai-tells.md 缺「规则组数：N 组／规则条数：N 条」声明（守卫无从咬合）")
+    else:
+        if int(m.group(1)) != len(groups):
+            err("去AI味规则库：md 写 %s 组，json 实算 %d 组" % (m.group(1), len(groups)))
+        if int(m.group(2)) != n_rules:
+            err("去AI味规则库：md 写 %s 条，json 实算 %d 条" % (m.group(2), n_rules))
+    # 组标题咬合：md 的 "### A · 空洞套话" 与 json 的 (id, name)
+    md_heads = dict(re.findall(r"^###\s*([A-Z])\s*·\s*(\S+)", mdsrc, re.M))
+    for g in groups:
+        if md_heads.get(g["id"]) not in (None, g.get("name")):
+            err("去AI味规则库：md 组标题 %s·%s 与 json 组名 %s 不一致"
+                % (g["id"], md_heads.get(g["id"]), g.get("name")))
+    # 引擎端咬合：ai-tells.py 的 load_rules 白名单
+    ep = os.path.join(HERE, "ai-tells.py")
+    if os.path.exists(ep):
+        esrc = _read(ep)
+        m3 = re.search(r'not in \("A", "B", "C", "D", "X"\)', esrc)
+        if not m3:
+            err("去AI味规则库：ai-tells.py 的组 ID 白名单与守卫口径不一致（须同为 A/B/C/D/X）")
+    if not ERRS or not any("去AI味规则库" in x for x in ERRS):
+        info("去AI味规则库：%d 组 %d 条，json↔md↔引擎三方咬合通过" % (len(groups), n_rules))
+
+
 def check_rule_baseline():
     """规则库回归基线：与 core/_rules-baseline.json 比对（检出规则增删改与评级变化）。"""
     p = os.path.join(ROOT, "core", "_rules-baseline.json")
@@ -1241,7 +1299,15 @@ def check_smoke_count():
     real = d.get("total")
     if not isinstance(real, int) or not real:
         return
-    # 只扫与冒烟/自检同一行的数字。须排除两类干扰，否则会把别的脚本的项数当成冒烟项数：
+    # 两档守恒断言（v3.30.0）：快速档与全量档的项数必须相等——快档是把耗时项记 SKIP 保留占位，
+    # 不是删掉条目。曾经 fast 用一条 skip 顶掉四条 check，fast=265／full=270，
+    # 于是 check_smoke_count 拿 fast 的 total 去比文档就报错，表现为「装完即红」。
+    # 两个键都在时才判（只跑过一档时不误报）。
+    _tf, _tk = d.get("total_full"), d.get("total_fast")
+    if isinstance(_tf, int) and isinstance(_tk, int) and _tf != _tk:
+        err("冒烟两档项数不守恒（全量 %d 项 ／ 快速 %d 项）——快速档须用 skip 保留占位，"
+            "不得删减条目；请对齐 fast 分支的 skip 与 else 分支的 check 后再跑两档"
+            % (_tf, _tk))    # 只扫与冒烟/自检同一行的数字。须排除两类干扰，否则会把别的脚本的项数当成冒烟项数：
     # (1) 其他脚本所在行（check.py 的 12 项、pack.py 的 5 项都不是冒烟项数）
     # (2) 列表式表述「N 项：结构／字段／…」——那是分项的枚举，不是总数
     kw = ("smoke-test", "冒烟", "自检")
@@ -1294,8 +1360,11 @@ def check_doc_number_caliber():
     DOCS = ("SKILL.md", "README.md", "安装使用教程.md",
             "文档合规审查助手AI合同提示词版.md")
 
-    # ---- 真源 1：格式数（make-docx.py 的 --formats 帮助串；锚定 --formats 并跨行，
-    #      以免被同文件的 --types 帮助「逗号分隔：tracked,…」抢匹配）----
+    # ---- 真源 1：格式数 ----
+    # v3.31.0 引擎拆分后，**格式家族清单的声明仍在 make-docx.py 的 --formats 帮助串**
+    # （CLI 入口在那里），而家族的覆盖矩阵/白名单/生成器字典搬到了 format-engine.py。
+    # 这里读法不变，只把路径写成「CLI 入口」，并额外与 format-engine 的 FORMAT_ALL 咬合
+    # ——两处任一处漏改都会被下面这条断言抓出来。
     real_fmt = None
     mk = os.path.join(HERE, "make-docx.py")
     if os.path.exists(mk):
@@ -1342,11 +1411,17 @@ def check_doc_number_caliber():
     fmt_bad, menu_bad, seed_bad, elems_bad = [], [], [], []
     for rel in DOCS:
         for ln, line in enumerate(_doc_lines(rel), 1):
-            # 格式数：「N 种格式」；必须带「种」字，否则会误伤「☐6 格式与体例降级」这类选项编号＋类别名。
+            # 格式数：「N 种格式」与「N 格式」（v3.28.0 起后者也拦——OPEN-ISSUES H-15 的
+            # 「5 格式」不带种字漏抓缺口就此补上）。两处**精确豁免**（豁免须写清理由，不许宽泛词表）：
+            #   a. 行含「☐」＝选项编号＋类别名语境（如「☐6 格式与体例降级」是侧重选项，
+            #      不是格式总数——v3.25.x 立守卫时实测误伤形态）；
+            #   b. 行含「侧重」＝提示词版侧重清单，同类误伤源。
             # 「N 种封装」不算（那是发布包封装格式）。
             if real_fmt:
-                for m in re.finditer(r"(\d+)\s*种\s*格式", line):
+                for m in re.finditer(r"(\d+)\s*(?:种)?\s*格式", line):
                     if "封装" in line or ".skill" in line or ".zip" in line:
+                        continue
+                    if "☐" in line or "侧重" in line:
                         continue
                     n = int(m.group(1))
                     if n != real_fmt:
@@ -1630,6 +1705,65 @@ def _check_pseudo_controls():
         info("交互：清单一律无伪控件符号；整块选不中时有逐条降级条款")
 
 
+def check_naming_fields():
+    """命名三字段守卫（铁律第 21 条）：`name` 显示名（可中文）／`slug` kebab-case／`display_name` 同值兼容位。
+
+    **为什么非有这条不可**：2026-10-30 起字段分工重排——
+      · `name` ← **显示名**（平台面板读它）。**可写中文**，允许但不强制——写成纯英文不违规，
+        只是面板上显示英文；
+      · `slug` ← **kebab-case 标识**（官方规范要求；进技能目录名、包名第四段、脚本内引用）；
+      · `display_name` ← `name` 的同值**兼容位**（可选；保留则须逐字相同）。
+    原来这两个角色都压在 `name` 一个字段上，拆开之后三种病都会悄悄发生，故逐条断言：
+
+      a. **`name` 含文件名非法字符或控制字符** —— `pack.py` 的 `_safe_name` 会**静默剔除**，
+         于是文件名与 `name` 不一致而无人知晓（12.5 禁止静默降级）。这是三条里最阴的一条：
+         `name` 以前不进文件名（进的是 `display_name`），分工一换它**就进文件名了**；
+      b. **`slug` 不是 kebab-case** —— 含大写／下划线／点／空格／全角符号即报。目录名、
+         包名第四段、命令行引用三处一起坏，且坏在装机时才暴露；
+      c. **`name` 与 `display_name` 不同值** —— 两处各存必漂（12.2），改一处忘另一处。
+
+    **不查的一条**：`name` 是否含汉字。中文只是**允许**、不是**要求**——
+    强制中文化会把纯英文命名的既有技能一律判红，那不是守卫该干的事。
+    真源仍是 `SKILL.md` frontmatter；本函数只断言，不改写。
+    """
+    skill = os.path.join(ROOT, "SKILL.md")
+    if not os.path.exists(skill):
+        return
+    m = re.search(r"^---\n(.*?)\n---", _read(skill), re.S)
+    if not m:
+        err("SKILL.md 找不到 frontmatter 段，命名守卫无法执行")
+        return
+    fmtext = m.group(1)
+
+    def _v(key):
+        mm = re.search(r"(?m)^%s:[ \t]*(.*)$" % re.escape(key), fmtext)
+        return (mm.group(1) if mm else "").strip().strip('"').strip("'").strip()
+
+    name, slug, disp = _v("name"), _v("slug"), _v("display_name")
+    bad = []
+    if not name:
+        bad.append("缺 `name`——平台面板显示读的就是它（可写中文，也可纯英文）")
+    elif re.search(r'[\\/:*?"<>|\x00-\x1f]', name):
+        bad.append("`name` 含文件名非法字符或控制字符（`%s`）——`pack.py` 的 `_safe_name` "
+                   "会**静默剔除**它们，文件名将与 `name` 不一致" % name)
+    elif name != name.strip():
+        bad.append("`name` 首尾有空白（`%r`）" % name)
+    if not slug:
+        bad.append("缺 `slug`——应为 **kebab-case** 标识，进技能目录名与包名第四段")
+    elif not re.match(r"^[a-z0-9]+(?:-[a-z0-9]+)*$", slug):
+        bad.append("`slug` 不合 kebab-case（`%s`）——只许小写字母与数字、单词间用**单个连字符**；"
+                   "禁大写、下划线、点、空格与全角符号" % slug)
+    if name and disp and name != disp:
+        bad.append("`name`（`%s`）与 `display_name`（`%s`）不同值——"
+                   "两者是同一真源的两个落点，须逐字一致；不保留 `display_name` 时须整体删去" % (name, disp))
+    if bad:
+        for b in bad:
+            err("命名：" + b)
+    else:
+        info("命名三字段：name=%s｜slug=%s（kebab-case）%s" % (
+            name, slug, "｜display_name 同值" if disp else "｜未设 display_name"))
+
+
 def check_package_fields():
     """出包必填字段守卫：`pack.py` 组装文件名所依赖的 frontmatter 字段，必须齐且非空。
 
@@ -1639,7 +1773,8 @@ def check_package_fields():
     **为什么非有这条不可**：`package_stem` 对每个字段都写了 `or` 兜底，字段丢了**不报错**，
     只会静默降级——四段式看着仍合规，`verify_filename` 也照样放行。V3.11.2 把它列为遗留，
     本条即其落地：**不再允许静默**。
-    （V3.11.6 起文件名第四段改用 slug `name`，丢了会退化成技能目录名；`display_name_en`
+    （V3.11.6 起文件名第四段改用 slug；2026-10-30 起该角色由独立字段 `slug` 承担，
+    `name` 改承担中文技能名、丢失会让产品名段退化成技能目录名；`display_name_en`
     仍读取、仍属必填，只是不进文件名——本守卫照旧看 `pack.py` 的真实调用，自动跟上。）
 
     **第二道**：直接调用 pack.py 自己的 `package_stem` 实算文件名、再交给 `verify_filename`
@@ -2157,7 +2292,11 @@ def _check_format_default():
     m = re.search(r'add_argument\(\s*"--formats"\s*,\s*default\s*=\s*"?([^",)\s]+)"?', src_m)
     raw = m.group(1) if m else None
     if raw == "None":
-        fb = re.search(r'^FORMAT_FALLBACK\s*=\s*"([^"]+)"', src_m, re.M)
+        # v3.31.0：FORMAT_FALLBACK 随格式引擎搬到 format-engine.py（格式家族真源），
+        # 先查本文件、再查引擎——两处只许有一处定义，都在则取到的值必然相同。
+        fb = (re.search(r'^FORMAT_FALLBACK\s*=\s*"([^"]+)"', src_m, re.M)
+              or re.search(r'^FORMAT_FALLBACK\s*=\s*"([^"]+)"',
+                           _read(os.path.join(ROOT, "scripts", "format-engine.py")), re.M))
         if not fb:
             err("--formats 用了哨兵 default=None，但找不到 FORMAT_FALLBACK 常量——"
                 "缺省值无处可查，文档登记也就无从核对")
@@ -2173,12 +2312,15 @@ def _check_format_default():
         err("--formats 未找到 default 声明，无法核对缺省格式")
         return
     src = _read(sp)
-    i = src.find("**文件格式（5 种")
-    if i < 0:
+    # v3.28.0：锚点从「5 种」改「不定数字」——格式数一变（5→7）锚点就失明、守卫静默 return
+    m = re.search(r"\*\*文件格式（(\d+)\s*种", src)
+    if not m:
         return
+    i = m.start()
     sec = src[i:i + 1200]
     # ① 文档登记的默认值须与代码一致（映射 WORD→docx 等）
-    name_map = {"docx": "WORD", "md": "MD", "excel": "Excel", "html": "HTML", "pdf": "PDF"}
+    name_map = {"docx": "WORD", "md": "MD", "excel": "Excel", "html": "HTML", "pdf": "PDF",
+                "pptx": "PPT", "mindmap": "思维导图"}
     codenames = [c.strip() for c in default.split(",") if c.strip()]
     for c in codenames:
         label = name_map.get(c, c)
@@ -2800,6 +2942,370 @@ def check_reproducible_build():
         info("可复现构建：基线标识内容派生、zip 条目时间戳固定（同版本重跑出包字节一致）")
 
 
+def check_tier_requirement():
+    """保真档位体系守卫（设计文档 §4.3 门禁四条）。
+
+    `make-docx.py` 的 `TIER_REQUIREMENT` 是要求类型真源，四条断言：
+      1. 键集合必须与 TYPE_ORDER 相同（少/多/拼错即报错）；
+      2. 键序必须与 TYPE_ORDER 一致（顺序漂移同样报错）；
+      3. 值必须是五种要求类型之一；
+      4. TIER_ALLOWED 中每种要求类型的允许落点必须覆盖 CONTENT_ONLY/NEWDOC 合法档，
+         且 ORIGINAL_* 不得把 NEWDOC 列为允许落点（落点与要求相容的静态部分）。
+    第 1 步（立体系）行为不变：本函数只做静态校验，不运行生成流程。
+    """
+    mp = os.path.join(HERE, "make-docx.py")
+    try:
+        import ast as _ast
+        tree = _ast.parse(_read(mp))
+    except Exception as e:  # noqa: BLE001
+        err("档位体系：无法解析 make-docx.py（%s）" % e)
+        return
+
+    defs = {}
+    for node in tree.body:
+        if isinstance(node, _ast.Assign) and len(node.targets) == 1 \
+                and isinstance(node.targets[0], _ast.Name):
+            name = node.targets[0].id
+            if name in ("TYPE_ORDER", "TIER_REQUIREMENT", "TIER_LEVELS", "TIER_ALLOWED"):
+                try:
+                    defs[name] = _ast.literal_eval(node.value)
+                except Exception:  # noqa: BLE001
+                    err("档位体系：%s 不是可字面求值的常量" % name)
+    if "TIER_REQUIREMENT" not in defs:
+        err("档位体系：make-docx.py 未定义 TIER_REQUIREMENT（保真档位真源缺失）")
+        return
+    tier = defs["TIER_REQUIREMENT"]
+
+    to = defs.get("TYPE_ORDER")
+    if to is None:
+        err("档位体系：make-docx.py 未定义 TYPE_ORDER")
+        return
+    # 第 1 条：键集合
+    if set(tier.keys()) != set(to):
+        miss = sorted(set(to) - set(tier.keys()))
+        extra = sorted(set(tier.keys()) - set(to))
+        err("档位体系：TIER_REQUIREMENT 键集合与 TYPE_ORDER 不一致"
+            "（缺 %s / 多 %s）" % (miss or "无", extra or "无"))
+    # 第 2 条：键序
+    elif list(tier.keys()) != list(to):
+        err("档位体系：TIER_REQUIREMENT 键序与 TYPE_ORDER 不一致——"
+            "TYPE_ORDER=%s，TIER_REQUIREMENT=%s（顺序漂移同样算错）"
+            % (list(to), list(tier.keys())))
+    # 第 3 条：值合法
+    levels = defs.get("TIER_LEVELS")
+    if levels is None:
+        err("档位体系：make-docx.py 未定义 TIER_LEVELS（五种要求类型清单缺失）")
+    else:
+        bad = {k: v for k, v in tier.items() if v not in levels}
+        if bad:
+            err("档位体系：TIER_REQUIREMENT 含未知要求类型（须为 %s 之一）：%s"
+                % (list(levels), bad))
+    # 第 4 条：相容矩阵静态自检
+    allowed = defs.get("TIER_ALLOWED")
+    if allowed is None:
+        err("档位体系：make-docx.py 未定义 TIER_ALLOWED（要求→落点相容矩阵缺失）")
+    elif levels is not None:
+        if set(allowed.keys()) != set(levels):
+            err("档位体系：TIER_ALLOWED 键集合与 TIER_LEVELS 不一致"
+                "（缺 %s / 多 %s）"
+                % (sorted(set(levels) - set(allowed)) or "无",
+                   sorted(set(allowed) - set(levels)) or "无"))
+        for lv, pts in allowed.items():
+            if lv in ("ORIGINAL_STRICT", "ORIGINAL_IF_AVAILABLE") and "NEWDOC" in pts:
+                err("档位体系：%s 的允许落点不得含 NEWDOC（与 §4.3 相容矩阵冲突）" % lv)
+            if lv == "NEWDOC_ONLY" and set(pts) != {"NEWDOC"}:
+                err("档位体系：NEWDOC_ONLY 的允许落点必须恰为 NEWDOC，现为 %s" % (pts,))
+    else:
+        info("档位体系：TIER_ALLOWED 静态自检跳过（TIER_LEVELS 缺失已另行报错）")
+    if not ERRS or not any("档位体系" in m for m in ERRS):
+        info("档位体系：TIER_REQUIREMENT 与 TYPE_ORDER 键集合/键序一致，"
+             "五种要求类型与相容矩阵自检通过")
+
+
+def check_format_matrix():
+    """格式矩阵守卫（v3.28.0，风格同 check_tier_requirement）。
+
+    格式维度新增 pptx/mindmap 后，「哪类交付物支持哪些格式」不能再靠三个生成器
+    字典的隐式键对齐——PPT_GEN/MINDMAP_GEN 漏写一类是**静默缺口**，现有守卫发现不了。
+    本守卫六判据（全部 AST 字面求值，静态校验、不跑生成流程）：
+      1. FORMAT_ALL 键集合 == FORMAT_LABEL 键集合（少/多即报）；
+      2. FORMAT_FALLBACK ∈ FORMAT_ALL；
+      3. --formats 帮助串列出的键与 FORMAT_ALL 双向咬合（防帮助串漏登某键）；
+      4. PPT_TYPES/MINDMAP_TYPES ⊆ TYPE_ORDER，且 PPT_TYPES ⊆ MINDMAP_TYPES
+         （能出 PPT 的必能出导图——PPT 页面可用导图插图）；
+      5. PPT_TYPES 各类的 TIER_REQUIREMENT ∈ {NEWDOC_ONLY, CITE_FIDELITY}
+         （防把原稿操作件塞进 PPT——幻灯片冒充原稿是保真体系的破口）；
+      6. PPT_GEN/MINDMAP_GEN 键集合 ⊆ 对应覆盖集，且 PPT_TYPES 每类都有导图。
+    """
+    # v3.31.0 引擎拆分：格式家族常量与生成器字典搬到 format-engine.py，
+    # 而 TYPE_ORDER／TIER_REQUIREMENT 属交付物类型真源，仍在 make-docx.py。
+    # 故两张 AST 分别解析、合并查表——**两边都读**才是拆分后不瞎的写法；
+    # 只改路径不改判据，会让第 4/5 条悄悄降级成「未定义即报」的假红。
+    mp = os.path.join(HERE, "format-engine.py")
+    mp2 = os.path.join(HERE, "make-docx.py")
+    try:
+        import ast as _ast
+        tree = _ast.parse(_read(mp))
+        tree2 = _ast.parse(_read(mp2))
+    except Exception as e:  # noqa: BLE001
+        err("格式矩阵：无法解析 format-engine.py / make-docx.py（%s）" % e)
+        return
+    want = ("FORMAT_ALL", "FORMAT_FALLBACK", "FORMAT_LABEL",
+            "PPT_TYPES", "MINDMAP_TYPES", "TYPE_ORDER", "TIER_REQUIREMENT")
+    defs = {}
+    for node in list(tree.body) + list(tree2.body):
+        if isinstance(node, _ast.Assign) and len(node.targets) == 1 \
+                and isinstance(node.targets[0], _ast.Name):
+            name = node.targets[0].id
+            if name in want:
+                try:
+                    defs[name] = _ast.literal_eval(node.value)
+                except Exception:  # noqa: BLE001
+                    err("格式矩阵：%s 不是可字面求值的常量" % name)
+    # PPT_GEN/MINDMAP_GEN 是函数字典（值不可字面求值），只取键名
+    gens = {}
+    for node in list(tree.body) + list(tree2.body):
+        if isinstance(node, _ast.Assign) and len(node.targets) == 1 \
+                and isinstance(node.targets[0], _ast.Name) \
+                and node.targets[0].id in ("PPT_GEN", "MINDMAP_GEN"):
+            try:
+                gens[node.targets[0].id] = sorted(
+                    k.value for k in node.value.keys)
+            except Exception:  # noqa: BLE001
+                err("格式矩阵：%s 不是以字符串字面量为键的字典" % node.targets[0].id)
+    for name in want:
+        if name not in defs:
+            err("格式矩阵：未定义 %s（格式真源缺失，应在 format-engine.py 或 make-docx.py）" % name)
+            return
+    fa, fb, fl = defs["FORMAT_ALL"], defs["FORMAT_FALLBACK"], defs["FORMAT_LABEL"]
+    if not isinstance(fa, list) or not fa:
+        err("格式矩阵：FORMAT_ALL 须为非空列表")
+        return
+    # 第 1 条：FORMAT_ALL == FORMAT_LABEL 键集
+    if set(fa) != set(fl):
+        err("格式矩阵：FORMAT_ALL 与 FORMAT_LABEL 键集合不一致"
+            "（缺 %s / 多 %s）" % (sorted(set(fa) - set(fl)) or "无",
+                                  sorted(set(fl) - set(fa)) or "无"))
+    # 第 2 条：兜底 ∈ 全集
+    if fb not in fa:
+        err("格式矩阵：FORMAT_FALLBACK=%r 不在 FORMAT_ALL 内" % fb)
+    # 第 3 条：帮助串双向咬合
+    m = re.search(r'"--formats".*?help="逗号分隔：([a-z,]+)', _read(mp2), re.S)
+    if not m:
+        err("格式矩阵：--formats 帮助串未匹配到「逗号分隔：<清单>」——格式数守卫与帮助串双向咬合失明")
+    else:
+        help_keys = [x for x in m.group(1).split(",") if x]
+        miss = sorted(set(fa) - set(help_keys))
+        extra = sorted(set(help_keys) - set(fa))
+        if miss or extra:
+            err("格式矩阵：--formats 帮助串与 FORMAT_ALL 不一致"
+                "（帮助串缺 %s / 多 %s）——帮助串是格式数真源，漏登即静默少数" % (miss or "无", extra or "无"))
+    to = defs["TYPE_ORDER"]
+    pt, mt = defs["PPT_TYPES"], defs["MINDMAP_TYPES"]
+    # 第 4 条：覆盖集 ⊆ TYPE_ORDER，且 PPT ⊆ 导图
+    for label, s in (("PPT_TYPES", pt), ("MINDMAP_TYPES", mt)):
+        if not isinstance(s, tuple) or not s:
+            err("格式矩阵：%s 须为非空元组" % label)
+        elif set(s) - set(to):
+            err("格式矩阵：%s 含 TYPE_ORDER 之外的类型：%s" % (label, sorted(set(s) - set(to))))
+    if isinstance(pt, tuple) and isinstance(mt, tuple) and set(pt) - set(mt):
+        err("格式矩阵：PPT_TYPES 不是 MINDMAP_TYPES 的子集（多出 %s）——"
+            "能出 PPT 的必能出导图（PPT 页可插导图 PNG）" % sorted(set(pt) - set(mt)))
+    # 第 5 条：PPT 类必须是新建/引文类（防幻灯片冒充原稿）
+    tier = defs["TIER_REQUIREMENT"]
+    for t in pt:
+        if tier.get(t) not in ("NEWDOC_ONLY", "CITE_FIDELITY"):
+            err("格式矩阵：PPT_TYPES 含原稿级/内容级交付物 %s（要求=%s）——"
+                "PPT 仅覆盖 NEWDOC_ONLY/CITE_FIDELITY 类，原稿操作件不得做成幻灯片"
+                % (t, tier.get(t)))
+    # 第 6 条：GEN 字典键集 ⊆ 覆盖集，且 PPT 类都有导图
+    if "PPT_GEN" not in gens:
+        err("格式矩阵：format-engine.py 未定义 PPT_GEN（PPT 生成器字典缺失）")
+    elif set(gens["PPT_GEN"]) != set(pt):
+        err("格式矩阵：PPT_GEN 键集合与 PPT_TYPES 不一致"
+            "（缺 %s / 多 %s）" % (sorted(set(pt) - set(gens["PPT_GEN"])) or "无",
+                                  sorted(set(gens["PPT_GEN"]) - set(pt)) or "无"))
+    if "MINDMAP_GEN" not in gens:
+        err("格式矩阵：format-engine.py 未定义 MINDMAP_GEN（导图生成器字典缺失）")
+    elif isinstance(mt, tuple):
+        if set(gens["MINDMAP_GEN"]) - set(mt):
+            err("格式矩阵：MINDMAP_GEN 含 MINDMAP_TYPES 之外的类型：%s"
+                % sorted(set(gens["MINDMAP_GEN"]) - set(mt)))
+        elif isinstance(pt, tuple) and set(pt) - set(gens["MINDMAP_GEN"]):
+            err("格式矩阵：PPT_TYPES 中 %s 无导图生成器（PPT 类必有导图）"
+                % sorted(set(pt) - set(gens["MINDMAP_GEN"])))
+    # 第 7 条（v3.32.0）：image 家族咬合——
+    #   a. "image" ∈ FORMAT_ALL 时，IMAGE_TYPES/IMG_TYPES 必须在 format-engine.py 定义；
+    #   b. IMAGE_TYPES 六子格式 ⊆ {png,jpg,webp,gif,svg,ico}（防写错扩展名）；
+    #   c. --image-formats 帮助串列出的子格式与 IMAGE_TYPES 双向咬合；
+    #   d. --image-formats 参数必须排在 --formats 之后（数字口径守卫的惰性正则依赖此顺序）。
+    if "image" in fa:
+        want_img = ("IMAGE_TYPES", "IMG_TYPES")
+        idefs = {}
+        for node in tree.body:
+            if isinstance(node, _ast.Assign) and len(node.targets) == 1 \
+                    and isinstance(node.targets[0], _ast.Name) \
+                    and node.targets[0].id in want_img:
+                try:
+                    idefs[node.targets[0].id] = _ast.literal_eval(node.value)
+                except Exception:  # noqa: BLE001
+                    err("格式矩阵：%s 不是可字面求值的常量" % node.targets[0].id)
+        for name in want_img:
+            if name not in idefs:
+                err("格式矩阵：format-engine.py 未定义 %s（image 家族真源缺失）" % name)
+        it = idefs.get("IMAGE_TYPES")
+        if isinstance(it, tuple):
+            bad_sub = [x for x in it if x not in ("png", "jpg", "webp", "gif", "svg", "ico")]
+            if bad_sub:
+                err("格式矩阵：IMAGE_TYPES 含不认识的子格式 %s" % bad_sub)
+        m2 = re.search(r'"--image-formats".*?help="逗号分隔：([a-z,]+)', _read(mp2), re.S)
+        if not m2:
+            err("格式矩阵：--image-formats 帮助串未匹配到「逗号分隔：<清单>」——"
+                "image 家族的子格式咬合失明")
+        elif isinstance(it, tuple):
+            h2 = [x for x in m2.group(1).split(",") if x]
+            if set(h2) != set(it):
+                err("格式矩阵：--image-formats 帮助串与 IMAGE_TYPES 不一致"
+                    "（帮助串缺 %s / 多 %s）" % (sorted(set(it) - set(h2)) or "无",
+                                                sorted(set(h2) - set(it)) or "无"))
+        src_mk = _read(mp2)
+        pos_f = src_mk.find('"--formats"')
+        pos_i = src_mk.find('"--image-formats"')
+        if pos_f < 0 or pos_i < 0 or pos_i < pos_f:
+            err("格式矩阵：--image-formats 必须声明在 --formats 之后——"
+                "数字口径守卫的惰性正则按「--formats 之后第一处逗号清单」取格式数，"
+                "顺序颠倒会把 image 子格式当成格式清单（格式数 8 被读成 6）")
+    if not ERRS or not any("格式矩阵" in m for m in ERRS):
+        info("格式矩阵：FORMAT_ALL %d 种（image 家族 %d 子格式），覆盖集与生成器字典、"
+             "要求类型、帮助串判据自检通过"
+             % (len(fa), len(idefs.get("IMAGE_TYPES") or ())))
+
+
+def check_html_online_guard():
+    """HTML 在线增强版守卫（v3.28.0）。
+
+    在线版把白名单 CDN 外链写进产物 HTML——「离线零外部资源」的承诺就此有了例外，
+    例外若无守卫必然回潮（要么默认变在线、要么白名单外偷偷加域）。五条断言：
+      ① HTML_CDN_ALLOW 存在且非空；
+      ② 每项都是纯主机名（无 scheme/路径/端口，防写成 "https://x/y" 绕过比对）；
+      ③ 与 SECURITY.md 白名单名单双向一致（同 check_net_tiers 的咬合手法）；
+      ④ format-engine.py 全文除常量定义外不得出现白名单以外的 http(s):// 主机字样；
+      ⑤ html_page 的 online 参数默认值必须为 False（防「默认在线」回潮）。
+
+    v3.31.0：本守卫原本读 make-docx.py，引擎拆分后白名单与 html_page 都搬进
+    format-engine.py——只改代码不改守卫，守卫就会对着空文件「零命中通过」，是假绿。
+    E0 口径：脚本自身不出网（红线是「脚本不出网」），产物含外链不改档位——
+    本守卫只盯字符串层面的白名单，不涉及任何 import/网络调用。
+    """
+    # v3.31.0：白名单真源随格式引擎搬到 format-engine.py；hereafter 只读那一个文件。
+    mp = os.path.join(HERE, "format-engine.py")
+    src = _read(mp)
+    m = re.search(r"^HTML_CDN_ALLOW\s*=\s*\(([^)]*)\)", src, re.M | re.S)
+    if not m:
+        err("HTML 在线守卫：format-engine.py 未定义 HTML_CDN_ALLOW（白名单真源缺失）")
+        return
+    allow = [x.strip().strip("'\"") for x in m.group(1).split(",") if x.strip().strip("'\"")]
+    if not allow:
+        err("HTML 在线守卫：HTML_CDN_ALLOW 为空——在线版将无任何合法外链域")
+        return
+    for h in allow:
+        if re.match(r"^[a-zA-Z][a-zA-Z0-9+.-]*://", h) or "/" in h or ":" in h:
+            err("HTML 在线守卫：白名单项 %r 不是纯主机名（不得含 scheme/路径/端口）" % h)
+        elif not re.match(r"^[a-z0-9][a-z0-9.-]*\.[a-z]{2,}$", h):
+            err("HTML 在线守卫：白名单项 %r 不像合法域名" % h)
+    # ③ 与 SECURITY.md 双向一致
+    sec_path = os.path.join(ROOT, "SECURITY.md")
+    if not os.path.exists(sec_path):
+        err("HTML 在线守卫：找不到 SECURITY.md——白名单名单无从比对")
+    else:
+        sec = _read(os.path.join(ROOT, "SECURITY.md"))
+        i = sec.find("白名单 CDN")
+        if i < 0:
+            err("SECURITY.md 未写「白名单 CDN」段——在线版外链名单须在文档登记，"
+                "否则承诺与实现分家（25.2 形态）")
+        else:
+            sec_hosts = set(re.findall(r"[a-z0-9][a-z0-9.-]*\.[a-z]{2,}",
+                                       sec[i:i + 600]))
+            sec_hosts = {h for h in sec_hosts if h in allow} | {
+                h for h in allow if h in sec[i:i + 600]}
+            miss = [h for h in allow if h not in sec[i:i + 600]]
+            extra = [h for h in re.findall(r"(?:cdn|fonts)[a-z0-9.-]*\.[a-z]{2,}", sec[i:i + 600])
+                     if h not in allow]
+            if miss or extra:
+                err("HTML 在线守卫：SECURITY.md 白名单名单与 HTML_CDN_ALLOW 不一致"
+                    "（文档缺 %s / 文档多 %s）；两处须同步" % (miss or "无", extra or "无"))
+    # ④ 白名单外 http(s):// 主机字样（xmlns 命名空间是标记语法不是外链，先剥除——
+    #   v3.29.0 起 mindmap 产物为 SVG，模板含 xmlns="http://www.w3.org/2000/svg" 属正常）
+    body = re.sub(r'xmlns="https?://[^"]+"', "", src[m.end():])
+    for hm in re.finditer(r"https?://([a-zA-Z0-9.-]+)", body):
+        host = hm.group(1).lower()
+        if host not in [h.lower() for h in allow]:
+            err("HTML 在线守卫：format-engine.py 出现白名单以外的主机字样 %s——"
+                "在线版外链域只许 %s，如需扩展请先改白名单真源并同步 SECURITY.md"
+                % (host, allow))
+            break
+    # ⑤ online 默认必须 False
+    if not re.search(r"def html_page\([^)]*online\s*=\s*False", src):
+        err("HTML 在线守卫：html_page 的 online 参数默认值不是 False——"
+            "「默认离线」的承诺不许回潮（在线必须显式 --html-online）")
+    if not ERRS or not any("HTML 在线守卫" in m for m in ERRS):
+        info("HTML 在线守卫：白名单 %s 与 SECURITY.md 双向一致，默认离线，自检通过" % allow)
+
+
+def check_mindmap_single_source():
+    """导图单一真源守卫（v3.30.0）。
+
+    为什么立这条：思维导图有两条入口——交付物 `--formats mindmap`（数据＝审查规格）
+    与精要总结第二十一节（数据＝文档正文大纲）。数据来源不同是设计，**但渲染器必须同一套**；
+    若两处各写一套，改了一处另一处不跟，就会静默分家（铁律第 12 条）。此前"同源"只写在
+    SKILL 文档里，没有任何代码在盯——正是「文档写一套、代码做一套」的 25.2 形态。
+
+    四条断言（AST 静态）：
+      ① mindmap_svg / mindmap_html / mindmap_png 三个渲染函数存在且可解析；
+      ② export_summary_mindmap（精要入口）的函数体必须**直接调用**上述三个函数名；
+      ③ export_mindmap（交付物入口）同样必须调用三者（默认 SVG，HTML/PNG 按开关）；
+      ④ 精要产物必须落隔离目录——函数体须出现 summary_dir 调用（防"总结件混进审查件"）。
+    """
+    # v3.31.0：三个渲染器搬进 format-engine.py，两个入口 wrapper 留在 make-docx.py
+    # （export_summary_mindmap 要写 _精要总结/ 隔离目录、export_mindmap 要用 CLI 侧 outname）。
+    # 故两个文件都解析：渲染函数找 format-engine，入口 wrapper 找 make-docx。
+    # 只改一处路径就会让下面四条断言全部落空、守卫静默变瞎。
+    mp = os.path.join(HERE, "make-docx.py")
+    mp2 = os.path.join(HERE, "format-engine.py")
+    try:
+        import ast as _ast
+        tree = _ast.parse(_read(mp))
+        tree2 = _ast.parse(_read(mp2))
+    except Exception as e:  # noqa: BLE001
+        err("导图单一真源：无法解析 make-docx.py / format-engine.py（%s）" % e)
+        return
+    funcs = {}
+    for node in list(tree.body) + list(tree2.body):
+        if isinstance(node, _ast.FunctionDef):
+            funcs[node.name] = node
+    render = ("mindmap_svg", "mindmap_html", "mindmap_png")
+    lack = [f for f in render if f not in funcs]
+    if lack:
+        err("导图单一真源：缺少渲染函数 %s——两种入口须共用同一套渲染器" % "、".join(lack))
+        return
+    for entry, need_dir in (("export_summary_mindmap", True), ("export_mindmap", False)):
+        fn = funcs.get(entry)
+        if fn is None:
+            err("导图单一真源：缺少入口函数 %s" % entry)
+            continue
+        calls = {n.func.id for n in _ast.walk(fn)
+                 if isinstance(n, _ast.Call) and isinstance(n.func, _ast.Name)}
+        miss = [r for r in render if r not in calls]
+        if miss:
+            err("导图单一真源：%s 未调用 %s——另起了一套渲染实现，两入口就此分家（第 12 条）"
+                % (entry, "、".join(miss)))
+        if need_dir and "summary_dir" not in calls:
+            err("导图单一真源：export_summary_mindmap 未调用 summary_dir——"
+                "精要产物必须落 _精要总结/ 隔离目录，不得与审查件混放")
+    if not ERRS or not any("导图单一真源" in m for m in ERRS):
+        info("导图单一真源：交付物与精要总结两入口共用 svg/html/png 三渲染器，精要产物隔离输出，自检通过")
+
+
 def check_gitignore():
     """`.gitignore` 有效性守卫：防"行尾注释"写法让规则**静默失效**。
 
@@ -3306,6 +3812,7 @@ def main():
         _check_pseudo_controls()
         _check_menu_entries()
         check_package_fields()
+        check_naming_fields()
         check_platform_limit()
         check_sample_baseline()
         check_legal_db()
@@ -3317,6 +3824,11 @@ def main():
         check_security_matrix()
         check_tpl_engine()
         check_verify_engine()
+        check_tier_requirement()
+        check_format_matrix()
+        check_html_online_guard()
+        check_mindmap_single_source()
+        check_ai_tells_rules()
         check_imbalance_engine()
         check_engine_implementations()
         check_reproducible_build()

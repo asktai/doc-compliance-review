@@ -20,6 +20,11 @@
   (12) 元规则归属  编号体系／书写／表格例外／字符须在正文条文中成文，不得退回文首导读区
   (13) 落实总表    第 24.3 表须覆盖正文全部条（漏登／多登／重登即报错），落点属四态
   (14) 在线版      目录去锚点的派生版须与源同步（零锚点残留 ＋ 正文逐字节一致）
+  (15) 承诺措辞    第 25 条须成文，且承诺句不得含含糊词（「基本上」「大体上」类）
+  (16) 结转清单    遗留问题清单的「态」须属三态、标「转下轮」者须有再见条件
+  (17) 零实现名    正文不得含本机实现名（角色称谓通用）；实现对照表路径须真实存在
+  (18) 台账新鲜度  产出物台账的包数／版本数／版本区间须与 `dist/` 实扫值逐项相等
+
 
 归属说明
     · 本脚本属于**维护侧**（`/workspace/dev/maint/tools/`），**不随技能包分发**；
@@ -1677,6 +1682,103 @@ def check_impl_table(s):
         info("对照表 %d 项路径引用全部真实存在" % len(cands))
 
 
+def check_ledger_fresh(s_ignored=None):
+    """(18) 产出物台账须与 `dist/` 实际一致——**派生物不刷新就会静静过期**。
+
+    **为什么必须单列一维**：台账是**派生文件**，真源是 `dist/` 里的实际包。规范里一直
+    写着「每次交付产出物后刷新」，但这条**此前没挂任何自动入口**，于是两次全检都抓到它
+    过期（v3.26.8 全检时停在 v3.12.1；v3.26.12 全检时写着 98 个包／49 个版本，实际 6 个／3 版）。
+    两次都不是算错，是**没人记得跑**——「写进规范但不挂机制」等于没有（第 16 条）。
+
+    2026-10-30 起出包链已挂自动刷新（发布脚本出包成功后调生成器），本维是**兜底**：
+    手工往 `dist/` 放包、删包，或绕过发布链出包，台账照样会漂。
+    **一个治因、一个兜底，缺一则要么天天漂、要么漂了没人知**——两者的失败方式不同，
+    不能互相顶替（与「跨侧漂移」那条同理：机制挡住绝大多数，守卫只兜剩下的意外）。
+
+    只比四项**可实算**的读数，不判断台账里的叙述是否恰当（那属人工复核）：
+      A. 分发包总数；B. 版本数；C. 版本区间起；D. 版本区间止。
+
+    **判据取「包名正则」的真源不另写一份**：从生成器实读 `PKG_RE`（12.2 两处各存必漂）。
+    生成器改了命名规则而本维不跟，会得到「守卫说台账错、其实台账对」的假红。
+    """
+    head("(18) 产出物台账须与 dist 实际一致")
+
+    ws = os.path.dirname(DEV)                  # /workspace
+    led = os.path.join(ws, "产出物台账.md")
+    dist = os.path.join(ws, "dist")
+
+    if not os.path.isdir(dist):
+        info("dist/ 不存在——本维不适用，跳过")
+        return
+    if not os.path.exists(led):
+        err("未找到《产出物台账》（%s）——它是派生物，跑生成器即可重建；"
+            "缺失本身就是过期的最极端形态" % led)
+        return
+
+    # 真源 1：包名正则，从生成器实读
+    pkg_re = None
+    gen = os.path.join(DEV, "maint", "tools", "gen-ledger.py")
+    if os.path.exists(gen):
+        try:
+            import importlib.util
+            _spec = importlib.util.spec_from_file_location("_gen_ledger_probe", gen)
+            _mod = importlib.util.module_from_spec(_spec)
+            _spec.loader.exec_module(_mod)       # 其 main 在 __main__ 保护下，导入无副作用
+            pkg_re = _mod.PKG_RE
+        except Exception as e:
+            warn("未能从生成器读到包名正则（%s: %s），改用内置同款——"
+                 "生成器若改了命名规则，本维可能误报" % (type(e).__name__, e))
+    if pkg_re is None:
+        pkg_re = re.compile(r"^(?P<name>.+?)_(?P<ver>v\d+\.\d+\.\d+)_(?P<date>\d{8})_"
+                            r"\((?P<slug>[^)]+)\)\.(?P<ext>skill|zip)$")
+
+    files, vers = 0, set()
+    for fn in sorted(os.listdir(dist)):
+        if not os.path.isfile(os.path.join(dist, fn)):
+            continue
+        m = pkg_re.match(fn)
+        if m:
+            files += 1
+            vers.add(m.group("ver"))
+
+    # 真源 2：台账自述（读不到即报错——读不到等于没守卫，不许静默跳过）
+    t = open(led, encoding="utf-8").read()
+    m = re.search(r"分发包总数：\*\*(\d+)\*\*\s*个（覆盖\s*\*\*(\d+)\*\*\s*个版本："
+                  r"\s*(v\d+\.\d+\.\d+)\s*—\s*(v\d+\.\d+\.\d+)）", t)
+    if not m:
+        err("台账里未找到「分发包总数／版本数／版本区间」这一行——生成器输出格式变了？"
+            "本维读不到就无从比较，但**不得静默跳过**")
+        return
+    n_led, m_led = int(m.group(1)), int(m.group(2))
+    v_lo, v_hi = m.group(3), m.group(4)
+
+    if not vers:
+        if n_led:
+            err("台账写 %d 个分发包，而 dist/ 里一个四段式包都没有"
+                "——台账过期，或 dist/ 被清空后未刷新" % n_led)
+        else:
+            info("dist/ 与台账都为空，一致")
+        return
+
+    def _vk(v):
+        return tuple(int(x) for x in v.lstrip("v").split("."))
+    s_lo, s_hi = min(vers, key=_vk), max(vers, key=_vk)
+
+    bad = []
+    if n_led != files:
+        bad.append("包数 台账 %d ≠ 实际 %d" % (n_led, files))
+    if m_led != len(vers):
+        bad.append("版本数 台账 %d ≠ 实际 %d" % (m_led, len(vers)))
+    if (v_lo, v_hi) != (s_lo, s_hi):
+        bad.append("版本区间 台账 %s — %s ≠ 实际 %s — %s" % (v_lo, v_hi, s_lo, s_hi))
+    if bad:
+        err("产出物台账与 dist/ 实际不一致（%s）——台账是派生物，跑一次生成器即对齐；"
+            "若已挂自动刷新仍漂，说明有人在发布链之外动过 dist/" % "；".join(bad))
+    else:
+        info("台账与 dist/ 一致：%d 个包 / %d 个版本（%s — %s）"
+             % (files, len(vers), s_lo, s_hi))
+
+
 def main():
     global QUIET, RULES
     args = sys.argv[1:]
@@ -1711,6 +1813,7 @@ def main():
     check_promise(s)
     check_open_issues(s)
     check_impl_table(s)
+    check_ledger_fresh()
     print("=" * 62)
     if ERRS:
         print("结果：错误 %d 项，警告 %d 项 —— **未通过**" % (len(ERRS), len(WARNS)))

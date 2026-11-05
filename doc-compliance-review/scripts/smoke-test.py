@@ -155,6 +155,25 @@ def build_spec(path):
     return path
 
 
+def make_src_docx(path, text):
+    """由纯文本（SAMPLE）生成一个 .docx 原稿，每行一段，供 --source-docx 联调原稿级修订。
+
+    选用 SAMPLE 是因为 spec 里各条款的 original 文本本就是 SAMPLE 的子串，
+    能稳定落到原稿段落、产出真正的 Word 原生修订（w:ins/w:del），而非降级。
+    """
+    import docx as _dx
+    d = _dx.Document()
+    for line in text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        if line.startswith("#"):
+            line = line.lstrip("#").strip()
+        d.add_paragraph(line)
+    d.save(path)
+    return path
+
+
 def run(cmd, timeout=600):
     # errors="replace"（**不是 ignore**）：被 spawn 的脚本都已自钉 stdout 为 UTF-8，正常不会有
     # 非法字节；万一真有（子脚本崩在写一半、第三方工具吐 GBK），**ignore 会把字符静默吞掉**，
@@ -222,6 +241,14 @@ try:
         m.check_security_matrix()
     elif which == "fmt_default":
         m._check_format_default()
+    elif which == "fmt_matrix":
+        m.check_format_matrix()
+    elif which == "html_online":
+        m.check_html_online_guard()
+    elif which == "mm_source":
+        m.check_mindmap_single_source()
+    elif which == "ai_tells":
+        m.check_ai_tells_rules()
     else:
         m._check_no_bytecode()
 except BaseException as e:
@@ -254,6 +281,14 @@ def _inject_gate_tests(tmp):
         # 带上 SECURITY.md：安全引擎门禁要拿文档名单与代码自标比对，
         # 副本里缺了它，门禁会报"文档缺名单"而不是被注入的那一处——误报会掩盖真信号。
         shutil.copy(os.path.join(os.path.dirname(HERE), "SECURITY.md"), base)
+        # v3.32.0：带上 core/ 的去AI味两件（json 真源＋md 人读版）——
+        # ai_tells 门禁要在副本里读它们；缺了会报"文件不存在"而非注入点。
+        _core_dst = os.path.join(base, "core")
+        os.makedirs(_core_dst, exist_ok=True)
+        for _f in ("ai-tells.json", "03-ai-tells.md"):
+            _src_f = os.path.join(os.path.dirname(HERE), "core", _f)
+            if os.path.exists(_src_f):
+                shutil.copy(_src_f, _core_dst)
     except Exception as e:
         return [("反向注入：准备临时副本", False, repr(e))]
 
@@ -443,7 +478,7 @@ def _inject_gate_tests(tmp):
     try:
         with open(os.path.join(base, "SKILL.md"), "w", encoding="utf-8") as _f:
             _f.write("## 十一、交付格式\n\n"
-                     "**文件格式（5 种：WORD／MD／Excel／HTML／PDF）**\n\n"
+                     "**文件格式（7 种：WORD／MD／Excel／HTML／PDF／PPT／思维导图）**\n\n"
                      "格式由开场清单第 9 项收集，不选或回「默认」→ 仅 WORD。\n\n"
                      "格式是产出前必收项：清单被跳过或该项未答时，产出前必须问一次，"
                      "用户回「默认」或直接回车即按 WORD 出，但这一问本身不能省。\n")
@@ -465,13 +500,16 @@ def _inject_gate_tests(tmp):
 
     if _skill_ok:
         # ⑩ 兜底值悄悄放宽到 5 种，文档却仍写「仅 WORD」——说的比给的少
-        if rewrite("make-docx.py", 'FORMAT_FALLBACK = "docx"',
+        # v3.31.0：FORMAT_FALLBACK 搬到 format-engine.py（格式家族真源），注入点随代码搬家。
+        # 注入点不跟着搬，断言就变成「注入点未命中」——冒烟会红，但红的是冒烟自己，
+        # 不是被守卫抓住，等于守卫失守却看不出来（正是 v3.30.0 修过的同类假信号）。
+        if rewrite("format-engine.py", 'FORMAT_FALLBACK = "docx"',
                    'FORMAT_FALLBACK = "docx,md,excel,html,pdf"'):
             bad, errs, _ = run_gate("fmt_default")
             hit = any("文档说的比给的少" in m for m in errs)
             case("反向注入⑩：默认格式悄悄放宽到 5 种 → 文档仍写「仅 WORD」必须红",
                  hit, "已报文档说的比给的少", "未报；" + (bad or "errs=%s" % errs))
-            rewrite("make-docx.py", 'FORMAT_FALLBACK = "docx,md,excel,html,pdf"',
+            rewrite("format-engine.py", 'FORMAT_FALLBACK = "docx,md,excel,html,pdf"',
                     'FORMAT_FALLBACK = "docx"')
         else:
             out.append(("反向注入⑩：放宽 FORMAT_FALLBACK → 必须红", False, "注入点未命中"))
@@ -487,12 +525,12 @@ def _inject_gate_tests(tmp):
             out.append(("反向注入⑪：删「必须问」→ 必须红", False, "注入点未命中"))
 
         # ⑫ 兜底值塞进文档压根没登记过的格式名
-        if rewrite("make-docx.py", 'FORMAT_FALLBACK = "docx"', 'FORMAT_FALLBACK = "docx,xyz"'):
+        if rewrite("format-engine.py", 'FORMAT_FALLBACK = "docx"', 'FORMAT_FALLBACK = "docx,xyz"'):
             bad, errs, _ = run_gate("fmt_default")
             hit = any("未登记" in m and "xyz" in m for m in errs)
             case("反向注入⑫：兜底值塞入未登记格式 xyz → 文档与代码分家必须红",
                  hit, "已报 xyz 未登记", "未报；" + (bad or "errs=%s" % errs))
-            rewrite("make-docx.py", 'FORMAT_FALLBACK = "docx,xyz"', 'FORMAT_FALLBACK = "docx"')
+            rewrite("format-engine.py", 'FORMAT_FALLBACK = "docx,xyz"', 'FORMAT_FALLBACK = "docx"')
         else:
             out.append(("反向注入⑫：塞未登记格式 → 必须红", False, "注入点未命中"))
 
@@ -507,6 +545,105 @@ def _inject_gate_tests(tmp):
         else:
             out.append(("反向注入⑬：哨兵改回固定值 → 必须红", False, "注入点未命中"))
 
+        # ⑭ 帮助串漏登一个格式键（v3.28.0）：--formats 帮助串是格式数真源，
+        #    漏写一键 → 格式数静默少数、文档承诺对不上。check_format_matrix 第 3 条必须拦。
+        if rewrite("make-docx.py", "excel,pdf,html,pptx,mindmap,image（不写则仅",
+                   "excel,pdf,html,pptx,mindmap（不写则仅"):
+            bad, errs, _ = run_gate("fmt_matrix")
+            hit = any("帮助串" in m and "不一致" in m for m in errs)
+            case("反向注入⑭：--formats 帮助串漏写 mindmap → 格式矩阵必须红",
+                 hit, "已报帮助串与 FORMAT_ALL 不一致", "未报；" + (bad or "errs=%s" % errs))
+            rewrite("make-docx.py", "excel,pdf,html,pptx,mindmap（不写则仅",
+                    "excel,pdf,html,pptx,mindmap,image（不写则仅")
+        else:
+            out.append(("反向注入⑭：帮助串漏登 → 必须红", False, "注入点未命中"))
+
+        # ⑮ 白名单外 CDN 域混入（v3.28.0）：在线版外链只许 HTML_CDN_ALLOW 三域，
+        #    偷加一个域就是「离线零外部资源」承诺的暗门。check_html_online_guard 第 ④ 条必须拦。
+        if rewrite("format-engine.py", "HTML_CDN_ALLOW = (",
+                   "HTML_CDN_ALLOW = (\"evil.example.com\","):
+            bad, errs, _ = run_gate("html_online")
+            hit = any("白名单" in m and ("以外" in m or "不一致" in m) for m in errs)
+            case("反向注入⑮：白名单混入 evil.example.com → HTML 在线守卫必须红",
+                 hit, "已报白名单违规", "未报；" + (bad or "errs=%s" % errs))
+            rewrite("format-engine.py", 'HTML_CDN_ALLOW = ("evil.example.com",',
+                    "HTML_CDN_ALLOW = (")
+        else:
+            out.append(("反向注入⑮：白名单外域 → 必须红", False, "注入点未命中"))
+
+        # ⑯ 精要入口另起一套渲染（v3.30.0）：把 export_summary_mindmap 的 svg 调用换掉，
+        #    模拟"两入口各写一套渲染器"——check_mindmap_single_source 必须拦。
+        # v3.31.0：精要入口 export_summary_mindmap 整体搬进 format-engine.py，注入点随之搬。
+        if rewrite("format-engine.py",
+                   "write(mindmap_svg(title_txt, nodes))",
+                   'write("<svg/>")'):
+            bad, errs, _ = run_gate("mm_source")
+            hit = any("导图单一真源" in m and "未调用" in m for m in errs)
+            case("反向注入⑯：精要入口改用自建 SVG 渲染 → 导图单一真源必须红",
+                 hit, "已报两入口分家", "未报；" + (bad or "errs=%s" % errs))
+            rewrite("format-engine.py", 'write("<svg/>")', "write(mindmap_svg(title_txt, nodes))")
+        else:
+            out.append(("反向注入⑯：精要入口另起渲染 → 必须红", False, "注入点未命中"))
+
+        # ⑰ image 子格式写坏（v3.32.0）：IMAGE_TYPES 混入不认识的扩展名 → 格式矩阵第 7 条必须拦。
+        if rewrite("format-engine.py", 'IMAGE_TYPES = ("png", "jpg", "webp", "gif", "svg", "ico")',
+                   'IMAGE_TYPES = ("png", "jpg", "webp", "gif", "svg", "bmp")'):
+            bad, errs, _ = run_gate("fmt_matrix")
+            hit = any("IMAGE_TYPES 含不认识" in m for m in errs)
+            case("反向注入⑰：image 子格式混入 bmp → 格式矩阵必须红",
+                 hit, "已报 IMAGE_TYPES 越界", "未报；" + (bad or "errs=%s" % errs))
+            rewrite("format-engine.py", 'IMAGE_TYPES = ("png", "jpg", "webp", "gif", "svg", "bmp")',
+                    'IMAGE_TYPES = ("png", "jpg", "webp", "gif", "svg", "ico")')
+        else:
+            out.append(("反向注入⑰：image 子格式写坏 → 必须红", False, "注入点未命中"))
+
+        # ⑱ --image-formats 插到 --formats 之前：数字口径守卫的惰性正则会把子格式
+        #    当成格式清单（8 被读成 6）——格式矩阵第 7d 条必须拦。
+        src_mk = open(os.path.join(tgt, "make-docx.py"), encoding="utf-8").read()
+        moved = src_mk.replace('    ap.add_argument("--formats", default=None,',
+            '    ap.add_argument("--image-formats", default=None, help="x")\n'
+            '    ap.add_argument("--formats", default=None,', 1)
+        if moved != src_mk:
+            open(os.path.join(tgt, "make-docx.py"), "w", encoding="utf-8").write(moved)
+            bad, errs, _ = run_gate("fmt_matrix")
+            hit = any("--image-formats" in m and ("必须声明在" in m or "不一致" in m) for m in errs)
+            case("反向注入⑱：--image-formats 插到 --formats 之前 → 格式矩阵必须红",
+                 hit, "已报参数顺序违规", "未报；" + (bad or "errs=%s" % errs))
+            open(os.path.join(tgt, "make-docx.py"), "w", encoding="utf-8").write(src_mk)
+        else:
+            out.append(("反向注入⑱：参数顺序颠倒 → 必须红", False, "注入点未命中"))
+
+        # ⑲ 去AI味规则库计数漂移（v3.32.0）：md 写的条数与 json 实算不一致 → 必须拦。
+        if True:
+            # 改副本 core/03-ai-tells.md 的条数声明
+            _md = os.path.join(base, "core", "03-ai-tells.md")
+            _msrc = open(_md, encoding="utf-8").read()
+            _mbad = _msrc.replace("规则组数：5 组／**规则条数**：33 条",
+                                  "规则组数：5 组／**规则条数**：30 条", 1)
+            if _mbad != _msrc:
+                open(_md, "w", encoding="utf-8").write(_mbad)
+                bad, errs, _ = run_gate("ai_tells")
+                hit = any("去AI味规则库" in m and "30 条" in m for m in errs)
+                case("反向注入⑲：去AI味规则库条数漂移（33→30）→ 必须红",
+                     hit, "已报条数不一致", "未报；" + (bad or "errs=%s" % errs))
+                open(_md, "w", encoding="utf-8").write(_msrc)
+            else:
+                out.append(("反向注入⑲：规则库条数漂移 → 必须红", False, "注入点未命中"))
+
+        # ⑳ 去AI味规则库组名漂移：md 组标题与 json 组名不一致 → 必须拦。
+        _md = os.path.join(base, "core", "03-ai-tells.md")
+        _msrc = open(_md, encoding="utf-8").read()
+        _mbad = _msrc.replace("### A · 空洞套话", "### A · 空话套语", 1)
+        if _mbad != _msrc:
+            open(_md, "w", encoding="utf-8").write(_mbad)
+            bad, errs, _ = run_gate("ai_tells")
+            hit = any("组标题" in m and "不一致" in m for m in errs)
+            case("反向注入⑳：去AI味 md 组标题与 json 组名漂移 → 必须红",
+                 hit, "已报组名不一致", "未报；" + (bad or "errs=%s" % errs))
+            open(_md, "w", encoding="utf-8").write(_msrc)
+        else:
+            out.append(("反向注入⑳：规则库组名漂移 → 必须红", False, "注入点未命中"))
+
     # ④ 对照组：副本**没改坏**时两个门禁都必须零 ERR。
     #    为什么要这一组：只验"改坏了会报"还不够——一个见谁报谁的门禁同样能通过 ①②③。
     #    必须同时证明"没改坏时不报"，才能说明报错是被注入的那一处触发的。
@@ -515,12 +652,18 @@ def _inject_gate_tests(tmp):
     bad3, errs3, _ = run_gate("net_tiers")
     bad4, errs4, _ = run_gate("sec_matrix")
     bad5, errs5, _ = run_gate("fmt_default")
-    clean = not (errs or errs2 or errs3 or errs4 or errs5)
-    out.append(("反向注入④（对照）：副本未改坏时五个门禁必须零报错",
+    bad6, errs6, _ = run_gate("fmt_matrix")
+    bad7, errs7, _ = run_gate("html_online")
+    bad8, errs8, _ = run_gate("mm_source")
+    bad9, errs9, _ = run_gate("fmt_matrix")      # 含 image 第 7 条
+    bad10, errs10, _ = run_gate("ai_tells")
+    clean = not (errs or errs2 or errs3 or errs4 or errs5 or errs6 or errs7 or errs8 or errs9 or errs10)
+    out.append(("反向注入④（对照）：副本未改坏时十个门禁必须零报错",
                 clean,
                 "均零报错" if clean
-                else ("误报：" + (bad or bad2 or bad3 or bad4 or bad5
-                                 or str(errs + errs2 + errs3 + errs4 + errs5)))))
+                else ("误报：" + (bad or bad2 or bad3 or bad4 or bad5 or bad6 or bad7 or bad8
+                                 or str(errs + errs2 + errs3 + errs4 + errs5 + errs6 + errs7
+                                        + errs8 + errs9 + errs10)))))
 
     shutil.rmtree(tmp, ignore_errors=True)
     return out
@@ -727,21 +870,26 @@ def main():
         check("python-docx 直读 docx（降级通道可用）", False, repr(e))
 
     # --- 2. 交付物链路 ---
-    print("\n[2] 交付物链路（10 类型 × docx/excel/html/pdf）")
+    print("\n[2] 交付物链路（10 类型 × docx/excel/html/pdf/pptx/mindmap）")
     spec = build_spec(os.path.join(work, "spec.json"))
     outdir = os.path.join(work, "交付物")
-    fmts = "docx,excel,html" if a.fast else "docx,excel,html,pdf"   # --fast 跳过 PDF 导出（耗时大头）
+    fmts = ("docx,excel,html" if a.fast
+            else "docx,excel,html,pdf,pptx,mindmap")   # --fast 跳过 PDF 导出（耗时大头）
+    # v3.29.0：mindmap 默认只出 SVG；全量档加 --mindmap-html/--mindmap-png 验证三形态
     mk = run([PY, os.path.join(HERE, "make-docx.py"), spec,
               "--reviewer", "SMOKE-TEST", "--ts", datetime.datetime.now().strftime("%Y%m%d-%H%M"),
               "--formats", fmts, "--comments", "--out", outdir,
-              "--types", "tracked,reportc,clean,redline,report,masked,original,diff,compare,template"])
+              "--types", "tracked,reportc,clean,redline,report,masked,original,diff,compare,template"]
+             + ([] if a.fast else ["--mindmap-html", "--mindmap-png"]))
     check("make-docx.py 执行", mk.returncode == 0, (mk.stdout or "")[-300:] if mk.returncode else "")
     produced = sorted(os.listdir(outdir)) if os.path.isdir(outdir) else []
-    kinds = ["修订版", "红线修订格式版", "修改后清洁版", "审查意见报告",
+    # 注：本综合用例未传 --source-docx，故类型 1 修订版会按设计降级为 4 红线标记修订版
+    # （二者去重），下方只核验实际产物；类型 1 的原生修订粒度改由 [2.x] 有原稿场景单独验证。
+    kinds = ["红线标记修订版", "清洁版", "审查意见报告",
              "原文脱敏版", "原文照录版", "文件比对报告", "新旧比对", "模板版"]
     for k in kinds:
         check(f"产出 {k}.docx", any(k in f and f.endswith(".docx") and "批注版" not in f for f in produced))
-    check("产出 审查意见批注版.docx（类型 2，--comments 兼容开关）",
+    check("产出 审查意见批注版.docx（类型 5，--comments 兼容开关）",
           any("批注版" in f and f.endswith(".docx") for f in produced))
 
     # 格式缺省尾注（v3.25.7）：不指定 --formats 时，出件后必须留一句"还有四种可勾选"；
@@ -752,15 +900,123 @@ def main():
           "--ts", _ts, "--types", "tracked", "--out", _od]
     _a = run(_k)
     _oa = _a.stdout or ""
-    check("格式缺省：未指定 --formats 时出件后必须提示还有四种格式",
+    check("格式缺省：未指定 --formats 时出件后必须提示其余可勾选格式",
           _a.returncode == 0 and "本次未指定 --formats" in _oa, tail_line(_oa))
     _b = run(_k + ["--formats", "docx"])
     _ob = _b.stdout or ""
     check("格式缺省（对照）：显式指定 --formats docx 时不再提示",
           _b.returncode == 0 and "本次未指定 --formats" not in _ob, tail_line(_ob))
     check("产出 Excel（.xlsx）", any(f.endswith(".xlsx") for f in produced))
-    check("产出 HTML（.html，10 类全覆盖）",
-          sum(1 for f in produced if f.endswith(".html")) >= 10)
+    # 无 --source-docx 时 1 修订版降级为 4 红线标记修订版（去重），故实出 9 类 HTML
+    check("产出 HTML（.html，9 类全覆盖：无原稿时 1 降级为 4）",
+          sum(1 for f in produced if f.endswith(".html")) >= 9)
+    # --- v3.28.0：PPT 讲解版与思维导图（一物两件）；快速档 fmts 不含 pptx/mindmap，须 skip 保持项数守恒 ---
+    # 项数守恒铁律：快速档的每条 skip 必须与全量档的每条 check **逐条同名一一对应**。
+    # 早期写法用一条 skip（「思维导图三形态」）顶掉全量档四条 check，导致 fast 比 full 少 4 项，
+    # 而 check_smoke_count 会拿 fast 的 total 去比文档——两档不再守恒时它就误报。此处改为一一对应。
+    if a.fast:
+        skip("产出 PPT 讲解版（.pptx，仅 2/8/9 三类）", "快速档已跳过（跑全量档加 --full）")
+        skip("PPT 不套原稿操作件（1/3/4/5/6/7 无 .pptx）", "快速档已跳过")
+        skip("产出 思维导图 SVG（默认静态形态，2/8/9/10 四类）", "快速档已跳过（跑全量档加 --full）")
+        skip("产出 思维导图 HTML（--mindmap-html，四类）", "快速档已跳过")
+        skip("产出 思维导图 PNG（--mindmap-png 兜底，四类）", "快速档已跳过")
+        skip("导图覆盖集外无产物（原稿操作件无导图）", "快速档已跳过")
+        skip("导图 HTML 自检（可折叠树/零外链）", "快速档已跳过")
+        skip("导图 SVG 自检（合法标记/零外链/含内容）", "快速档已跳过")
+    else:
+        check("产出 PPT 讲解版（.pptx，仅 2/8/9 三类）",
+              sum(1 for f in produced if f.endswith(".pptx")) == 3)
+        _orig_ops = ("修订版", "清洁版", "红线", "批注版", "脱敏", "照录")
+        check("PPT 不套原稿操作件（1/3/4/5/6/7 无 .pptx）",
+              not any(f.endswith(".pptx") and any(k in f for k in _orig_ops) for f in produced))
+        # v3.29.0：mindmap 默认 SVG；--mindmap-html/--mindmap-png 开关追加（本跑已带，验三形态各 4 件）
+        check("产出 思维导图 SVG（默认静态形态，2/8/9/10 四类）",
+              sum(1 for f in produced if f.endswith(".svg") and "思维导图" in f) == 4)
+        check("产出 思维导图 HTML（--mindmap-html，四类）",
+              sum(1 for f in produced if f.endswith(".html") and "思维导图" in f) == 4)
+        check("产出 思维导图 PNG（--mindmap-png 兜底，四类）",
+              sum(1 for f in produced if f.endswith(".png") and "思维导图" in f) == 4,
+              f"实出 {sum(1 for f in produced if f.endswith('.png') and '思维导图' in f)} 张")
+        check("导图覆盖集外无产物（原稿操作件无导图）",
+              not any(f.endswith((".svg", ".png")) and any(k in f for k in _orig_ops) for f in produced))
+        _mm_html = next((os.path.join(outdir, f) for f in produced
+                         if f.endswith(".html") and "思维导图" in f and "审查意见报告" in f), None)
+        ok_mm = False
+        if _mm_html and os.path.isfile(_mm_html):
+            try:
+                mh = open(_mm_html, encoding="utf-8").read()
+                ok_mm = ("mm-node" in mh and "addEventListener" in mh
+                         and 'src="http' not in mh and 'href="http' not in mh)
+            except Exception:
+                ok_mm = False
+        check("导图 HTML 自检（可折叠树/零外链）", ok_mm)
+        _mm_svg = next((os.path.join(outdir, f) for f in produced
+                        if f.endswith(".svg") and "思维导图" in f and "审查意见报告" in f), None)
+        ok_svg = False
+        if _mm_svg and os.path.isfile(_mm_svg):
+            try:
+                sv = open(_mm_svg, encoding="utf-8").read()
+                ok_svg = (sv.lstrip().startswith("<svg") and "</svg>" in sv
+                          and "http" not in sv.replace('xmlns="http://www.w3.org/2000/svg"', "")
+                          and "审查" in sv)
+            except Exception:
+                ok_svg = False
+        check("导图 SVG 自检（合法标记/零外链/含内容）", ok_svg)
+    if a.fast:
+        skip("产出 思维导图 PNG（matplotlib，300dpi）", "快速档已跳过（跑全量档加 --full）")
+        skip("思维导图 PNG 位图自检（魔数/体积）", "快速档已跳过")
+    else:
+        _pngs = [f for f in produced if f.endswith(".png") and "思维导图" in f]
+        check("产出 思维导图 PNG（matplotlib，300dpi）", len(_pngs) == 4,
+              f"实出 {len(_pngs)} 张")
+        if _pngs:
+            _p0 = os.path.join(outdir, _pngs[0])
+            ok_png = (open(_p0, "rb").read(8) == b"\x89PNG\r\n\x1a\n"
+                      and os.path.getsize(_p0) > 20 * 1024)
+            check("思维导图 PNG 位图自检（魔数/体积）", ok_png)
+        else:
+            check("思维导图 PNG 位图自检（魔数/体积）", False, "无 PNG 可检")
+    # PPT 内容级自检（可解析、页数、页脚免责）
+    _pp = next((os.path.join(outdir, f) for f in produced
+                if f.endswith(".pptx") and "审查意见报告" in f), None)
+    if a.fast:
+        skip("PPT 可解析且页脚带免责（python-pptx）", "快速档已跳过")
+    else:
+        ok_ppt, why_ppt = False, "无 pptx 可检"
+        if _pp and os.path.isfile(_pp):
+            try:
+                from pptx import Presentation as _P
+                _prs = _P(_pp)
+                _txt = "\n".join(sh.text_frame.text
+                                 for sl in _prs.slides
+                                 for sh in sl.shapes if sh.has_text_frame)
+                ok_ppt = len(_prs.slides._sldIdLst) >= 3 and "不构成法律意见" in _txt
+                why_ppt = f"{len(_prs.slides._sldIdLst)} 页"
+            except Exception as e:
+                ok_ppt, why_ppt = False, repr(e)
+        check("PPT 可解析且页脚带免责（python-pptx）", ok_ppt, why_ppt)
+    # 在线增强版（--html-online）：外链域必须 ⊆ HTML_CDN_ALLOW 白名单（运行时读真源）
+    _ol_dir = os.path.join(work, "在线HTML")
+    _ol = run([PY, os.path.join(HERE, "make-docx.py"), spec,
+               "--reviewer", "SMOKE-TEST", "--ts", datetime.datetime.now().strftime("%Y%m%d-%H%M"),
+               "--formats", "html", "--types", "report", "--html-online", "--out", _ol_dir])
+    _ol_hosts, _ol_ok = set(), False
+    if _ol.returncode == 0 and os.path.isdir(_ol_dir):
+        _ol_files = [x for x in os.listdir(_ol_dir) if x.endswith(".html")]
+        if _ol_files:
+            _oh = open(os.path.join(_ol_dir, _ol_files[0]), encoding="utf-8").read()
+            _ol_hosts = set(re.findall(r'(?:src|href)="https?://([^/"]+)', _oh))
+            import importlib.util as _ilu
+            _spec_m = _ilu.spec_from_file_location("_mk_probe", os.path.join(HERE, "make-docx.py"))
+            _mk_m = _ilu.module_from_spec(_spec_m)
+            try:
+                _spec_m.loader.exec_module(_mk_m)
+                _allow = set(_mk_m.HTML_CDN_ALLOW)
+            except Exception:
+                _allow = {"cdn.jsdelivr.net", "fonts.googleapis.com", "fonts.gstatic.com"}
+            _ol_ok = _ol_hosts <= _allow and '<nav class="toc">' in _oh and bool(_ol_hosts)
+    check("HTML 在线增强版仅引用白名单 CDN 域（核心交互仍内联）", _ol_ok,
+          f"外链域 {_ol_hosts or '无'}")
     hp = next((os.path.join(outdir, f) for f in produced
                if f.endswith(".html") and "审查意见报告" in f), None)
     ok_html = False
@@ -778,6 +1034,52 @@ def main():
         skip("产出 PDF（.pdf，依赖 LibreOffice）", "快速档已跳过（跑全量档加 --full）")
     else:
         check("产出 PDF（.pdf，依赖 LibreOffice）", any(f.endswith(".pdf") for f in produced))
+
+    # --- 2.x 降级链 1→4 与 原稿级修订粒度（v3.26.15 新增；v3.27.0 编号随 3/4/5 互换更新）---
+    print("\n[2.x] 降级链 1→4（无原稿→红线标记修订版）· 原稿级修订粒度（有原稿）")
+    _xdir = os.path.join(work, "降级链")
+    # (a) 无 --source-docx：类型 1 必须按设计降级为 4 红线标记修订版（不得冒充原稿修改）
+    _xmk = run([PY, os.path.join(HERE, "make-docx.py"), spec,
+                "--reviewer", "SMOKE-TEST", "--ts", datetime.datetime.now().strftime("%Y%m%d-%H%M"),
+                "--formats", "docx,md", "--out", _xdir, "--types", "tracked,report"])
+    check("降级链：make-docx 执行（tracked+report，无 --source-docx）", _xmk.returncode == 0, (_xmk.stderr or "")[-200:])
+    _xprod = sorted(os.listdir(_xdir)) if os.path.isdir(_xdir) else []
+    _x_has_rl = any("红线标记修订版" in f and "批注版" not in f and f.endswith(".docx") for f in _xprod)
+    _x_has_tr = any("修订版" in f and "红线" not in f and "批注版" not in f and f.endswith(".docx") for f in _xprod)
+    _x_has_rp = any("审查意见报告" in f and f.endswith(".docx") for f in _xprod)
+    check("降级链：1 降级为 4（产出 红线标记修订版，且文件名带 -准原稿 档位标记）",
+          _x_has_rl and any("-准原稿" in f for f in _xprod), "产出：" + "/".join(_xprod[:3]))
+    check("降级链：修订版未产出（无原稿不得冒充原稿修改）", not _x_has_tr, "/".join(_xprod[:3]))
+    check("降级链：审查意见报告(2) 不受影响，照常产出", _x_has_rp)
+    # (b) 有 --source-docx（由 SAMPLE 生成可匹配原稿）：类型 1 必须产出真正的 Word 原生修订
+    _sdir_x = os.path.join(work, "src_sample.docx")
+    make_src_docx(_sdir_x, SAMPLE)
+    # 注意：本目录须与 [3.z] 原稿级修订块的 rout（work/原稿修订）区分，
+    # 二者都跑「tracked + --source-docx」，make-docx 不清理输出目录，
+    # 若同名则 [3.z] 的 _tr[0] 会误取本块用 SAMPLE 生成的「修订版」。
+    _gdir = os.path.join(work, "原稿修订_有原稿")
+    _gmk = run([PY, os.path.join(HERE, "make-docx.py"), spec,
+                "--reviewer", "SMOKE-TEST", "--ts", datetime.datetime.now().strftime("%Y%m%d-%H%M"),
+                "--formats", "docx", "--out", _gdir, "--source-docx", _sdir_x,
+                "--types", "tracked"])
+    check("原稿级修订：make-docx 执行（tracked + --source-docx）", _gmk.returncode == 0, (_gmk.stderr or "")[-200:])
+    _gprod = sorted(os.listdir(_gdir)) if os.path.isdir(_gdir) else []
+    _g_tr = [x for x in _gprod if "修订版" in x and "红线" not in x and "批注版" not in x and x.endswith(".docx")]
+    _g_rl = [x for x in _gprod if "红线标记修订版" in x and x.endswith(".docx")]
+    check("原稿级修订：产出 修订版（原稿级，无 -准原稿 档位标记）",
+          bool(_g_tr) and not _g_rl and not any("-准原稿" in x for x in _g_tr), "/".join(_gprod[:3]))
+    try:
+        import zipfile as _zf2
+        _tf = _g_tr[0]
+        with _zf2.ZipFile(os.path.join(_gdir, _tf)) as _z2:
+            _dx2x = _z2.read("word/document.xml").decode("utf-8")
+        _segs = re.findall(r"<w:(?:ins|del) [^>]*>(.*?)</w:(?:ins|del)>", _dx2x, re.S)
+        _lens = [len("".join(re.findall(r"<w:(?:t|delText)[^>]*>(.*?)</w:(?:t|delText)>", s, re.S)))
+                 for s in _segs]
+        check("原稿级修订粒度：存在局部改动片段（非整段替换，w:ins/w:del）",
+              bool(_lens) and min(_lens) <= 10, "%d 处痕迹，最短 %s 字" % (len(_lens), min(_lens) if _lens else "-"))
+    except Exception as e:
+        check("原稿级修订粒度自检", False, str(e))
 
     # --- 3. 内容自检 ---
     print("\n[3] 产出内容自检")
@@ -842,7 +1144,7 @@ def main():
     try:
         import docx as _dxf
         from docx.enum.text import WD_ALIGN_PARAGRAPH as _AL
-        cf = os.path.join(outdir, [f for f in produced if "修改后清洁版" in f and f.endswith(".docx")][0])
+        cf = os.path.join(outdir, [f for f in produced if "清洁版" in f and f.endswith(".docx")][0])
         ps = _dxf.Document(cf).paragraphs
         check("排版档位：清洁版文档标题居中", bool(ps) and ps[0].alignment == _AL.CENTER,
               (ps[0].text[:16] if ps else "无段落"))
@@ -874,11 +1176,13 @@ def main():
         check("排版档位自检", False, str(e))
 
     # --- 3.z 交付物呈现口径（文档型不人为增加抬头；元数据进文档属性；3/6/7 零批注） ---
-    print("\n[3.z] 交付物呈现口径（去抬头 · 文档属性 · 零批注 · 修订粒度）")
-    _DOC_KINDS = {"修订版": "tracked", "修改后清洁版": "clean", "红线修订格式版": "redline",
+    print("\n[3.z] 交付物呈现口径（去抬头 · 文档属性 · 零批注）")
+    # 本综合用例无 --source-docx：类型 1 已降级为 4 红线标记修订版，故以「红线标记修订版」入表
+    # （slug 仅作标注，查找靠中文名）；修订版不入表（无原稿不产出，由 [2.x] 单独验证）。
+    _DOC_KINDS = {"红线标记修订版": "redline", "清洁版": "clean",
                   "原文脱敏版": "masked", "原文照录版": "original"}
     _HEADER_MARKS = ["（修订模式）", "（红线格式）", "（清洁版）", "（原文脱敏版）", "（原文照录版）"]
-    _ZERO_COMMENT = ["修改后清洁版", "原文脱敏版", "原文照录版"]
+    _ZERO_COMMENT = ["清洁版", "原文脱敏版", "原文照录版"]
     try:
         import zipfile as _zf
         for _zh in _DOC_KINDS:
@@ -897,18 +1201,6 @@ def main():
                 check(f"对外/原文类零批注：{_zh}", _nc == 0, "%d 条批注（应为 0）" % _nc)
     except Exception as e:
         check("交付物呈现口径自检", False, str(e))
-    try:
-        import zipfile as _zf2
-        _tf = [x for x in produced if "修订版" in x and "批注版" not in x and x.endswith(".docx")][0]
-        with _zf2.ZipFile(os.path.join(outdir, _tf)) as _z2:
-            _dx2x = _z2.read("word/document.xml").decode("utf-8")
-        _segs = re.findall(r"<w:(?:ins|del) [^>]*>(.*?)</w:(?:ins|del)>", _dx2x, re.S)
-        _lens = [len("".join(re.findall(r"<w:(?:t|delText)[^>]*>(.*?)</w:(?:t|delText)>", s, re.S)))
-                 for s in _segs]
-        check("修订粒度：存在局部改动片段（非整段替换）",
-              bool(_lens) and min(_lens) <= 10, "%d 处痕迹，最短 %s 字" % (len(_lens), min(_lens) if _lens else "-"))
-    except Exception as e:
-        check("修订粒度自检", False, str(e))
 
     # --- 3.y 半档 C（--source-docx：3、6、7 以原稿做底，版式沿用原稿） ---
     print("\n[3.y] 半档C 排版保真（--source-docx）")
@@ -1032,29 +1324,29 @@ def main():
                  "--types", "tracked", "--source-docx", sd, "--out", bout,
                  "--ts", "20260101-0000"])
             _bf = [f for f in os.listdir(bout)] if os.path.isdir(bout) else []
-            _deg = [f for f in _bf if "降级" in f]
+            _deg = [f for f in _bf if "-准原稿B" in f]
             _cm = ""
             if _bf:
                 try:
                     _cm = _dxr.Document(os.path.join(bout, _bf[0])).core_properties.comments or ""
                 except Exception:
                     _cm = ""
-            check("原稿修订：定位失败时降级并标注（文件名＋文档属性两处）",
+            check("原稿修订：定位失败时降级并标注（文件名档位标记＋文档属性两处）",
                   bool(_deg) and "降级" in _cm,
-                  "文件名降级=%s 属性含降级=%s" % (bool(_deg), "降级" in _cm))
+                  "文件名档位标记=%s 属性含降级=%s" % (bool(_deg), "降级" in _cm))
     except Exception as e:
         check("原稿级修订自检", False, repr(e))
 
-    # --- 3.z2 原稿就地批注（2 批注版：正文＝原稿、意见挂在原稿段落上）---
+    # --- 3.z2 原稿就地批注（5 批注版：正文＝原稿、意见挂在原稿段落上）---
     # 这一组是 D-2 的回归守卫：v3.26.6 及以前 type 2 根本不读 --source-docx，
     # 交出的是「新建清单 ＋ 批注挂在清单标题上」，与 1 修订版行为不一致却看不出来。
     # 判据取**段落序列逐段相等**——只要它偷懒重建，段落数与文字必然不同，一眼红。
-    print("\n[3.z2] 原稿就地批注（2 审查意见批注版）")
+    print("\n[3.z2] 原稿就地批注（4 审查意见批注版）")
     _NC = ["批注版：以 --source-docx 为底（段落序列与原稿逐段相等）",
            "批注版：意见挂到原稿对应段落",
            "批注版：批注者＝审查人、条数＝实质意见数",
            "批注版：无原稿时回退并标注非原稿",
-           "批注版：部分定位不到标 -降级-部分 且仍是原稿",
+           "批注版：部分定位不到仍属原稿件（无档位标记、属性标注部分落位）",
            "批注版：.doc 老格式先转 .docx 再做底"]
     try:
         import docx as _dxn
@@ -1122,10 +1414,10 @@ def main():
                 _dg = os.path.join(work, "批注无原稿")
                 _df = _run_cmt(_csp, _dg)
                 _dtx = "".join(p.text for p in _dxn.Document(os.path.join(_dg, _df[0])).paragraphs) if _df else ""
-                check(_NC[3], bool(_df) and "降级" in _df[0] and "非原稿" in _dtx,
+                check(_NC[3], bool(_df) and "-准原稿B" in _df[0] and "非原稿" in _dtx,
                       "%s｜正文标注=%s" % (_df[0] if _df else "无产出", "非原稿" in _dtx))
 
-                # 负向 2：部分条款对不上 → 仍是原稿件，标「-降级-部分」，正文不作重建
+                # 负向 2：部分条款对不上 → 仍是原稿件（文件名无 -准原稿 标记），正文不作重建
                 _psp = os.path.join(work, "cmt-part.json")
                 with open(_psp, "w", encoding="utf-8") as f:
                     json.dump({"name": "批注版部分", "source": "合同比对A版",
@@ -1137,8 +1429,15 @@ def main():
                 _pf = _run_cmt(_psp, _po, _sd)
                 _ptx2 = ([p.text for p in _dxn.Document(os.path.join(_po, _pf[0])).paragraphs]
                          if _pf else [])
-                check(_NC[4], bool(_pf) and "-降级-部分" in _pf[0] and _ptx2 == _ptx,
-                      "%s｜段落序列仍等于原稿=%s" % (_pf[0] if _pf else "无产出", _ptx2 == _ptx))
+                import zipfile as _zfp
+                _czmeta = ""
+                if _pf:
+                    with _zfp.ZipFile(os.path.join(_po, _pf[0])) as _zc:
+                        _czmeta = _zc.read("docProps/core.xml").decode("utf-8", "replace")
+                check(_NC[4], bool(_pf) and "-准原稿" not in _pf[0]
+                          and "降级（部分）" in _czmeta and _ptx2 == _ptx,
+                      "%s｜段落序列仍等于原稿=%s｜属性含部分落位=%s"
+                      % (_pf[0] if _pf else "无产出", _ptx2 == _ptx, "降级（部分）" in _czmeta))
 
                 # 正路 2：.doc 老格式——预读按文件头识别、转 .docx 后再做底
                 _soc = shutil.which("soffice") or shutil.which("libreoffice")
@@ -2154,7 +2453,7 @@ def main():
         # 这两条正好对应两类病害：①「默认要求做一件做不到的事」（逻辑不自洽）；
         # ②「库数少了一个」（数字口径漂移）——都是文案改一半就复发的。
         for _tag, _old, _new, _kw in [
-            ("默认交付物含本版做不出的第 2 类", "不选则默认出 1、3", "不选则默认出 1、2、3",
+            ("默认交付物含本版做不出的第 4 类", "不选则默认出 1、2", "不选则默认出 1、2、4",
              "默认交付物含本版做不出的"),
             ("行业清单缺「建筑地产」", "建筑地产", "其他行业", "缺「建筑地产」"),
         ]:
@@ -2233,11 +2532,43 @@ def main():
             return v
 
         # 平台字段表里的必填项（不含 allowed-tools / examples_* 这两组选填）
-        _must = ["name", "display_name", "display_name_en", "description",
+        # 2026-10-30 起 `slug` 也是必填：`name` 改承担中文显示名，ASCII 标识独立成字段
+        _must = ["name", "slug", "display_name", "display_name_en", "description",
                  "description_zh", "description_en", "version", "author"]
         _gone = [k for k in _must if _val(k) is None]
-        check("frontmatter 平台必填 8 字段齐备（name/两个展示名/三个描述/version/author）",
-              not _gone, "缺：%s" % "、".join(_gone) if _gone else "八项齐备")
+        check("frontmatter 平台必填 9 字段齐备（name/slug/两个展示名/三个描述/version/author）",
+              not _gone, "缺：%s" % "、".join(_gone) if _gone else "九项齐备")
+
+        # 命名分工：slug 必须是 kebab-case；name 可中文（允许不强制），只需无文件名非法字符
+        _n2, _s2 = _val("name") or "", _val("slug") or ""
+        check("slug 是 kebab-case（小写＋单连字符），name 非空且无文件名非法字符",
+              bool(_n2) and not re.search(r'[\\/:*?"<>|]', _n2)
+              and bool(re.match(r"^[a-z0-9]+(?:-[a-z0-9]+)*$", _s2)),
+              "name=%s｜slug=%s" % (_n2, _s2))
+
+        # 区分度注入一：slug 写成中文，门禁必须报（kebab-case 断言真的在跑）
+        open(_skp2, "wb").write(
+            re.sub(r"(?m)^slug:.*$", "slug: 文档合规审查", _txt2).encode("utf-8"))
+        _rslug = run([PY, os.path.join(HERE, "check.py")])
+        check("slug 写成中文 → 门禁报「不合 kebab-case」",
+              _rslug.returncode != 0 and "kebab-case" in _rslug.stdout,
+              "退出码 %d" % _rslug.returncode)
+
+        # 区分度注入二：slug 用下划线——看着像 slug，其实不合 kebab-case（kebab 不是「随手一个 ASCII」）
+        open(_skp2, "wb").write(
+            re.sub(r"(?m)^slug:.*$", "slug: doc_compliance_review", _txt2).encode("utf-8"))
+        _rslug2 = run([PY, os.path.join(HERE, "check.py")])
+        check("slug 用下划线 → 门禁报「不合 kebab-case」（区分 snake_case 与 kebab-case）",
+              _rslug2.returncode != 0 and "kebab-case" in _rslug2.stdout,
+              "退出码 %d" % _rslug2.returncode)
+
+        # 区分度注入三：name 含半角冒号——最阴的一条，_safe_name 会静默剔除它
+        open(_skp2, "wb").write(
+            re.sub(r"(?m)^name:.*$", "name: 文档:合规审查", _txt2).encode("utf-8"))
+        _rname = run([PY, os.path.join(HERE, "check.py")])
+        check("name 含半角冒号 → 门禁报「文件名非法字符」（_safe_name 会静默剔除）",
+              _rname.returncode != 0 and "文件名非法字符" in _rname.stdout,
+              "退出码 %d" % _rname.returncode)
 
         _zh2, _en2 = _val("description_zh") or "", _val("description_en") or ""
         check("description_zh 是简短介绍（≤200 字），不是触发长文的复制品",
@@ -2429,6 +2760,29 @@ def main():
         leak = _m.bytecode_leaks()
         check("缓存防护：每个脚本在 import 前关闭字节码写入", not leak,
               "漏写: %s" % ", ".join(leak))
+        # 两档项数守恒（v3.30.0）：快档是用 skip **占位**，不是删条目。台账分键记两档 total，
+        # check.py 据 total_full／total_fast 断言相等。这里做判据反证——把一份台账改坏，
+        # 直接喂给判据函数，必须报错；不落盘、不碰真台账。
+        try:
+            import tempfile as _tf_fast
+            _bad_dir = _tf_fast.mkdtemp(prefix="dcr_led_")
+            os.makedirs(os.path.join(_bad_dir, "core"), exist_ok=True)
+            _bad_led = os.path.join(_bad_dir, "core", "_smoke-baseline.json")
+            open(_bad_led, "w", encoding="utf-8").write(json.dumps(
+                {"total": 270, "total_full": 270, "total_fast": 265,
+                 "failed": 0, "mode": "full"}, ensure_ascii=False))
+            _errs_before = len(_m.ERRS)
+            _old_root = getattr(_m, "ROOT", None)
+            _m.ROOT = _bad_dir     # 让判据在临时目录找台账
+            _m.check_smoke_count()
+            _caught = len(_m.ERRS) > _errs_before
+            _m.ERRS[:] = _m.ERRS[:_errs_before]
+            if _old_root is not None:
+                _m.ROOT = _old_root
+            check("两档守恒判据：台账 total_full≠total_fast 须报「不守恒」", _caught,
+                  "已报不守恒" if _caught else "未拦（假绿）")
+        except Exception as e:
+            check("两档守恒判据：台账 total_full≠total_fast 须报「不守恒」", False, repr(e))
 
         # ── 反向注入（铁律 25.5.3：门禁须证明拦得住，不做注入等于"尚未落实"）──
         # 上面几条是**正向断言**（现状必须合规），只能证明"现在是对的"；
@@ -2445,13 +2799,29 @@ def main():
     print(f"结果：通过 {len(PASSES)} 项，失败 {len(FAILS)} 项，跳过 {len(SKIPS)} 项")
     # 记账：把本次真实项数落盘，供 check.py 校验「文档里写的项数」是否属实。
     # 两档项数守恒（全量把 OCR 两步拆开，快档合并为一步，总数一致），故只记 total。
+    # v3.30.0：**同一档位的 total 分键记录**（total_full / total_fast），check.py 据此断言两档相等。
+    # 背景：曾有 fast 比 full 少 4 项（用一条 skip 顶掉四条 check），两档不再守恒时
+    # check_smoke_count 会拿 fast 的 total 去比文档，导致「在别的机器上装完即红」。
+    _tot = len(PASSES) + len(FAILS) + len(SKIPS)
+    _mode = "fast" if a.fast else "full"
     try:
+        # 先读旧值再开写——顺序不能颠倒：以 "w" 打开那一刻文件已被截断，此时再读只会得到空串，
+        # 另一档的项数就会被静默抹成 null（本项初版即踩此坑）。
+        _old = {}
+        try:
+            _old = json.loads(open(SMOKE_LEDGER, encoding="utf-8").read())
+        except Exception:
+            _old = {}
         with open(SMOKE_LEDGER, "w", encoding="utf-8") as f:
             json.dump({"_说明": "冒烟结果台账（smoke-test.py 自动生成，运行侧生成物不随开发侧留存）；"
-                               "供 check.py 校验 README/教程所写项数是否为真。",
+                               "供 check.py 校验 README/教程所写项数是否为真。"
+                               "total_full／total_fast 两键各自记最近一次该档的项数，"
+                               "check.py 断言二者相等——两档项数必须守恒，否则文档口径无法同时成立。",
                        "generated": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                       "mode": "fast" if a.fast else "full",
-                       "total": len(PASSES) + len(FAILS) + len(SKIPS),
+                       "mode": _mode,
+                       "total": _tot,
+                       "total_full": _tot if _mode == "full" else _old.get("total_full"),
+                       "total_fast": _tot if _mode == "fast" else _old.get("total_fast"),
                        "passed": len(PASSES), "failed": len(FAILS), "skipped": len(SKIPS)},
                       f, ensure_ascii=False, indent=2)
     except Exception as e:

@@ -1,0 +1,877 @@
+[
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同_v3.22.1_20261022_(doc-compliance-review).skill",
+  "bytes": 1769994,
+  "sha256": "b24d44fdb8256906f0d966ad63739e5539a523af82f5d85ee9ef264a3bc284c1"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同_v3.22.1_20261022_(doc-compliance-review).zip",
+  "bytes": 1769643,
+  "sha256": "efccefffb8fe0804c48f2efd2ed454cd424e38e08e8470ccfff55ab427eb4bf3"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同_v3.22.2_20261022_(doc-compliance-review).skill",
+  "bytes": 1780904,
+  "sha256": "e72a401fe7fafb3acd9f7847404a5efbda267676995f5737fd8370141dfdcac2"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同_v3.22.2_20261022_(doc-compliance-review).zip",
+  "bytes": 1780553,
+  "sha256": "399f0aa37a9c787470eb8799ff6319a8c677f328614f0af6ef70bebb89a91b79"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同_v3.22.3_20261022_(doc-compliance-review).skill",
+  "bytes": 1783291,
+  "sha256": "08d35525e580041a40f40a37f9187061bcfb119d1e9bd24b9cc2c00f95a782eb"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同_v3.22.3_20261022_(doc-compliance-review).zip",
+  "bytes": 1782940,
+  "sha256": "9dc953c3cd6b51cddaea1148af5c3ab5f70d4b47b3fe2eb097c6d338f44af17f"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同_v3.23.0_20261023_(doc-compliance-review).skill",
+  "bytes": 1801260,
+  "sha256": "d9e8c5524f1e47d8b16e5d02389a9b400482566b4916a08bcc381a4c0f203b5e"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同_v3.23.0_20261023_(doc-compliance-review).zip",
+  "bytes": 1800909,
+  "sha256": "e2e319e49be4d1e5cace0c2c0cdebdfe1bba59cc77e3da8d2c4a1d5af1e13434"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同_v3.23.1_20261023_(doc-compliance-review).skill",
+  "bytes": 1802354,
+  "sha256": "a0d14f0ff903291d4e599677a5b96a896bfeed49c1d64d8ea6a41b4243370dc5"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同_v3.23.1_20261023_(doc-compliance-review).zip",
+  "bytes": 1802003,
+  "sha256": "f3fcf0da100d5bd58a7811e588804126cb7ba4975f960937d55acb2a61003a31"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同_v3.25.0_20261026_(doc-compliance-review).skill",
+  "bytes": 1940697,
+  "sha256": "778c279d673ec3d2e613c320d18e78282f4a04d591d1296a1444df6cbf68ec95"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同_v3.25.0_20261026_(doc-compliance-review).zip",
+  "bytes": 1940346,
+  "sha256": "7f08a2eb4cc3bd9c6b246e3b67dd978257f46625d37973c4d42c39dda090f33b"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同_v3.25.1_20261026_(doc-compliance-review).skill",
+  "bytes": 1943798,
+  "sha256": "68d0b6ac1bcdcba0022db7a45215b5c39672500de7f00c5a5fbd64cb4c644b79"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同_v3.25.1_20261026_(doc-compliance-review).zip",
+  "bytes": 1943447,
+  "sha256": "fc328e7b73e61750c0e4231c9d2ee4b14fe5c56a19ca050ed8fe1e8cce847018"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同_v3.25.2_20261026_(doc-compliance-review).skill",
+  "bytes": 1946384,
+  "sha256": "d8ec31cf303cff960774d8189d53ee369653fb287d1598ceaf717d9bfe2a4e01"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同_v3.25.2_20261026_(doc-compliance-review).zip",
+  "bytes": 1946033,
+  "sha256": "fa5d3afdc2b6a81d46f4eb2d82613993131f86a7db63c72c350436d23919618e"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同_v3.25.3_20261026_(doc-compliance-review).skill",
+  "bytes": 1950323,
+  "sha256": "64dfe8bcdc3c412cf12c9c6f97bdd0c2fa685ca337dc56227b4b509bd0e061f9"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同_v3.25.3_20261026_(doc-compliance-review).zip",
+  "bytes": 1949972,
+  "sha256": "092b0a49aed6e60c815e2f1b9b8ef8f39916538fe6d58a0185c1b5b1c01ded4b"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同_v3.25.4_20261026_(doc-compliance-review).skill",
+  "bytes": 1953247,
+  "sha256": "f3f4456072a21eb994c117ca51e65c45dbedc663919e1e19127dff8ef96dabec"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同_v3.25.4_20261026_(doc-compliance-review).zip",
+  "bytes": 1952896,
+  "sha256": "67d7eacf320c828e4984ffc535723e413641dc85c26fcf3e16a69596b19c595e"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同_v3.25.5_20261026_(doc-compliance-review).skill",
+  "bytes": 1956207,
+  "sha256": "3668543b2346347f8ef1aaaa7db18816547bea7c48ffe6c9ad2958c64880bde4"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同_v3.25.5_20261026_(doc-compliance-review).zip",
+  "bytes": 1955856,
+  "sha256": "0b0b910e8f56b847af65912460ae2a21b850bcd60c3631285e5beff08e45d55e"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同_v3.25.6_20261026_(doc-compliance-review).skill",
+  "bytes": 1959468,
+  "sha256": "0181c2300f4df6c3d7ad0cd527236a4a1b322f8f6d043dcfd03132fea117f178"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同_v3.25.6_20261026_(doc-compliance-review).zip",
+  "bytes": 1959117,
+  "sha256": "f243b4d8758ab44ff579472ddee6f11fe6214b29093f42d2bf7baf8f53e832ee"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同_v3.25.7_20261028_(doc-compliance-review).skill",
+  "bytes": 1821852,
+  "sha256": "dfeee63e664924fbe32b96881bb6b84cc17dd132c48e78a9f2dcc37ebc8f7e07"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同_v3.25.7_20261028_(doc-compliance-review).zip",
+  "bytes": 1821501,
+  "sha256": "71436dbd20e133e7a301d7e9a2d1eb9cf7dff15527997e464c14546d514cf4d7"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同_v3.25.8_20261028_(doc-compliance-review).skill",
+  "bytes": 1812032,
+  "sha256": "5df9521a74e44f8e1dd27ea279afe2326dee554fb886d09303b9e9679df750fd"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同_v3.25.8_20261028_(doc-compliance-review).zip",
+  "bytes": 1811681,
+  "sha256": "c392addd9e6e138b47596394db49f2dcce8410cbf1de8fcf5f2a5c42a52e8cd5"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同_v3.25.9_20261028_(doc-compliance-review).skill",
+  "bytes": 1812983,
+  "sha256": "b6d117185fcb108b2efc1df41a5554e8c1c958d992bad6928ff81cd5268a374d"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同_v3.25.9_20261028_(doc-compliance-review).zip",
+  "bytes": 1812632,
+  "sha256": "3c214e0eb4001e9b9cfc8832f06a3718037165a72511d8dd24abb82ea7b08f96"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同_v3.26.0_20261028_(doc-compliance-review).skill",
+  "bytes": 1819217,
+  "sha256": "89fa7ddb73b5d7e671bcb84a1019b98595fb03fca9bc4545659d042afe591266"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同_v3.26.0_20261028_(doc-compliance-review).zip",
+  "bytes": 1818866,
+  "sha256": "0ffd1ef91a2dd1b2b46e67190959420388ca793dbbb575d915316d0cc675a148"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同_v3.26.1_20261029_(doc-compliance-review).skill",
+  "bytes": 1797405,
+  "sha256": "66d478415775e27c36ef95f7d24d1cb5a179232fe034ad0af348b2fcc182789a"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同_v3.26.1_20261029_(doc-compliance-review).zip",
+  "bytes": 1797054,
+  "sha256": "1beae80a370e6578881faaea3b6b13fb4d5906eeb0b3db6e6513240d9d316edf"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同_v3.26.2_20261029_(doc-compliance-review).skill",
+  "bytes": 1806864,
+  "sha256": "847819d966a4f665004deeae5d98fb22f3def1a7e3ce1cc2368f182be1b3cdbc"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同_v3.26.2_20261029_(doc-compliance-review).zip",
+  "bytes": 1806513,
+  "sha256": "833b945313636ebbf0ec28bb842af644fe3fe688076ff58bc48fc243ea944498"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同_v3.26.3_20261029_(doc-compliance-review).skill",
+  "bytes": 1809153,
+  "sha256": "cf63f23ff94e2e23ced2bbecfa8d5356315e8b1a4354e52e1a25b25fb0215ce6"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同_v3.26.3_20261029_(doc-compliance-review).zip",
+  "bytes": 1808802,
+  "sha256": "1277ad34b08680b7b39a7f5eca3877da5e62dcc4dd85ed9334d87745efa10f07"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同_v3.26.4_20261029_(doc-compliance-review).skill",
+  "bytes": 1817147,
+  "sha256": "c76ad7c49923ba57308ca3aefe2808c05f8e187b87f9e3c7d91fde7bd3adb343"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同_v3.26.4_20261029_(doc-compliance-review).zip",
+  "bytes": 1816796,
+  "sha256": "c80a71c92d894c6048fc53418cde42f3d3f50c1df0ae2329778ea2e66a889c5c"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同_v3.26.5_20261029_(doc-compliance-review).skill",
+  "bytes": 1826437,
+  "sha256": "0802c50aa2a24ba9f25c29b62a98e4e31da132a1bcc61125c1a44fee88fa8a88"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同_v3.26.5_20261029_(doc-compliance-review).zip",
+  "bytes": 1826086,
+  "sha256": "348565349b608b20e3249a90b2b6df1692fd85b8682cdf7b487d5efbc4f78180"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同_v3.26.6_20261029_(doc-compliance-review).skill",
+  "bytes": 1831595,
+  "sha256": "18c13d4144c403ae4b97142ed356491f4e75803fb53aa64e0560ce06cfa20320"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同_v3.26.6_20261029_(doc-compliance-review).zip",
+  "bytes": 1831244,
+  "sha256": "0de3f6d91ec98385f00dacd3789ea323a9d77fdc6e5d662b2af3f1ae0b5844cc"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同_v3.26.7_20261029_(doc-compliance-review).skill",
+  "bytes": 1832606,
+  "sha256": "da463b6c886d31d0db8eaa3bfa19c67b13f90c642fff44374919019292759f99"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同_v3.26.7_20261029_(doc-compliance-review).zip",
+  "bytes": 1832255,
+  "sha256": "ee19d37f2f77f40311571c5d9e73a6b41374b2bc028823786012da1eb1f7fd36"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同_v3.26.8_20261029_(doc-compliance-review).skill",
+  "bytes": 1841627,
+  "sha256": "fbbaafa87bf297c3f08311cbf07a499c485acf76151ab25c8ac1be4288400083"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同_v3.26.8_20261029_(doc-compliance-review).zip",
+  "bytes": 1841276,
+  "sha256": "6bb455472ee6dcf1fb17fe84df544738c6056d5940d0b90da1cb3c3a6ed92764"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同_v3.26.9_20261029_(doc-compliance-review).skill",
+  "bytes": 1844511,
+  "sha256": "719cca1d9e3c2363c7328b42e6bb754160ae62e57b95e471e95e1e803ccedc4d"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同_v3.26.9_20261029_(doc-compliance-review).zip",
+  "bytes": 1844160,
+  "sha256": "0081823c9d977693b5eec78f4496f334e1df45dd5bfa0f6c6bf52dd1ffde4fc4"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同审核全能版_v3.10.0_20260924_(doc-compliance-review).skill",
+  "bytes": 1530877,
+  "sha256": "9c2e985b792ee05ba572eb3c02b5731563a718039ab04ba4e902bb52d6eb3190"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同审核全能版_v3.10.0_20260924_(doc-compliance-review).zip",
+  "bytes": 1530509,
+  "sha256": "be12d33d9fd1d1abbf8ed2789bbc7d3943f368d82ee78725a2e7b6919d42787d"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同审核全能版_v3.10.1_20260924_(doc-compliance-review).skill",
+  "bytes": 1555728,
+  "sha256": "b394b18376a67a3681ff442b8c412fdd3aa20cefa87707cb55ef58070e4afcbc"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同审核全能版_v3.10.1_20260924_(doc-compliance-review).zip",
+  "bytes": 1555360,
+  "sha256": "fc124ee9d3c158868bae3a43cfe387b59041d1fb70a778930c35af7222ec6e72"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同审核全能版_v3.10.2_20260924_(doc-compliance-review).skill",
+  "bytes": 1557703,
+  "sha256": "c7baaab51f2e3ae7aa8b7efe857721f4ad1ba618f7a6c7b442cd25dac5ec88dc"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同审核全能版_v3.10.2_20260924_(doc-compliance-review).zip",
+  "bytes": 1557335,
+  "sha256": "a9b2d87bf80fa365be5bd214d9933273494c012bef143a63e0a693dee543cbe4"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同审核全能版_v3.11.0_20260925_(doc-compliance-review).skill",
+  "bytes": 1564453,
+  "sha256": "58e591ad1ae811a1ebba85ae81835800e1cbdd7e7ca141d118df7f09638a2ffd"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同审核全能版_v3.11.0_20260925_(doc-compliance-review).zip",
+  "bytes": 1564085,
+  "sha256": "0ac9c3b59270f7396113370d5f1f57d33092c89712b1d23ae5416ffa252483c1"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同审核全能版_v3.11.10_20261014_(doc-compliance-review).skill",
+  "bytes": 1578057,
+  "sha256": "83bc459092843fd70f9a2c577897832969abdd9252b02b171b8fc9aaa714aba4"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同审核全能版_v3.11.10_20261014_(doc-compliance-review).zip",
+  "bytes": 1577690,
+  "sha256": "361246bbada55840063d7fc4dc58f2d62cff6edca062a7b94627ad0e1e46cec8"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同审核全能版_v3.11.11_20261014_(doc-compliance-review).skill",
+  "bytes": 1584506,
+  "sha256": "56e0e72b2d59979cde8eab39981df9d812048a20f049c518629e1590eeb131b2"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同审核全能版_v3.11.11_20261014_(doc-compliance-review).zip",
+  "bytes": 1584139,
+  "sha256": "4e282c245e5cca401737f171721a033c5a87ecd3dc52fc095a7ef14d7d2193bb"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同审核全能版_v3.11.12_20261016_(doc-compliance-review).skill",
+  "bytes": 1587378,
+  "sha256": "9465c07fc34c0e6939a60aefc532021bbea5a917dbc1702da3f916fb8a18c041"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同审核全能版_v3.11.12_20261016_(doc-compliance-review).zip",
+  "bytes": 1587011,
+  "sha256": "c7b2be723ed52a2584047dc0c76be8d4951de90703ee61a1b8349e8a92118047"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同审核全能版_v3.11.13_20261016_(doc-compliance-review).skill",
+  "bytes": 1586925,
+  "sha256": "ff07ff8497841850ea322530913343892648299fbedd000f1518017e177e05a9"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同审核全能版_v3.11.13_20261016_(doc-compliance-review).zip",
+  "bytes": 1586558,
+  "sha256": "a4702527366191dad0e5fefdf3671d36c447ad8baf46bb6a6a9bfcde24efae95"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同审核全能版_v3.11.14_20261020_(doc-compliance-review).skill",
+  "bytes": 1583030,
+  "sha256": "aab36f370979fab1adbdca5bfefd44bd9b9e1d91d9c4e32bcc7901846a6ee255"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同审核全能版_v3.11.14_20261020_(doc-compliance-review).zip",
+  "bytes": 1582663,
+  "sha256": "ef52c112d5dcbe33cd4aa34c1a69c681f2b6c444c0baafb8b213f8e722848aa2"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同审核全能版_v3.11.15_20261020_(doc-compliance-review).skill",
+  "bytes": 1593233,
+  "sha256": "942b58f013be81386f8b1269861c7ee7b1ccdcf0ca49726c80361a2569b60dfb"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同审核全能版_v3.11.15_20261020_(doc-compliance-review).zip",
+  "bytes": 1592866,
+  "sha256": "3a5e94cc9141873acf7760f79d0e93b2f5d2756513decfc75d74f6b780f08970"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同审核全能版_v3.11.1_20260925_(doc-compliance-review).skill",
+  "bytes": 1565249,
+  "sha256": "915d951b894bc767ddc6b745c3e9c77c1f2234f242c815c7591d93b714c4a627"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同审核全能版_v3.11.1_20260925_(doc-compliance-review).zip",
+  "bytes": 1564881,
+  "sha256": "306eed6b4adb278b07618feec51c44ada524309c285a853e24460f8d1816f667"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同审核全能版_v3.11.2_20260925_(doc-compliance-review).skill",
+  "bytes": 1567994,
+  "sha256": "4b7b568cb174e07696393d5de108a5df4fe31b938f895e024f5586014562b6cb"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同审核全能版_v3.11.2_20260925_(doc-compliance-review).zip",
+  "bytes": 1567628,
+  "sha256": "fb6d62f549204d0e6fcc215eb8c1a59668871b4ce56688f1af7d82a35288a101"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同审核全能版_v3.11.3_20260925_(doc-compliance-review).skill",
+  "bytes": 1569354,
+  "sha256": "ee032d35fdc1222f5cb4a2c5b012ee4abd0fb70d9db8a2a6a3082f08a95470ef"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同审核全能版_v3.11.3_20260925_(doc-compliance-review).zip",
+  "bytes": 1568988,
+  "sha256": "03b0a19440f3fd08d1b66ebf7654d1cb9fa28f88afbdd7830e09cfb79a9e924b"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同审核全能版_v3.11.4_20260926_(doc-compliance-review).skill",
+  "bytes": 1570773,
+  "sha256": "9cf5ead82e4037c2f134312993d61b6bda235fc91e44aef40a277ba00c44aa1a"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同审核全能版_v3.11.4_20260926_(doc-compliance-review).zip",
+  "bytes": 1570407,
+  "sha256": "bc9f9ec6d12181b6e6f6dfd334c4d394f75a538fcafeee3c5a7ae0a730c373ca"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同审核全能版_v3.11.5_20260928_(doc-compliance-review).skill",
+  "bytes": 1571768,
+  "sha256": "cfea24dc480b5f2e832bcbef5af6136d136a9c1111091f37b7afac72f0165092"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同审核全能版_v3.11.5_20260928_(doc-compliance-review).zip",
+  "bytes": 1571402,
+  "sha256": "fb7ea786e0a5c628bb1a1f38982a6d2a6d7519f073191ae77ed1b372f8cec4f4"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同审核全能版_v3.11.6_20261010_(doc-compliance-review).skill",
+  "bytes": 1573635,
+  "sha256": "1bb5d7758801359fe8e16beb90cec704a40d5a47b9b5c650cb688ac603fd7fb5"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同审核全能版_v3.11.6_20261010_(doc-compliance-review).zip",
+  "bytes": 1573269,
+  "sha256": "51ef3cebd3f25cb51ee90a6756c27a1641bf53d2f97eaace89fbe94e665643cf"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同审核全能版_v3.11.8_20261013_(doc-compliance-review).skill",
+  "bytes": 1577392,
+  "sha256": "d1d56783efff3d54d422bdfea31cded0776dd8d33d361c6a122d7837d16636fc"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同审核全能版_v3.11.8_20261013_(doc-compliance-review).zip",
+  "bytes": 1577026,
+  "sha256": "a09c15fc10a375d964a9aa1e229e432fe762eaa2b2e30312d42b4bf44d71ce9a"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同审核全能版_v3.11.9_20261014_(doc-compliance-review).skill",
+  "bytes": 1578491,
+  "sha256": "8a1141389d712c0d9f7359785e5ad60726726d0e24358949e3995bc18922db30"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同审核全能版_v3.11.9_20261014_(doc-compliance-review).zip",
+  "bytes": 1578125,
+  "sha256": "c2f8e47183a722ffe74e7b179d4a29f6d2d2f3ad8029306707c2d25722bca634"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同审核全能版_v3.8.8_20260924_(doc-compliance-review).skill",
+  "bytes": 1349496,
+  "sha256": "9f814bcc7efeb76a7665555e7f04a8fba10d1e1622aaa97783496f3eda19773b"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同审核全能版_v3.8.8_20260924_(doc-compliance-review).zip",
+  "bytes": 1349129,
+  "sha256": "c07288da800310c66a4886f8c798d554eee616f3c9d2d555f909b362f62d63c8"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同审核全能版_v3.8.9_20260924_(doc-compliance-review).skill",
+  "bytes": 1349624,
+  "sha256": "d0a14940dcfb8d01cca6c0aa24ee2b6f16f03c9baa8bee359a0bd25311cfed1a"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同审核全能版_v3.8.9_20260924_(doc-compliance-review).zip",
+  "bytes": 1349257,
+  "sha256": "ac874fe17089cb34c8dd77996d329d7ef9d1b6cf5cca1b5e1fb27a42132bec15"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同审核全能版_v3.9.0_20260924_(doc-compliance-review).skill",
+  "bytes": 1353208,
+  "sha256": "96d8b391c84097662225689301d7bbf6afd2e0e731a7c0a2a544417371d7b020"
+ },
+ {
+  "path": "/workspace/dist/文档合规审查助手AI合同审核全能版_v3.9.0_20260924_(doc-compliance-review).zip",
+  "bytes": 1352841,
+  "sha256": "0c176ffc6139e3a950c99c6b12cda890c4894c3f21ea9f475a638e0ee97ba927"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同_v3.12.1_20261021_(doc-compliance-review).skill",
+  "bytes": 1581655,
+  "sha256": "3054580570bd762965310e6fc16e332da7993bc7acae73343f41c6fed32665a6"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同_v3.12.1_20261021_(doc-compliance-review).zip",
+  "bytes": 1581304,
+  "sha256": "6e3a087c9d5bc930380e534f8c656206c48169617f8f62f2f0618d5d3cc4785d"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同_v3.12.2_20261021_(doc-compliance-review).skill",
+  "bytes": 1582525,
+  "sha256": "fb4ce45173378140b2a7678cfa59fbfad7ac6c2ab0ba1dfa508c2652da3ab130"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同_v3.12.2_20261021_(doc-compliance-review).zip",
+  "bytes": 1582174,
+  "sha256": "ff6d60eca9b31f5c6dac3d8ac26e2029646b716fd36c566f298184749c1384b9"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同_v3.12.3_20261021_(doc-compliance-review).skill",
+  "bytes": 1582807,
+  "sha256": "f85b16f62bff1001ee0599147f85914e183dfe347442c0db093ff70df6d500f0"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同_v3.12.3_20261021_(doc-compliance-review).zip",
+  "bytes": 1582456,
+  "sha256": "18c209787e1d8dbb40f30412b39b114e232a443bce7365d3cb4bfa45ca4599fd"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同_v3.13.0_20261022_(doc-compliance-review).skill",
+  "bytes": 1590589,
+  "sha256": "0ce4c5102a566497e012203b35c3208114be351368b935f808dcb4dabed3de41"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同_v3.13.0_20261022_(doc-compliance-review).zip",
+  "bytes": 1590238,
+  "sha256": "14ec131c8538d1f14919aa5050f6ec7cc175b47e812947b6f15bd4c6b589dfd6"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同_v3.13.1_20261022_(doc-compliance-review).skill",
+  "bytes": 1589293,
+  "sha256": "21dc99bd739d0a2c157ca15c491c2c4abe0607d2b5b34ed3e6844778b8bff551"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同_v3.13.1_20261022_(doc-compliance-review).zip",
+  "bytes": 1588942,
+  "sha256": "ef73684b5b8bb70a5260e29950fd6b433a26d77e8c0cf7b2d955dff616878e30"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同_v3.14.0_20261022_(doc-compliance-review).skill",
+  "bytes": 1617264,
+  "sha256": "f05aae1e901e208f9cc166b4c6b6bf65f49a7739c2f91c231cb671cddd4655a7"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同_v3.14.0_20261022_(doc-compliance-review).zip",
+  "bytes": 1616913,
+  "sha256": "e2058cf4449c4b189d2f63ae4b63dbab0168b72b09ecd6137505b8fec30c66fe"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同_v3.22.0_20261022_(doc-compliance-review).skill",
+  "bytes": 1766322,
+  "sha256": "609227ba398176875917bfd72cf7616e96e83f984384a85819075f8f35e62531"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同_v3.22.0_20261022_(doc-compliance-review).zip",
+  "bytes": 1765971,
+  "sha256": "b6c3ef5b36033545e003c2e532533d6b6fd67270386300e7de597230ccad124b"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同_v3.23.2_20261023_(doc-compliance-review).skill",
+  "bytes": 1808575,
+  "sha256": "091fba16b9f6b315f019f0fe7cd7d35f615bad559d75a0cfcadaa7e0e3125026"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同_v3.23.2_20261023_(doc-compliance-review).zip",
+  "bytes": 1808224,
+  "sha256": "11c0ea4f3cff3e67977fa819743e309ead77e75402e3f0c1c8a83387dccebcf1"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同_v3.23.3_20261023_(doc-compliance-review).skill",
+  "bytes": 1816393,
+  "sha256": "7dce67e248437fbbc87b58ed6474fb9a32f2534f854722d0d8394b1e34d916cb"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同_v3.23.3_20261023_(doc-compliance-review).zip",
+  "bytes": 1816042,
+  "sha256": "b6c7b267a1f0342754204e8dd02b3330c66bbdb09ae29c9a5c2ffd0cf23cee90"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同_v3.23.4_20261023_(doc-compliance-review).skill",
+  "bytes": 1824239,
+  "sha256": "c60b02faa3c9cc94aed0cc5d59377d45a0943b9a65ba1811fc7d03ce3b5b886b"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同_v3.23.4_20261023_(doc-compliance-review).zip",
+  "bytes": 1823888,
+  "sha256": "b0bdc94b5e2dc7b2e29099d0366afa17903a25a4946c2ee3cb10680f89279def"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同_v3.23.5_20261023_(doc-compliance-review).skill",
+  "bytes": 1828082,
+  "sha256": "b618635dd0aa3da9b243f7f96eff007e843300d5c9ceaf566d9f9c985af06af5"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同_v3.23.5_20261023_(doc-compliance-review).zip",
+  "bytes": 1827731,
+  "sha256": "cb589349ac58bddf9c252c304baafb85f3d473b8ba26d56191ccdde25cc72366"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同_v3.23.6_20261026_(doc-compliance-review).skill",
+  "bytes": 1846524,
+  "sha256": "f3627a55df6a852bb9cfa2cda2374df70a956ee07d1005d568a95dec93bcceaf"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同_v3.23.6_20261026_(doc-compliance-review).zip",
+  "bytes": 1846173,
+  "sha256": "0c5c9fb2d37db4094666d2f20e16a6a580e749426f399416e109ff8a20584e76"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同_v3.24.0_20261026_(doc-compliance-review).skill",
+  "bytes": 1871800,
+  "sha256": "0b395df3f091296273119f25168027425d3655af64da3b0b46fe4782dc23474f"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同_v3.24.0_20261026_(doc-compliance-review).zip",
+  "bytes": 1871449,
+  "sha256": "b513d4555603c3e2978ef46fea5d38c2284b2646555b514cb7545a576ace3a33"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同_v3.25.0_20261026_(doc-compliance-review).skill",
+  "bytes": 1940697,
+  "sha256": "778c279d673ec3d2e613c320d18e78282f4a04d591d1296a1444df6cbf68ec95"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同_v3.25.0_20261026_(doc-compliance-review).zip",
+  "bytes": 1940346,
+  "sha256": "7f08a2eb4cc3bd9c6b246e3b67dd978257f46625d37973c4d42c39dda090f33b"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同_v3.25.1_20261026_(doc-compliance-review).skill",
+  "bytes": 1943798,
+  "sha256": "68d0b6ac1bcdcba0022db7a45215b5c39672500de7f00c5a5fbd64cb4c644b79"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同_v3.25.1_20261026_(doc-compliance-review).zip",
+  "bytes": 1943447,
+  "sha256": "fc328e7b73e61750c0e4231c9d2ee4b14fe5c56a19ca050ed8fe1e8cce847018"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同_v3.25.2_20261026_(doc-compliance-review).skill",
+  "bytes": 1946384,
+  "sha256": "d8ec31cf303cff960774d8189d53ee369653fb287d1598ceaf717d9bfe2a4e01"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同_v3.25.2_20261026_(doc-compliance-review).zip",
+  "bytes": 1946033,
+  "sha256": "fa5d3afdc2b6a81d46f4eb2d82613993131f86a7db63c72c350436d23919618e"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同_v3.25.3_20261026_(doc-compliance-review).skill",
+  "bytes": 1950323,
+  "sha256": "64dfe8bcdc3c412cf12c9c6f97bdd0c2fa685ca337dc56227b4b509bd0e061f9"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同_v3.25.3_20261026_(doc-compliance-review).zip",
+  "bytes": 1949972,
+  "sha256": "092b0a49aed6e60c815e2f1b9b8ef8f39916538fe6d58a0185c1b5b1c01ded4b"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同_v3.25.4_20261026_(doc-compliance-review).skill",
+  "bytes": 1953247,
+  "sha256": "f3f4456072a21eb994c117ca51e65c45dbedc663919e1e19127dff8ef96dabec"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同_v3.25.4_20261026_(doc-compliance-review).zip",
+  "bytes": 1952896,
+  "sha256": "67d7eacf320c828e4984ffc535723e413641dc85c26fcf3e16a69596b19c595e"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同_v3.25.5_20261026_(doc-compliance-review).skill",
+  "bytes": 1956207,
+  "sha256": "3668543b2346347f8ef1aaaa7db18816547bea7c48ffe6c9ad2958c64880bde4"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同_v3.25.5_20261026_(doc-compliance-review).zip",
+  "bytes": 1955856,
+  "sha256": "0b0b910e8f56b847af65912460ae2a21b850bcd60c3631285e5beff08e45d55e"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同_v3.25.6_20261026_(doc-compliance-review).skill",
+  "bytes": 1959468,
+  "sha256": "0181c2300f4df6c3d7ad0cd527236a4a1b322f8f6d043dcfd03132fea117f178"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同_v3.25.6_20261026_(doc-compliance-review).zip",
+  "bytes": 1959117,
+  "sha256": "f243b4d8758ab44ff579472ddee6f11fe6214b29093f42d2bf7baf8f53e832ee"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同_v3.25.7_20261028_(doc-compliance-review).skill",
+  "bytes": 1821852,
+  "sha256": "dfeee63e664924fbe32b96881bb6b84cc17dd132c48e78a9f2dcc37ebc8f7e07"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同_v3.25.7_20261028_(doc-compliance-review).zip",
+  "bytes": 1821501,
+  "sha256": "71436dbd20e133e7a301d7e9a2d1eb9cf7dff15527997e464c14546d514cf4d7"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同_v3.25.8_20261028_(doc-compliance-review).skill",
+  "bytes": 1812032,
+  "sha256": "5df9521a74e44f8e1dd27ea279afe2326dee554fb886d09303b9e9679df750fd"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同_v3.25.8_20261028_(doc-compliance-review).zip",
+  "bytes": 1811681,
+  "sha256": "c392addd9e6e138b47596394db49f2dcce8410cbf1de8fcf5f2a5c42a52e8cd5"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同_v3.25.9_20261028_(doc-compliance-review).skill",
+  "bytes": 1812983,
+  "sha256": "b6d117185fcb108b2efc1df41a5554e8c1c958d992bad6928ff81cd5268a374d"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同_v3.25.9_20261028_(doc-compliance-review).zip",
+  "bytes": 1812632,
+  "sha256": "3c214e0eb4001e9b9cfc8832f06a3718037165a72511d8dd24abb82ea7b08f96"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同_v3.26.0_20261028_(doc-compliance-review).skill",
+  "bytes": 1819217,
+  "sha256": "89fa7ddb73b5d7e671bcb84a1019b98595fb03fca9bc4545659d042afe591266"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同_v3.26.0_20261028_(doc-compliance-review).zip",
+  "bytes": 1818866,
+  "sha256": "0ffd1ef91a2dd1b2b46e67190959420388ca793dbbb575d915316d0cc675a148"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同_v3.26.1_20261029_(doc-compliance-review).skill",
+  "bytes": 1797405,
+  "sha256": "66d478415775e27c36ef95f7d24d1cb5a179232fe034ad0af348b2fcc182789a"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同_v3.26.1_20261029_(doc-compliance-review).zip",
+  "bytes": 1797054,
+  "sha256": "1beae80a370e6578881faaea3b6b13fb4d5906eeb0b3db6e6513240d9d316edf"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同_v3.26.2_20261029_(doc-compliance-review).skill",
+  "bytes": 1806864,
+  "sha256": "847819d966a4f665004deeae5d98fb22f3def1a7e3ce1cc2368f182be1b3cdbc"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同_v3.26.2_20261029_(doc-compliance-review).zip",
+  "bytes": 1806513,
+  "sha256": "833b945313636ebbf0ec28bb842af644fe3fe688076ff58bc48fc243ea944498"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同_v3.26.3_20261029_(doc-compliance-review).skill",
+  "bytes": 1809153,
+  "sha256": "cf63f23ff94e2e23ced2bbecfa8d5356315e8b1a4354e52e1a25b25fb0215ce6"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同_v3.26.3_20261029_(doc-compliance-review).zip",
+  "bytes": 1808802,
+  "sha256": "1277ad34b08680b7b39a7f5eca3877da5e62dcc4dd85ed9334d87745efa10f07"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同_v3.26.4_20261029_(doc-compliance-review).skill",
+  "bytes": 1817147,
+  "sha256": "c76ad7c49923ba57308ca3aefe2808c05f8e187b87f9e3c7d91fde7bd3adb343"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同_v3.26.4_20261029_(doc-compliance-review).zip",
+  "bytes": 1816796,
+  "sha256": "c80a71c92d894c6048fc53418cde42f3d3f50c1df0ae2329778ea2e66a889c5c"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同_v3.26.5_20261029_(doc-compliance-review).skill",
+  "bytes": 1826437,
+  "sha256": "0802c50aa2a24ba9f25c29b62a98e4e31da132a1bcc61125c1a44fee88fa8a88"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同_v3.26.5_20261029_(doc-compliance-review).zip",
+  "bytes": 1826086,
+  "sha256": "348565349b608b20e3249a90b2b6df1692fd85b8682cdf7b487d5efbc4f78180"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同_v3.26.6_20261029_(doc-compliance-review).skill",
+  "bytes": 1831595,
+  "sha256": "18c13d4144c403ae4b97142ed356491f4e75803fb53aa64e0560ce06cfa20320"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同_v3.26.6_20261029_(doc-compliance-review).zip",
+  "bytes": 1831244,
+  "sha256": "0de3f6d91ec98385f00dacd3789ea323a9d77fdc6e5d662b2af3f1ae0b5844cc"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同_v3.26.7_20261029_(doc-compliance-review).skill",
+  "bytes": 1832606,
+  "sha256": "da463b6c886d31d0db8eaa3bfa19c67b13f90c642fff44374919019292759f99"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同_v3.26.7_20261029_(doc-compliance-review).zip",
+  "bytes": 1832255,
+  "sha256": "ee19d37f2f77f40311571c5d9e73a6b41374b2bc028823786012da1eb1f7fd36"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同审核全能版_v3.11.16_20261021_(doc-compliance-review).skill",
+  "bytes": 1599153,
+  "sha256": "78cf850ce2ed144733d31b18bc9ae0dca6123b602ba567284f3f941ec9d7fe0e"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同审核全能版_v3.11.16_20261021_(doc-compliance-review).zip",
+  "bytes": 1598786,
+  "sha256": "a48b46f4a35d6354ef8a24afe8e2b60b8c960b5bed1cb05443cdf7a7c7426c9b"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同审核全能版_v3.12.0_20261021_(doc-compliance-review).skill",
+  "bytes": 1603463,
+  "sha256": "203799a69e1fa62bdf9a932709ec272450ed71bbb136bb39411e352169d2edc9"
+ },
+ {
+  "path": "/workspace/dev/dist/文档合规审查助手AI合同审核全能版_v3.12.0_20261021_(doc-compliance-review).zip",
+  "bytes": 1603097,
+  "sha256": "2d3713096053455a0677410665e9a59dc20e3306ec484dd3d50f6dd6fb762355"
+ },
+ {
+  "path": "/workspace/dev/maint/backups/skills-bak-20261021至20261026.tar.gz",
+  "bytes": 49814178,
+  "sha256": "f2f22624073a85f3f493744b1a59665c86557103451190c429a6971b237d4bf4"
+ },
+ {
+  "path": "/workspace/dev/doc-compliance-review/_发布包/文档合规审查助手AI合同_v3.26.0_20261028_(doc-compliance-review).skill",
+  "bytes": 1819217,
+  "sha256": "89fa7ddb73b5d7e671bcb84a1019b98595fb03fca9bc4545659d042afe591266"
+ },
+ {
+  "path": "/workspace/dev/doc-compliance-review/_发布包/文档合规审查助手AI合同_v3.26.0_20261028_(doc-compliance-review).zip",
+  "bytes": 1818866,
+  "sha256": "0ffd1ef91a2dd1b2b46e67190959420388ca793dbbb575d915316d0cc675a148"
+ },
+ {
+  "path": "/workspace/dev/doc-compliance-review/_发布包/文档合规审查助手AI合同_v3.26.1_20261029_(doc-compliance-review).skill",
+  "bytes": 1797405,
+  "sha256": "66d478415775e27c36ef95f7d24d1cb5a179232fe034ad0af348b2fcc182789a"
+ },
+ {
+  "path": "/workspace/dev/doc-compliance-review/_发布包/文档合规审查助手AI合同_v3.26.1_20261029_(doc-compliance-review).zip",
+  "bytes": 1797054,
+  "sha256": "1beae80a370e6578881faaea3b6b13fb4d5906eeb0b3db6e6513240d9d316edf"
+ },
+ {
+  "path": "/workspace/dev/doc-compliance-review/_发布包/文档合规审查助手AI合同_v3.26.2_20261029_(doc-compliance-review).skill",
+  "bytes": 1806864,
+  "sha256": "847819d966a4f665004deeae5d98fb22f3def1a7e3ce1cc2368f182be1b3cdbc"
+ },
+ {
+  "path": "/workspace/dev/doc-compliance-review/_发布包/文档合规审查助手AI合同_v3.26.2_20261029_(doc-compliance-review).zip",
+  "bytes": 1806513,
+  "sha256": "833b945313636ebbf0ec28bb842af644fe3fe688076ff58bc48fc243ea944498"
+ },
+ {
+  "path": "/workspace/dev/doc-compliance-review/_发布包/文档合规审查助手AI合同_v3.26.3_20261029_(doc-compliance-review).skill",
+  "bytes": 1809153,
+  "sha256": "cf63f23ff94e2e23ced2bbecfa8d5356315e8b1a4354e52e1a25b25fb0215ce6"
+ },
+ {
+  "path": "/workspace/dev/doc-compliance-review/_发布包/文档合规审查助手AI合同_v3.26.3_20261029_(doc-compliance-review).zip",
+  "bytes": 1808802,
+  "sha256": "1277ad34b08680b7b39a7f5eca3877da5e62dcc4dd85ed9334d87745efa10f07"
+ },
+ {
+  "path": "/workspace/dev/doc-compliance-review/_发布包/文档合规审查助手AI合同_v3.26.4_20261029_(doc-compliance-review).skill",
+  "bytes": 1817147,
+  "sha256": "c76ad7c49923ba57308ca3aefe2808c05f8e187b87f9e3c7d91fde7bd3adb343"
+ },
+ {
+  "path": "/workspace/dev/doc-compliance-review/_发布包/文档合规审查助手AI合同_v3.26.4_20261029_(doc-compliance-review).zip",
+  "bytes": 1816796,
+  "sha256": "c80a71c92d894c6048fc53418cde42f3d3f50c1df0ae2329778ea2e66a889c5c"
+ },
+ {
+  "path": "/workspace/dev/doc-compliance-review/_发布包/文档合规审查助手AI合同_v3.26.5_20261029_(doc-compliance-review).skill",
+  "bytes": 1826437,
+  "sha256": "0802c50aa2a24ba9f25c29b62a98e4e31da132a1bcc61125c1a44fee88fa8a88"
+ },
+ {
+  "path": "/workspace/dev/doc-compliance-review/_发布包/文档合规审查助手AI合同_v3.26.5_20261029_(doc-compliance-review).zip",
+  "bytes": 1826086,
+  "sha256": "348565349b608b20e3249a90b2b6df1692fd85b8682cdf7b487d5efbc4f78180"
+ },
+ {
+  "path": "/workspace/dev/doc-compliance-review/_发布包/文档合规审查助手AI合同_v3.26.6_20261029_(doc-compliance-review).skill",
+  "bytes": 1831595,
+  "sha256": "18c13d4144c403ae4b97142ed356491f4e75803fb53aa64e0560ce06cfa20320"
+ },
+ {
+  "path": "/workspace/dev/doc-compliance-review/_发布包/文档合规审查助手AI合同_v3.26.6_20261029_(doc-compliance-review).zip",
+  "bytes": 1831244,
+  "sha256": "0de3f6d91ec98385f00dacd3789ea323a9d77fdc6e5d662b2af3f1ae0b5844cc"
+ },
+ {
+  "path": "/workspace/dev/doc-compliance-review/_发布包/文档合规审查助手AI合同_v3.26.7_20261029_(doc-compliance-review).skill",
+  "bytes": 1832606,
+  "sha256": "da463b6c886d31d0db8eaa3bfa19c67b13f90c642fff44374919019292759f99"
+ },
+ {
+  "path": "/workspace/dev/doc-compliance-review/_发布包/文档合规审查助手AI合同_v3.26.7_20261029_(doc-compliance-review).zip",
+  "bytes": 1832255,
+  "sha256": "ee19d37f2f77f40311571c5d9e73a6b41374b2bc028823786012da1eb1f7fd36"
+ }
+]

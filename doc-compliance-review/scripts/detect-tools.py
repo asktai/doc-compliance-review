@@ -69,6 +69,8 @@ PY_DEPS = [
     ("openpyxl", "openpyxl", "Excel 比对台账与清单", "推荐"),
     ("PIL", "Pillow", "头标绘制（只在重画 assets 时需要）", "可选"),
     ("markdown", "markdown", "HTML 交付物转换（缺失时自动降级内置转换器，HTML 照样出）", "可选"),
+    ("pptx", "python-pptx", "PPT 讲解版（仅 2/8/9 报告讲解类；缺失时跳过不阻断）", "推荐"),
+    ("matplotlib", "matplotlib", "思维导图 PNG（缺失时只出交互 HTML 导图，跳过不阻断）", "推荐"),
 ]
 
 # 分平台安装命令（只列主流包管理器；使用者按自己机器挑一条）

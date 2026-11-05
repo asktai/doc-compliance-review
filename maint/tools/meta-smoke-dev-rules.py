@@ -55,6 +55,10 @@ CRIPPLES_FN = [
     (8, "跨侧一致性", "def check_cross_side(s_ignored=None):"),
     (14, "在线版同步", "def check_online_md(s):"),
     (16, "结转清单", "def check_open_issues(s_ignored=None):"),
+    # 第 18 维读工作区根的《产出物台账》，同样改铁律副本碰不到 → 单列档同法。
+    # 2026-10-30 加：它守的是「派生物不刷新就静静过期」，而这类病**两次全检才被发现**，
+    # 恰恰说明它此前没有任何守卫——现在有了，还须证明这个守卫自己被打瘸时会出声。
+    (18, "台账新鲜度", "def check_ledger_fresh(s_ignored=None):"),
 ]
 
 

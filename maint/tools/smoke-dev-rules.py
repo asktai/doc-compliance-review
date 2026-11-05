@@ -421,7 +421,12 @@ CROSS_SIDE_PROBE = "SKILL.md"
 # 改为**从用例表派生**：用例覆盖到第 N 维，自检就必须至少报出 N 维；
 # 再配合下方的"覆盖性自检"（每维都要有用例、没用例即报错），两个方向夹住，
 # 增删维度时**不必再手改这里**。
-EXPECTED_DIMS = max(d for d, _, _, _ in CASES) if CASES else 0
+#
+# 单列档的维度（改磁盘文件才能注入，无法用 CASES 的字符串机制表达）**也算"有注入用例"**，
+# 故一并纳入派生——2026-10-30 加第 (18) 维时暴露：只在 CASES 里取 max 的话，
+# 若最大维恰好是单列档，EXPECTED_DIMS 会少一维，`absent` 检查就漏掉它（守卫缺了不报）。
+STANDALONE_DIMS = {8, 14, 16, 18}
+EXPECTED_DIMS = max([d for d, _, _, _ in CASES] + sorted(STANDALONE_DIMS)) if CASES else 0
 
 
 def main():
@@ -485,9 +490,9 @@ def main():
     print("  [OK] 基线通过；自检共 %d 维：%s" % (len(covered), covered))
 
     # 覆盖性自检：脚本声称的每一维，用例表里都得有对应注入
-    # 第 8 维（跨侧）、第 14 维（在线版）、第 16 维（结转清单）都要**改磁盘文件**
-    # 才能注入，无法用 CASES 的"只改字符串"机制表达，各自单列一档，故在此登记为已覆盖。
-    STANDALONE_DIMS = {8, 14, 16}
+    # 第 8 维（跨侧）、第 14 维（在线版）、第 16 维（结转清单）、第 18 维（台账新鲜度）
+    # 都要**改磁盘文件**才能注入，无法用 CASES 的"只改字符串"机制表达，各自单列一档，
+    # 故在上方模块级 STANDALONE_DIMS 里登记为已覆盖。
     cased = sorted({c[0] for c in CASES} | STANDALONE_DIMS)
     absent = sorted(set(range(1, EXPECTED_DIMS + 1)) - set(covered))
     if absent:
@@ -497,7 +502,8 @@ def main():
     if missing:
         print("  [E] 以下维度**无注入用例**（守卫未被验证）：%s" % missing)
         return 1
-    print("  [OK] 每一维都有注入用例（第 8、14、16 维各单列一档）")
+    print("  [OK] 每一维都有注入用例（第 %s 维各单列一档）"
+          % "、".join(str(d) for d in sorted(STANDALONE_DIMS)))
 
     # ── B 注入 ──
     print("\n[B] 注入：逐维断言「必须拦住」")
@@ -720,6 +726,68 @@ def main():
             print("  [E] (16) 还原失败——**结转清单被污染**，请立即检查 %s" % OI)
         else:
             print("  [OK] (16) 结转清单已逐字节还原")
+
+    # ── 第 (18) 档：产出物台账新鲜度（2026-10-30 新增）──
+    # 本维读的是**工作区根的《产出物台账》**，改铁律副本碰不到它 → 与其他单列档同法：
+    # **造真坏形态 → 断言拦住 → 立即还原**。
+    # 三个病征全部取自**真实发生过的过期形态**：两次全检都抓到台账停在旧读数
+    # （v3.26.8 停在 v3.12.1；v3.26.12 写 98 个包／49 个版本，实际 6 个／3 版）。
+    # 读数不在此写死：从台账现文里现抠，改一处即可——写死就会在下次删包后失效。
+    print("  [--] (18) 产出物台账须与 dist 实际一致　单独一档")
+    LEDGER = os.path.join(os.path.dirname(DEV), "产出物台账.md")
+    if not os.path.exists(LEDGER):
+        fails.append((18, "台账新鲜度", "台账不存在"))
+        print("  [E] (18) 台账不存在（%s）——生成器可重建" % LEDGER)
+    else:
+        lbak = open(LEDGER, "rb").read()
+        try:
+            ltxt = lbak.decode("utf-8")
+            m18 = re.search(r"分发包总数：\*\*(\d+)\*\*\s*个（覆盖\s*\*\*(\d+)\*\*\s*个版本："
+                            r"\s*(v\d+\.\d+\.\d+)\s*—\s*(v\d+\.\d+\.\d+)）", ltxt)
+            if not m18:
+                fails.append((18, "台账新鲜度", "注入点未命中（找不到读数行）"))
+                print("  [E] (18) %-22s 注入点未命中（生成器输出格式已变）" % "读数行")
+            else:
+                n18, mv18 = int(m18.group(1)), int(m18.group(2))
+                lo18, hi18 = m18.group(3), m18.group(4)
+                rng18 = "%s — %s" % (lo18, hi18)
+                cases18 = [
+                    ("包数对不上",
+                     "分发包总数：**%d** 个" % n18,
+                     "分发包总数：**%d** 个" % (n18 + 1), "包数"),
+                    ("版本数对不上",
+                     "覆盖 **%d** 个版本" % mv18,
+                     "覆盖 **%d** 个版本" % (mv18 + 1), "版本数"),
+                    # 区间改成一个绝不存在的版本：只错误区间、不动读数，验的是第三项判据
+                    ("版本区间对不上",
+                     rng18, "v0.0.1 — %s" % hi18, "版本区间"),
+                ]
+                for cname, cold, cnew, kw18 in cases18:
+                    if cold not in ltxt:
+                        fails.append((18, cname, "注入点未命中"))
+                        print("  [E] (18) %-22s 注入点未命中" % cname)
+                        continue
+                    with open(LEDGER, "w", encoding="utf-8") as f:
+                        f.write(ltxt.replace(cold, cnew, 1))
+                    rc18, out18 = run_check()
+                    hit18 = [h for h in parse_dims(out18).get(18, []) if kw18 in h]
+                    if rc18 != 0 and hit18:
+                        standalone_n[0] += 1
+                        print("  [OK] (18) %-22s 拦住（报「%s」）" % (cname, kw18))
+                    else:
+                        fails.append((18, cname, "未报「%s」（守卫失效）" % kw18))
+                        print("  [E] (18) %-22s 未拦住（守卫失效）" % cname)
+                    # 每个病征后立即复原，下一个病征基于干净文本注入
+                    with open(LEDGER, "w", encoding="utf-8") as f:
+                        f.write(ltxt)
+        finally:
+            with open(LEDGER, "wb") as f:
+                f.write(lbak)
+        if digest(LEDGER) != hashlib.sha256(lbak).hexdigest():
+            fails.append((18, "台账新鲜度", "还原失败：台账哈希未复原"))
+            print("  [E] (18) 还原失败——**台账被污染**，请立即检查 %s" % LEDGER)
+        else:
+            print("  [OK] (18) 台账已逐字节还原")
 
     # ── 第 (3b) 档：外部文件里的铁律条号引用（2026-10-20 新增）──
     # 12.5.1.1 承认的盲区：条号被脚本注释、随包文档写死引用，真源改号后全部悬空，

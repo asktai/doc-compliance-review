@@ -31,6 +31,10 @@ doc-compliance-review · 云端开发侧发布脚本
                     放在 verify **之前**：冒烟会写"冒烟结果台账"，随后 check.py 即可校验到本次实跑的数字。
   (4) verify          结构校验 + 脚本指纹校验
   (5) pack            出分发包（仅在前面全绿时执行）
+  (6) **刷台账**       出包成功后刷新《产出物台账》。它是**派生文件**（真源是 `dist/` 里的
+                     实际包），不刷就会停在旧读数——规范写了「记得刷新」，但此前没有任何
+                     东西会在忘记时出声，两次全检都抓到过期。挂在出包后而非 (2)：那时
+                     `dist/` 才有本次新包，早刷只得到旧读数。
 
 
 生成物治理（V3.8.2 定型，勿退化）：
@@ -178,15 +182,46 @@ def separation():
     return r.returncode
 
 
+def refresh_ledger():
+    """出包成功后刷新《产出物台账》——**这条以前没有自动入口**。
+
+    台账是**派生文件**，真源是 `dist/` 里的实际包。原先只在规范里写着「每次交付后记得跑
+    刷新」，没有任何东西会在忘记时出声：2026-08 与 10-30 两次全检都抓到它过期（第二次停在
+    v3.26.12，实际已到 v3.26.13）。两次都不是算错，是**没人记得跑**——「写进规范但不挂机制」
+    等于没有。
+
+    挂在**出包之后**而不是 `refresh_generated()` 里：那时 `dist/` 才有本次的新包，早刷一遍
+    只会得到旧读数。刷新失败**不静默**——台账会停在旧数字，而铁律第 18 维（台账读数 vs
+    dist 实际）会当着面报出来，不会让人以为已经刷过。
+    """
+    g = os.path.join(MAINT, "tools", "gen-ledger.py")
+    if not os.path.exists(g):
+        print("[publish] ⚠ 未找到台账生成器，**台账未刷新**：%s" % g)
+        print("[publish]   台账将停在旧读数，铁律第 18 维会报不一致。")
+        return 1
+    r = subprocess.run([sys.executable, g], capture_output=True, text=True)
+    tail = (r.stdout or r.stderr).strip().splitlines()[-1:] or ["(无输出)"]
+    print("[publish] 刷新产出物台账 → %s" % tail[0])
+    if r.returncode != 0:
+        print("[publish] ✗ 台账刷新失败（退出码 %d）——台账停在旧读数，第 18 维会报"
+              % r.returncode)
+        return 1
+    return 0
+
+
 def pack():
     os.makedirs(DIST, exist_ok=True)
     # **从开发源出包，不从运行实例**：实例已按 (1b) 转成分发形态（无 history、无 VERSION.md），
     # 而 pack.py 会**正当地**拒收"源里没有沿革"的目录——拿它当出包源只会得到一份自己都不认的包。
     # 内容不会因此走样：sync 是 rmtree ＋ 镜像重建，两边除"分发形态那三处差异"外逐字节相同，
     # 而那三处本来就由 pack.py 在出包时剥掉。
+    # `--out` 必填（v3.26.14 起）：旧默认值会把包堆进技能目录，见 pack.py 的说明。
     r = subprocess.run([sys.executable, os.path.join(RUN, "scripts", "pack.py"),
                         DEV, "--out", DIST], capture_output=True, text=True)
     print((r.stdout or r.stderr).strip())
+    if r.returncode == 0:
+        # 出包即刷台账：新包已在 dist/，此刻刷新才读得到它
+        refresh_ledger()
     return r.returncode
 
 

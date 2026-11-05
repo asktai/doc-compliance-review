@@ -1,0 +1,23 @@
+{
+  "deleted_at": "2026-11-01",
+  "reason": "用户确认删除两处游离/备份物；正式版本仅5个(<8)无需删，实验包因H-01未定因保留",
+  "items": [
+    {
+      "path": "/workspace/doc-compliance-review-V3.7.1.zip",
+      "type": "file",
+      "embedded_version": "3.7.1",
+      "bytes": 1026817,
+      "sha256": "eebe97e7dbe53f47da66bbc680462b40c5a77c79a43659ea781d0ab5c09c04c6",
+      "mtime": "2025-09-23T23:48:00"
+    },
+    {
+      "path": "/root/.codebuddy/skills/doc-compliance-review_bak-v3260-20261028-1640",
+      "type": "dir",
+      "embedded_version": "3.25.9",
+      "bytes_du": 3262814,
+      "file_count": 85,
+      "skill_md_sha256": "417d81dd3ae534dcfa84edace38e8af1cce8dd7fbfb65b41733424c95c4414db",
+      "top_level": ["assets","core","drafting-guide.md","industries","LICENSE.md","permissions-and-libraries.md","README.md","report","samples","scripts","SECURITY.md","SKILL.md","template-guide.md","version.json","VERSION.md","安装使用教程.md","文档合规审查助手AI合同提示词版.md"]
+    }
+  ]
+}
