@@ -568,7 +568,27 @@ def check_expression(s):
     # 之前先作总述时用 `N.0`，其后子项仍自 `N.1` 起连号。故同级序列允许
     # `[0,1,...,n]`（0 至多一个且必在首位）或 `[1,...,n]`。
     kids = {}
-    for m in re.finditer(r"(?m)^(?: {0,2}- )?\*\*((?:\d+|A\.\d)(?:\.\d+)+)(?:\s|\*\*)", s):
+    # 2026-11-06 补**表格首列**：编号写进表格首列（`| **19.4.1 三种能力齐备** | …`）同样是声明编号单元。
+    # 原先只认段落与列表项，表格内编号一律看不见 → 19.4 的 `.1—.4` 全瞎，父级下只剩 `[5]`，误报断档。
+    # 但表格也大量用于**指路**（如 18.5 索引里的 `| **18.2** |`），把"引用"当"定义"会误报重号。
+    # 判据落在**这一格是不是只有编号**：格内编号后还有标题文字 → 是定义，收进 kids；
+    # 格内加粗闭合紧跟竖线（`** |`） → 是指路，收进 refs、不进 kids。不靠列序号猜。
+    _num = r"((?:\d+|A\.\d)(?:\.\d+)+)"
+    _head = re.compile(r"\|\s*\*\*" + _num + r"((?:[^*\n][^\n]*?)?)\*\*\s*\|")
+    rows, refs = [], set()
+    for m in re.finditer(r"(?m)^\|[^\n]*", s):
+        h = _head.match(m.group(0))
+        if not h:
+            continue
+        if h.group(2).strip(" \u3000"):
+            rows.append(h.group(1))      # 格内有标题文字 → 编号单元
+        else:
+            refs.add(h.group(1))         # 格内只有编号 → 指路，不是定义
+    for num in rows:
+        parent, child = num.rsplit(".", 1)
+        kids.setdefault(parent, []).append(int(child))
+
+    for m in re.finditer(r"(?m)^(?: {0,2}- )?\*\*" + _num + r"(?:\s|\*\*)", s):
         path = m.group(1); parent, child = path.rsplit(".", 1)
         kids.setdefault(parent, []).append(int(child))
     bad_path = []
