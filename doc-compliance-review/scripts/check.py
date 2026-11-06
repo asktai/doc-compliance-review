@@ -537,7 +537,31 @@ def check_net_tiers():
         err("E3 档（门禁自检类）不该真 import 网络库：%s；它只应持有用于检查别人的关键字清单"
             % "、".join(bad_l3))
         return
-    # ④ 与 SECURITY.md 双向咬合（文档一套代码一套，正是 25.2 的事故形态）
+    # ④ E0 档不得注册「在线类」开关——假开关的温床（2026-11-06 新补，此前是盲区）
+    #
+    # 抓到的事：`legal-search.py` 自标 E0、全文无网络库，却注册着 `--online`；
+    # 该参数**只在未命中分支打印一段说明**，命中路径上被完全忽略。使用者打了它以为在联网，
+    # 实际什么也没发生——25.3「承诺大于实际」。而原作的三条判据都在查 E1/E2 的**空头标签**
+    # （标了在线却没有联网路径），反方向（标了离线却挂着在线开关）**一条都没看**。
+    # 判据只认 argparse 注册这一形态：要保留兼容写法，就该自己拦 sys.argv 并拒绝，不注册。
+    # 判据须容得下 argparse 的**惯用写法** `add_argument("-o", "--online")`——
+    # 第一版只认「紧跟在左括号后的长旗」，独立复核当场指出现实中最常见的
+    # 「短旗＋长旗」形态反而漏掉（那不算刻意规避，是标准写法）。
+    # 刻意混淆（`"--" + "online"`、`*["--online"]`）仍可绕过，**如实记在这里**：
+    # 但 E0 的结构性底座是「禁网络库」（NET_IMPORT_RE），伪造一个开关骗到的是提示语，
+    # 不是数据——真要出网还得 import，那一关绕不过去。
+    ONLINE_FLAG_RE = re.compile(
+        r"""add_argument\([^)\n]{0,120}?["']--(?:online|net|remote|fetch|download)\b""")
+    fake = [n for n in by("E0") if ONLINE_FLAG_RE.search(_read(os.path.join(HERE, n)))]
+    if fake:
+        err("E0 档脚本注册了在线类开关：%s——E0 承诺零出网路径，注册这类开关只会让使用者"
+            "以为本脚本会联网（legal-search.py 的 `--online` 就是这么假的：只打印说明，"
+            "命中路径上被完全忽略）。要保留兼容写法，请在 main() 开头自己拦 sys.argv 并"
+            "**明确拒绝＋指路**，不要注册进 argparse（第 26 条）。"
+            "注意：这条判据看不见手动读 sys.argv 的通道——故那种写法**只许用于拒绝，"
+            "不得据 argv 分支执行任何动作**，否则就成了绕过本判据的后门" % "、".join(fake))
+        return
+    # ⑤ 与 SECURITY.md 双向咬合（文档一套代码一套，正是 25.2 的事故形态）
     doc = _doc_net_tiers()
     if doc is None:
         err("SECURITY.md 缺机读档位块（NET-TIERS）——名单无法与代码比对，改一处就分家（25.2）")

@@ -16,7 +16,10 @@
     「……」就是要件），属客观内容；「你这个情况算不算」「该不该签」「能不能赢」
     一槪不答。输出结构里**根本没有**结论字段——想写也写不进去。
   · **库外不猜**。库内没有的条号，一律明说「本库未收录」，绝不凭模型记忆补条文。
-    联网扩充须显式开 --online，且扩充结果只进临时集、不写回随包真值。
+  · **本脚本永不联网**（E0 档）。库外条文的联网核对由 `legal-lookup.py`（E2 档）承担，
+    那个脚本只接「法名＋条号」，没有放使用者文本的入口——两件事分开，是为了让
+    `--ask` 的自然语言问题（可能含案情）**永远不出域**。v3.33.0 起路由为**本地优先、
+    联网补位**：本地命中即回（毫秒级、双源已验证），未命中才提示走联网。
   · **覆盖面必须报**。本库是按审查场景精选，不是法律全集。每次输出都带
     覆盖面声明，避免用户误以为是全库检索。
   · **未验证不许冒充已验证**。每条必带 verified 状态；单源/冲突要显式标出。
@@ -31,10 +34,12 @@
   python scripts/legal-search.py --ask "合同违约金能约定多少"
   python scripts/legal-search.py --ask "违约金" --law 民法典
   python scripts/legal-search.py --article 民法典 585
-  python scripts/legal-search.py --ask "竞业限制" --online     # 库外联网扩充（显式）
   python scripts/legal-search.py --coverage                    # 看本库覆盖面
 
-退出码：0 命中；1 未命中（库内没有，且未开 --online 或扩充也失败）。
+库外条文（含司法解释）本脚本**抓不到也不去抓**——它标 E0、零网络库。改用：
+  python scripts/legal-lookup.py --article 商标法 3            # 联网补位，只发法名＋条号
+
+退出码：0 命中；1 未命中（库内没有；联网补位请走 legal-lookup.py）。
 """
 import sys as _sys
 _sys.dont_write_bytecode = True   # 不在技能目录留下 __pycache__
@@ -255,8 +260,10 @@ def render(results, q, db):
     out = []
     out.append("## 法规检索：%s" % q)
     out.append("")
-    out.append("> 库内检索，覆盖 %d 部法 %d 条（审查场景精选，非法律全集）。"
-               "以下为条文原文与要件拆解，**不构成法律意见**。" % (len(db.get("laws") or {}), total))
+    out.append("> **检索路径：本地库**（E0 档，全程未联网）。覆盖 %d 部法 %d 条，"
+               "全部经 ≥2 个独立来源交叉验证；是本库按审查场景精选的子集，**不是法律全集**。"
+               "以下为条文原文与要件拆解，**不构成法律意见**。"
+               % (len(db.get("laws") or {}), total))
     out.append("")
 
     for r in results:
@@ -313,8 +320,21 @@ def main():
     ap.add_argument("--limit", type=int, default=8)
     ap.add_argument("--coverage", action="store_true", help="只看本库覆盖面")
     ap.add_argument("--json", help="机读结果输出到文件")
-    ap.add_argument("--online", action="store_true",
-                    help="库外联网扩充（显式开启；默认严格离线）")
+    # 2026-11-06：这里原本注册着 `--online`，是个**假开关**——本脚本自标 E0、全文无网络库，
+    # 该参数只在未命中分支打印一段说明，命中路径上被完全忽略。使用者打了它以为在联网，
+    # 实际什么也没发生（25.3「承诺大于实际」）。现**不再注册进 argparse**（注册了就等于
+    # 宣称本脚本有在线能力），改为在 main() 开头手动拦截并明确拒绝——见下方 ONLINE_GONE。
+    # 已停用的开关：手动拦截，**明确拒绝并指路**（不注册进 argparse——不宣称本脚本有在线能力）
+    ONLINE_GONE = ("--online", "--net", "--remote")
+    _hit = [x for x in ONLINE_GONE if x in sys.argv[1:]]
+    if _hit:
+        print("`%s` 已停用。本脚本自标 **E0 档**（接触文档内容，绝对离线），全文无网络库——"
+              "它**从来没有真的联过网**，此前那个开关只打印一段说明。\n"
+              "联网核对请改用：python scripts/legal-lookup.py --article <法名> <条号>\n"
+              "（那条命令只发送法名与条号，不发送文档内容与问题原文。）" % _hit[0],
+              file=sys.stderr)
+        return 2
+
     a = ap.parse_args()
 
     db = load_db()
@@ -346,20 +366,29 @@ def main():
         total = sum(len(v) for v in (db.get("laws") or {}).values())
         print("## 未命中：%s" % q)
         print()
-        print("> 本库（%d 条）内没有可匹配的条文。" % total)
+        print("> **检索路径：本地库**（E0 档，全程未联网）。本库 %d 条，是按审查场景精选的子集，"
+              "**不是法律全集**——未命中不等于条号错。" % total)
         print()
-        if a.online:
-            print("联网扩充需经「抓取 → 解析 → 双源交叉验证」三步，"
-                  "由 `freshness-patrol.py` ＋ `legal-crosscheck.py` 完成；"
-                  "本次未开启扩充链路。")
+        if a.article:
+            print("### 本地未收录此条，可联网补位")
             print()
-            print("**扩充前的口径**：即便联网抓到，未通过双源验证的条文也不得引用。")
+            print("| 下一步 | 怎么做 |")
+            print("|---|---|")
+            print("| **联网核对原文** | `python scripts/legal-lookup.py --article %s %s` |"
+                  % (law, no_raw))
+            print("| 查官方文本后人工核对 | 国家法律法规数据库 flk.npc.gov.cn |")
+            print()
+            print("> 那条命令**只发送法名与条号**——不发送文档内容、问题原文或任何使用者信息；"
+                  "它把该法已登记的两个独立源各抓一遍，**双源一致才认**，单源会标「未核」而不冒充已核。")
+            print("> 不允许联网（涉密件／内网）时**别跑它**：直接按「未收录」处理，报告里标「待核验」。")
         else:
-            print("**本库未收录此条，且当前为严格离线模式（未开 --online）**——"
-                  "不凭记忆补条文，也不猜测。")
+            print("### 本地没搜到可匹配的条文")
             print()
-            print("可选：①加 `--online` 走联网扩充（须联网）；"
-                  "②直接查阅官方文本后人工核对。")
+            print("> `--ask` 的自然语言问题**永不联网**——问题里可能带案情，出网就等于外发。")
+            print("> 若已知法名与条号，改用 `--article`：`python scripts/legal-search.py --article 民法典 585`；")
+            print("> 那时再走 `legal-lookup.py` 联网核对才有意义（它只发法名与条号，不带问题原文）。")
+        print()
+        print("> **不凭记忆补条文，也不猜测。** 查不到就说查不到——把「没查到」写成「没问题」是最坏的一种错。")
         return 1
 
     md = render(results, q, db)

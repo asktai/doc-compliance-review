@@ -2737,6 +2737,55 @@ def main():
             if _b65 is not None:
                 open(_p65, "wb").write(_b65)   # 无论成败按字节还原，正式文件不留污染
 
+    # --- 3.66 库外条文联网核对（v3.33.0：本地优先、联网补位）---
+    print("\n[3.66] 库外条文联网核对（本地优先、联网补位）")
+    try:
+        ll = os.path.join(HERE, "legal-lookup.py")
+        if not os.path.exists(ll):
+            check("库外核对：脚本存在", False, "缺 scripts/legal-lookup.py")
+        else:
+            check("库外核对：脚本存在", True, "scripts/legal-lookup.py")
+
+            # (a) 安全边界是**结构性的**，不是承诺性的：参数表里压根没有能放使用者文本的入口。
+            #     这一条比"我们保证不发"硬得多——没有入口，就发不出去。
+            #     判据落在 `--help`（**使用者实际看得到的那份**）而不是全文扫描：
+            #     脚本正文里恰恰写着"本脚本没有 --ask、没有 --file"这句解释，
+            #     全文扫会把这句自述当成违规（第一版正是这么误报的）。
+            h = run([PY, ll, "--help"]).stdout or ""
+            forbidden = [p for p in ("--ask", "--file", "--dir", "--text", "--doc")
+                         if re.search(r"(?<![\w-])" + p + r"\b", h)]
+            check("库外核对：--help 里没有可放使用者文本的参数（--ask/--file/--dir 一概不设）",
+                  not forbidden, "出现: %s" % forbidden)
+
+            # (b) --offline 必须明示降级、不发请求、退出码 1（不许假装核过）
+            r = run([PY, ll, "--article", "民法典", "585", "--offline"])
+            o = r.stdout or ""
+            check("库外核对：--offline 明示降级、不假装核过（退出码 1 并指向本地检索）",
+                  r.returncode == 1 and "未完成" in o and "没有发出任何网络请求" in o
+                  and "legal-search.py" in o, head_lines(o))
+
+            # (c) --list-laws 报「哪些法登记了源」，并直接给源组数（<2 组就不能双源交叉）
+            r2 = run([PY, ll, "--list-laws"])
+            o2 = r2.stdout or ""
+            check("库外核对：--list-laws 列出已登记源的法并报源组数",
+                  r2.returncode == 0 and "源组数" in o2 and "民法典" in o2, head_lines(o2))
+
+            # (d) 库里没登记源的法：如实说抓不了，**不许瞎抓旁边的法**。
+            #     不加 --offline 也不会联网——没有源就没有请求（这也正是该分支的判据）。
+            r3 = run([PY, ll, "--article", "某某不存在的法", "1"])
+            o3 = (r3.stdout or "") + (r3.stderr or "")
+            check("库外核对：未登记源的法如实说抓不了，不瞎抓（退出码 1／2）",
+                  r3.returncode in (1, 2) and ("未登记" in o3 or "无法解析" in o3), head_lines(o3))
+
+            # (e) 旧开关不是被静默忽略，而是**明确拒绝并指路**——这才是「假开关」的根治
+            r4 = run([PY, os.path.join(HERE, "legal-search.py"),
+                      "--article", "民法典", "585", "--online"])
+            check("法规检索：--online 已停用且明确拒绝（退出码 2 并指向 legal-lookup）",
+                  r4.returncode == 2 and "已停用" in (r4.stderr or "")
+                  and "legal-lookup" in (r4.stderr or ""), head_lines(r4.stderr or ""))
+    except Exception as e:
+        check("库外条文核对自检", False, repr(e))
+
     # --- 3.5 版本与依赖（分发与落地成本）---
     print("\n[3.5] 版本与依赖")
     try:
@@ -2806,6 +2855,20 @@ def main():
         bad3 = [n for n in by("E3") if imp_re.search(srcs[n])]
         check("安全引擎：E3 档（门禁自检）只持关键字清单、不许真 import", not bad3,
               "真 import: %s" % ", ".join(bad3))
+        # 反方向的假开关（2026-11-06 抓获）：E0 承诺零出网，却注册在线类开关——
+        # legal-search.py 的 `--online` 就是这么假的：**只在未命中分支打印一段说明**，
+        # 命中路径上被完全忽略。使用者打了它以为在联网，实际什么都没发生（25.3）。
+        # 原作三条判据都在查 E1/E2 的**空头标签**，反方向一条都没看。
+        # 须容得下 `add_argument("-o", "--online")` 这种惯用写法（复核指出的漏网形态）
+        online_flag_re = re.compile(
+            r"""add_argument\([^)\n]{0,120}?["']--(?:online|net|remote|fetch|download)\b""")
+        fake = [n for n in by("E0") if online_flag_re.search(srcs[n])]
+        check("安全引擎：E0 档不得注册在线类开关（标了离线却挂在线开关＝假开关）", not fake,
+              "假开关: %s" % ", ".join(fake))
+        check("安全引擎判据反证：E0 样本的 add_argument(\"--online\") 须被认出（否则这条永远绿）",
+              online_flag_re.search('ap.add_argument("--online", action="store_true")') is not None)
+        check("安全引擎判据反证：短旗＋长旗写法 add_argument(\"-o\", \"--online\") 也须被认出",
+              online_flag_re.search('ap.add_argument("-o", "--online", action="store_true")') is not None)
         # 文档名单与代码自标逐档一致——25.2 的事故形态就是"文档一套、代码一套，无人比对"
         doc_t = {}
         for line in open(os.path.join(os.path.dirname(HERE), "SECURITY.md"), encoding="utf-8"):

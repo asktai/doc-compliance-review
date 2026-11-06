@@ -28,6 +28,10 @@
   "per_source_subdir": true,
   "harden_acl": false
  },
+ "_legal_说明": "库外条文联网核对（`legal-lookup.py`，E2 档）。allow_online=false 时该脚本一律不出网，直接明示降级到本地库——机构／涉密场景一处关掉即可，不必逐个命令行加 --offline。默认 true：脚本被显式调用本身就是一次知情同意（与 update.check_online_by_default 的「默认关」不同——那里的默认动作可能被隐式触发，这里的脚本只在你亲手敲命令时才跑）。无论开关如何，它发出的请求**只有法名与条号**，不发送文档内容、问题原文或任何使用者信息。",
+ "legal": {
+  "allow_online": true
+ },
  "_update_说明": "在线检查更新（**默认关闭**）。check_online_by_default 是总闸：仅当它被**显式设为 true** 时，`version.py --notice` 才会自动联网检查；留 false 或删掉该键＝一个请求都不发（此时仍可用 `version.py --check-online` 手动查一次）。manifest_url＝在线版本清单地址（version.json）；download_page＝下载指引页（人去看的页面）。**只读、不上传任何信息**；连不上或读不到时静默降级、不报错。这是本技能唯一会联网的地方，默认关是为了让联网永远由人先开口。",
  "update": {
   "manifest_url": "https://raw.githubusercontent.com/asktai/doc-compliance-review/main/version.json",

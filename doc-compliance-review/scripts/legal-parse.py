@@ -70,10 +70,23 @@ SRC_NAMES = {
     "qzlc.gov.cn": "泉州鲤城区政府",
 }
 
-def fetch(url, enc, tries=3):
-    ctx = ssl.create_default_context()
-    ctx.check_hostname = False
-    ctx.verify_mode = ssl.CERT_NONE
+def fetch(url, enc, tries=3, verify_tls=None):
+    """抓一个页面。
+
+    `verify_tls` 三态（2026-11-06 加，默认 None 保持原行为，故建库与巡检不受影响）：
+      · None  —— 不校验证书。**建库时的既定策略**：不少地方政府站证书链不完整，
+                 严格校验会让这些源整片抓不到，而建库要求"同一部法至少两源"，缺源就建不成。
+      · True  —— 严格校验。**核对用途（legal-lookup.py）默认走这条**：抓回来的条文是要被
+                 当原文引用的，中间人替换比"抓不到"危险得多——抓不到可以如实说抓不到，
+                 抓到一份被改过的"原文"却无从察觉。
+      · False —— 显式不校验（使用者 `--insecure` 主动放宽时）。
+    """
+    if verify_tls is True:
+        ctx = ssl.create_default_context()
+    else:
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
     last = None
     for i in range(tries):
         try:
