@@ -249,6 +249,8 @@ try:
         m.check_mindmap_single_source()
     elif which == "ai_tells":
         m.check_ai_tells_rules()
+    elif which == "ind_list":
+        m._check_questionnaire_libraries()
     else:
         m._check_no_bytecode()
 except BaseException as e:
@@ -289,6 +291,18 @@ def _inject_gate_tests(tmp):
             _src_f = os.path.join(os.path.dirname(HERE), "core", _f)
             if os.path.exists(_src_f):
                 shutil.copy(_src_f, _core_dst)
+        # v3.32.2：带上 SKILL.md／README.md／提示词版 与 industries/ ——
+        # 行业清单咬合守卫要在副本里读这几份清单与库元数据；缺了会报"找不到清单"，
+        # 与被注入的那一处混在一起，误报掩盖真信号（同上面两处的道理）。
+        _root_dir = os.path.dirname(HERE)
+        for _f in ("SKILL.md", "README.md", "文档合规审查助手AI合同提示词版.md"):
+            _src_f = os.path.join(_root_dir, _f)
+            if os.path.exists(_src_f):
+                shutil.copy(_src_f, base)
+        _ind_dst = os.path.join(base, "industries")
+        if os.path.isdir(os.path.join(_root_dir, "industries")):
+            shutil.copytree(os.path.join(_root_dir, "industries"), _ind_dst,
+                            ignore=shutil.ignore_patterns("__pycache__"))
     except Exception as e:
         return [("反向注入：准备临时副本", False, repr(e))]
 
@@ -644,6 +658,43 @@ def _inject_gate_tests(tmp):
         else:
             out.append(("反向注入⑳：规则库组名漂移 → 必须红", False, "注入点未命中"))
 
+        # ㉑ 行业清单名称漂移（v3.32.2）：README 把「建筑地产」写成「房地产」→ 必须拦。
+        #    这正是用户实测报「建筑行业库没有显示出来」的那一处，守不住就等于没修。
+        #    注意：注入⑩–⑬ 会把副本根的 SKILL.md **换成一小段假的**（格式门禁只读其中一节），
+        #    而行业清单门禁要读真的 SKILL.md 三处清单——故先恢复真件，否则报的是
+        #    「找不到 4. 加载库」而不是被注入的那一处（误报掩盖真信号）。
+        try:
+            shutil.copy(os.path.join(os.path.dirname(HERE), "SKILL.md"), base)
+            shutil.copy(os.path.join(os.path.dirname(HERE), "README.md"), base)
+        except Exception as e:
+            out.append(("反向注入㉑㉒：恢复副本真文档", False, repr(e)))
+        _rd = os.path.join(base, "README.md")
+        _rsrc = open(_rd, encoding="utf-8").read()
+        _rbad = _rsrc.replace("制造业·建筑地产）", "制造业·房地产）", 1)
+        if _rbad != _rsrc:
+            open(_rd, "w", encoding="utf-8").write(_rbad)
+            bad, errs, _ = run_gate("ind_list")
+            hit = any("行业清单咬合" in m and "建筑地产" in m for m in errs)
+            case("反向注入㉑：README 行业名「建筑地产」写成「房地产」→ 必须红",
+                 hit, "已报漏列建筑地产", "未报；" + (bad or "errs=%s" % errs))
+            open(_rd, "w", encoding="utf-8").write(_rsrc)
+        else:
+            out.append(("反向注入㉑：行业名漂移 → 必须红", False, "注入点未命中"))
+
+        # ㉒ 行业清单顺序漂移：名称都在，但顺序变了 → 必须拦（题号会指向不同的库）。
+        _rbad = _rsrc.replace(
+            "（医药·食品·新零售·新媒体·新能源·人力资源·医疗卫生·制造业·建筑地产）",
+            "（建筑地产·医药·食品·新零售·新媒体·新能源·人力资源·医疗卫生·制造业）", 1)
+        if _rbad != _rsrc:
+            open(_rd, "w", encoding="utf-8").write(_rbad)
+            bad, errs, _ = run_gate("ind_list")
+            hit = any("行业清单咬合" in m and "顺序" in m for m in errs)
+            case("反向注入㉒：README 行业清单顺序错位 → 必须红",
+                 hit, "已报顺序不一致", "未报；" + (bad or "errs=%s" % errs))
+            open(_rd, "w", encoding="utf-8").write(_rsrc)
+        else:
+            out.append(("反向注入㉒：行业顺序漂移 → 必须红", False, "注入点未命中"))
+
     # ④ 对照组：副本**没改坏**时两个门禁都必须零 ERR。
     #    为什么要这一组：只验"改坏了会报"还不够——一个见谁报谁的门禁同样能通过 ①②③。
     #    必须同时证明"没改坏时不报"，才能说明报错是被注入的那一处触发的。
@@ -657,13 +708,15 @@ def _inject_gate_tests(tmp):
     bad8, errs8, _ = run_gate("mm_source")
     bad9, errs9, _ = run_gate("fmt_matrix")      # 含 image 第 7 条
     bad10, errs10, _ = run_gate("ai_tells")
-    clean = not (errs or errs2 or errs3 or errs4 or errs5 or errs6 or errs7 or errs8 or errs9 or errs10)
-    out.append(("反向注入④（对照）：副本未改坏时十个门禁必须零报错",
+    bad11, errs11, _ = run_gate("ind_list")
+    clean = not (errs or errs2 or errs3 or errs4 or errs5 or errs6 or errs7 or errs8 or errs9
+                 or errs10 or errs11)
+    out.append(("反向注入④（对照）：副本未改坏时十一个门禁必须零报错",
                 clean,
                 "均零报错" if clean
                 else ("误报：" + (bad or bad2 or bad3 or bad4 or bad5 or bad6 or bad7 or bad8
                                  or str(errs + errs2 + errs3 + errs4 + errs5 + errs6 + errs7
-                                        + errs8 + errs9 + errs10)))))
+                                        + errs8 + errs9 + errs10 + errs11)))))
 
     shutil.rmtree(tmp, ignore_errors=True)
     return out

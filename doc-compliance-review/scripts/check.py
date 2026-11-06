@@ -1911,6 +1911,123 @@ def _check_questionnaire_libraries():
         if must not in sk:
             err("缺少作答语法写法 `%s`——用户少打字的入口被删了" % must)
 
+    # ---- 行业清单四处逐字一致（v3.32.2 加）----
+    # 由来（用户实测报「建筑行业库没有显示出来」）：库文件九个齐全、配对完整、
+    # SKILL 三处清单都对，但 README 的规则库表把「建筑地产」写成「房地产」并挪到末位——
+    # 成了第二套名称与顺序。按名检索搜不到、模型照它渲染就漏项。
+    # 而原守卫只查 SKILL「4. 加载库」那一段，**表格形态的清单完全没有守卫**（上面那条
+    # 「建筑地产」判据只盯着提示词版一处），于是这处口径分家漂了数个版本。
+    # 判据：**名称集合**须与 industries/*-meta.md 的 industry 字段逐字相同（少一个即漏列、
+    # 多一个即库里没有）；**顺序**以 SKILL 1.0.2 第 4 题为真源，其余三处逐位对齐——
+    # 顺序不一致同样会让「第 11 项」指向不同库。顺序真源只取一处，不另立 order 字段
+    # （12.2：同一事实不许两个真源，meta 里再造一份顺序，改清单时必漂）。
+    _IND_ORDER = []
+    if os.path.isdir(idir):
+        _seen = set()
+        for f in sorted(os.listdir(idir)):
+            if not f.endswith("-meta.md") or f.startswith("_"):
+                continue
+            _mi = re.search(r"(?m)^industry:\s*(.+)$", _read(os.path.join(idir, f)))
+            if _mi and _mi.group(1).strip():
+                _IND_ORDER.append(_mi.group(1).strip())
+                _seen.add(_mi.group(1).strip())
+
+    def _names_in(text):
+        """按出场顺序抽出文段中出现的行业名（长名优先，防「医药」吃掉「医疗卫生」）。"""
+        if not _IND_ORDER:
+            return []
+        _hit, _rest = [], text
+        for _n in sorted(_IND_ORDER, key=len, reverse=True):
+            if _n in _rest:
+                _hit.append((_rest.index(_n), _n))
+                _rest = _rest.replace(_n, "\u0000" * len(_n))
+        return [n for _, n in sorted(_hit)]
+
+    # 三处的抽取锚点：SKILL 1.0.2 第 4 题／SKILL 1.4 勾选框／README 规则库表。
+    # 只有三处——曾误以为「第九节菜单」是第四处，实为 1.4 段内的那行「行业库（内置 9 个…）」，
+    # 第九节是「上签强制检查」，不含行业清单。锚点重复会让两个名字抽到同一段，
+    # 报错指向错的地方（实测：只删 1.4 段却报「第九节菜单漏列」）。
+    _spots = [("SKILL 1.0.2 第 4 题", sk, r"(?m)^\s*4\.\s+加载库")]
+    _m14 = re.search(r"【Qn · 选择加载库", sk)
+    if _m14:
+        _spots.append(("SKILL 1.4 勾选框", sk, None))
+    _rd = _read(os.path.join(ROOT, "README.md"))
+    _spots.append(("README 规则库表", _rd, r"具体行业的专门规则"))
+    # 段抽取一律**截到下一个段落锚点**，不用固定字数窗口——实测 900 字窗口会越过
+    # 1.4 段尾爬到后面的说明文字里，而那里恰好也提到「建筑地产」，于是删掉选项行
+    # 仍判「列全了」（假绿）。按锚点截断，段内没有就是没有。
+    def _seg_until(text, start, stops):
+        _end = len(text)
+        for s in stops:
+            j = text.find(s, start + 1)
+            if j != -1 and j < _end:
+                _end = j
+        return text[start:_end]
+
+    # **只留非引用块**：段内的举例句一律写在 `>` 引用块里（「> 不可用项照常列出并标注
+    # （如「11. 建筑地产 —— 不可用：目录不存在」）」），它含行业名却**不是清单项**。
+    # 实测：删掉 1.4 的第 11 项后，判据被这句示例喂饱仍判「列全了」（第二次假绿，
+    # 第一次是字数窗口串段）。故先剔掉以 `>` 开头的行——选项与分组标题都不以 `>` 起。
+    def _option_lines(seg):
+        return "\n".join(_ln for _ln in seg.splitlines()
+                         if not _ln.lstrip().startswith(">"))
+
+    _i4_main = sk.find("4.  加载库")
+    _segs = {
+        "SKILL 1.0.2 第 4 题": _option_lines(_seg_until(sk, _i4_main, ["5.  我方身份"])) if _i4_main != -1 else "",
+        "SKILL 1.4 勾选框": _option_lines(_seg_until(sk, _m14.start(), ["**步骤 1.5"])) if _m14 else "",
+        "README 规则库表": _rd[_rd.find("具体行业的专门规则"):_rd.find("具体行业的专门规则") + 300] if "具体行业的专门规则" in _rd else "",
+    }
+    # 第三处外挂：提示词版的行业清单（纯文本版，编号自成一套：1 通用版 ＋ 2–10 行业）。
+    # 它也是使用者能看见清单的地方，同样会「看不到就永远不加载」，故一并咬合。
+    # 只比**名称集合**，不比顺序与编号——该版编号体系与主清单不同（含「1 通用版」打头）。
+    _pv = _read(os.path.join(ROOT, "文档合规审查助手AI合同提示词版.md"))
+    _pvseg = ""
+    _mpv = re.search(r"(?m)^4\.\s+询问\*\*行业与适用场景", _pv)
+    if _mpv:
+        _pvseg = _seg_until(_pv, _mpv.start(), ["\n5. ", "\n4. "])
+    if not _pvseg:
+        err("行业清单咬合：提示词版找不到「4. 询问行业与适用场景」清单——"
+            "纯文本版的使用者就没有行业库可勾了")
+    else:
+        _pgot = _names_in(_pvseg)
+        _pmiss = [n for n in _IND_ORDER if n not in _pgot]
+        if _pmiss:
+            err("行业清单咬合：提示词版漏列 %d 个内置行业库：%s——"
+                "纯文本版使用者看不到的库等于不存在，该库从此不会被加载" % (len(_pmiss), "、".join(_pmiss)))
+
+    for _label, _txt, _ in _spots:
+        _seg = _segs.get(_label, "")
+        if not _seg:
+            err("行业清单咬合：找不到 %s 的行业清单段——清单被改形或删除" % _label)
+            continue
+        _got = _names_in(_seg)
+        _miss = [n for n in _IND_ORDER if n not in _got]
+        _extra = [n for n in _got if n not in _IND_ORDER]
+        if _miss:
+            err("行业清单咬合：%s 漏列 %d 个内置行业库：%s——"
+                "使用者看不到的库等于不存在，该库从此不会被加载"
+                % (_label, len(_miss), "、".join(_miss)))
+        if _extra:
+            err("行业清单咬合：%s 出现库里没有的行业名：%s——"
+                "名称与 industries/*-meta.md 的 industry 字段不符，按名检索会搜不到"
+                % (_label, "、".join(_extra)))
+    # 顺序真源＝SKILL 1.0.2 第 4 题（使用者最先、也最可能按题号作答的那处）。
+    # 其余三处逐位对齐；顺序不同会让「第 11 项」在不同界面指向不同的库。
+    _ref = _names_in(_segs.get("SKILL 1.0.2 第 4 题", ""))
+    if len(_ref) == len(_IND_ORDER):
+        for _label in ("SKILL 1.4 勾选框", "README 规则库表"):
+            _got = _names_in(_segs.get(_label, ""))
+            if len(_got) == len(_ref) and _got != _ref:
+                err("行业清单咬合：%s 的顺序与清单第 4 题不一致（实测 %s ／ 应为 %s）——"
+                    "顺序不同会让同一个题号指向不同的库"
+                    % (_label, "·".join(_got), "·".join(_ref)))
+        info("行业清单咬合：SKILL 1.0.2 ／ 1.4 ／ README 表三处，%d 个行业库名称与顺序逐字一致"
+             % len(_IND_ORDER))
+    else:
+        err("行业清单咬合：清单第 4 题解析出 %d 个行业名，库里是 %d 个——"
+            "顺序基准取不到，无法逐位对齐" % (len(_ref), len(_IND_ORDER)))
+
     # ---- 一个提问只装一个答案维度（2026-10-29 加，v3.26.9）----
     # 由来（实测）：出现过把「审查尺度（粗细）」与「谈判地位（强弱）」合成一张卡片，
     # 给出「中性·强势方／中性·均衡／严苛·强势方／宽松·弱势方」四个组合选项——

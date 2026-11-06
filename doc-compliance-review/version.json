@@ -3,8 +3,8 @@
   "product": "文档合规审查助手AI合同",
   "skill_id": "doc-compliance-review",
   "latest": {
-    "version": "v3.32.1",
-    "date": "2026-11-05",
+    "version": "v3.32.2",
+    "date": "2026-11-06",
     "summary": "精要总结入口与交付物导图收口：产物隔离到 _精要总结/、同源改由门禁断言、导图形态菜单统一为 SVG/HTML/PNG 三种＋MD 大纲附加",
     "changes": [
       "产物隔离：精要总结与精要导图一律落 _精要总结/ 子目录、文件名带 _精要总结导图_ 段，与审查交付物物理分离（合规承诺不同：审查件评级、精要件不评级，混放会误用）。",
@@ -14,11 +14,23 @@
       "附带修掉一项真缺陷：快速档用一条 skip 顶掉全量档四条 check，两档项数不守恒（265／270），会让 check_smoke_count 在别处误报「装完即红」；现已逐条对齐，台账分键记 total_full／total_fast 并由 check.py 断言相等。冒烟 271 项。"
     ],
     "files": {
-      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.32.1/文档合规审查助手AI合同_v3.32.1_20261105_(doc-compliance-review).skill",
-      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.32.1/文档合规审查助手AI合同_v3.32.1_20261105_(doc-compliance-review).zip"
+      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.32.2/文档合规审查助手AI合同_v3.32.2_20261106_(doc-compliance-review).skill",
+      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.32.2/文档合规审查助手AI合同_v3.32.2_20261106_(doc-compliance-review).zip"
     }
   },
   "history": [
+    {
+      "version": "v3.32.2",
+      "date": "2026-11-06",
+      "summary": "修复行业库清单口径分家：README 把「建筑地产」写成「房地产」、「HR」写简称，名称与顺序成第二套口径；新增行业清单四处咬合守卫。",
+      "changes": [
+        "README 规则库表行业清单改为与真源逐字一致（建筑地产、人力资源），顺序对齐清单第 4 题。",
+        "README 开场清单段「HR」改「人力资源」——简称是第二种叫法，按名检索搜不到。",
+        "新增行业清单咬合守卫：SKILL 1.0.2 / 1.4 / README 表三处名称与顺序逐字比对，提示词版比名称集合；解析不到清单也报（防假绿）。",
+        "剔除举例句干扰：段内容易含「如「11. 建筑地产 —— 不可用」」这类示例，按行剔掉 `>` 引用块，防示例喂饱判据。",
+        "六组注入实测全拦：房地产/HR简称/顺序错位/1.0.2 漏项/1.4 漏项/提示词版漏项。"
+      ]
+    },
     {
       "version": "v3.32.1",
       "date": "2026-11-05",
@@ -1022,5 +1034,5 @@
   ],
   "_维护说明": "出包后请同步更新本文件（latest 段与 history）。真源是 SKILL.md 的 version 与 VERSION.md 的沿革；本文件是'对外公布的清单'，须与真源一致，否则使用者会被引向旧版。",
   "schema": 1,
-  "version": "3.32.1"
+  "version": "3.32.2"
 }
