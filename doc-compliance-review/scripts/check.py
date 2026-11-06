@@ -41,6 +41,14 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 INTEGRITY = os.path.join(HERE, ".integrity.json")
 
+# 脱敏类数的真源：直接取 desensitize.py 的两个常量，不在本文件另写一份
+# （12.2 同一事实只许一个真源；此处一旦抄成字面量，改口径时必漂）。
+_sys.path.insert(0, HERE)
+try:
+    import desensitize as _ds
+except Exception:
+    _ds = None
+
 ERRS = []
 WARNS = []
 INFOS = []
@@ -1222,12 +1230,39 @@ def check_rule_metadata():
         # 01 声明的「规则数」须与实际扫描一致（历史教训：写 140 而实为 159，
         # 因 A/B/X 组长期漏出正则白名单且无人校验，对外口径一路失真）
         if name == "01-general-risk-rules.md":
-            real = len(CORE_ID_RE.findall(_read(p)))
+            _src = _read(p)
+            real = len(CORE_ID_RE.findall(_src))
             mn = re.search(r"规则数\s*\**\s*(\d+)\s*\**", head)
             if not mn:
                 lack.append("规则数")
             elif int(mn.group(1)) != real:
                 lack.append("规则数写%s实为%d" % (mn.group(1), real))
+            # 紧邻下一行的「计数口径：159 条 ＝ 21 个组全覆盖（A3·B11·…）」是同一事实的
+            # **第二处声明**。只查头部那一处不够：改总数忘改明细、或改明细忘改总数，
+            # 都会让「明细加总 ≠ 总数」静默漂——而两处各自的数看着都对（12.2 两处写必漂）。
+            # 判据四层，任一层不等即报：明细加总＝声明总数、声明总数＝实扫条数、
+            # 声明组数＝明细项数、每组数＝实扫该组条数。四层都查才抓得住「总数对、分组错」。
+            _grp = re.search(r"计数口径[^\n]*?(\d+)\s*条[^\n]*?[（(]([A-Z]\d+[^）)]*)[）)]", _src)
+            if not _grp:
+                lack.append("计数口径")
+            else:
+                _total = int(_grp.group(1))
+                _pairs = re.findall(r"([A-Z])(\d+)", _grp.group(2))
+                _sum = sum(int(n) for _, n in _pairs)
+                _ng = re.search(r"计数口径[^\n]*?(\d+)\s*个组", _src)
+                if not _pairs:
+                    lack.append("计数口径明细")
+                else:
+                    if _sum != _total:
+                        lack.append("计数口径明细加总%d≠总数%d" % (_sum, _total))
+                    if _total != real:
+                        lack.append("计数口径%d≠实扫%d" % (_total, real))
+                    if _ng and int(_ng.group(1)) != len(_pairs):
+                        lack.append("计数口径称%d组实列%d组" % (int(_ng.group(1)), len(_pairs)))
+                    for _g, _n in _pairs:
+                        _real_g = len(re.findall(r"\|\s*%s\d+\s*\|" % _g, _src))
+                        if int(_n) != _real_g:
+                            lack.append("组%s写%s实为%d" % (_g, _n, _real_g))
         for m in re.finditer(r"(?:生效日|最近修订)\s*\**\s*(\d{4}-\d{2}-\d{2})", head):
             if m.group(1) > today:
                 lack.append("日期晚于今天(%s)" % m.group(1))
@@ -1494,9 +1529,140 @@ def check_doc_number_caliber():
             err("法规库规模失准（真源 core/legal-articles.json 实为 %d 部法 %d 条）：%s"
                 % (real_laws, real_arts, "；".join(law_bad)))
 
-    if not (fmt_bad or menu_bad or seed_bad or elems_bad or law_bad):
+    # ---- 真源 5：通用规则条数（H-15 最后一条缺口，2026-11-06 补）----
+    # 该数字在四份文档里写了 12 处，而原守卫只咬「core/01 头部 规则数 N」与
+    # 「README 通用库 N 条」两种措辞——实测 SKILL.md 5 行全漏。而 README 对外写着
+    # 「规则条数（159 条）已纳入常驻校验」（见 check_rules_meta 与 README 末节），
+    # 承诺大于实际（25.3：承诺有例外必须写进句子）。
+    # 难点在**措辞**不在数值：`N 条` 满文档都是（20 部法 725 条、民法典第 585 条、
+    # PIPL 73 条、几条规则…），裸正则必假红。故只认下列**明确指涉规则条数**的措辞。
+    # **宁漏不假红**：漏了只是覆盖不足（已在 README 写明覆盖到哪些措辞），
+    # 假红会让人干脆把守卫关掉（12.5.9「噪声冒充红线 → 脱敏」）。
+    real_rules = None
+    _c01 = os.path.join(ROOT, "core", "01-general-risk-rules.md")
+    if os.path.exists(_c01):
+        real_rules = len(CORE_ID_RE.findall(_read(_c01)))
+    # (正则, 是否强措辞)。**强措辞命中即判、不做法条豁免**——「规则库 N 条」这种话
+    # 不可能是在说法条，若还允许豁免，等于给真错留后门（2026-11-06 独立复核 I6 实测：
+    # 「规则库 158 条法规」因紧跟一个"法"字被放过）。弱措辞（数字清单、表格单元格）
+    # 本身不含指涉词，才按**法条句式**豁免。
+    RULE_PATS = (
+        (r"规则\s*数\s*\**\s*(\d+)", True),                            # 规则数 159
+        (r"通用(?:库|层|的)?[（(]?\s*\**\s*(\d+)\s*\**\s*条", True),   # 通用的 159 条／通用库（159 条）
+        (r"规则库\s*\**\s*(\d+)\s*\**\s*条", True),                   # 规则库 159 条
+        (r"(\d+)\s*\**\s*条\s*\**\s*规则(?!库)", True),                # 159 条规则（「N 条规则库」属去AI味库）
+        (r"对标\s*\**\s*(\d+)\s*\**\s*条", True),                     # 对标 159 条
+        (r"规则条数[（(]?\s*\**\s*(\d+)\s*\**\s*条", True),            # 规则条数（159 条）
+        (r"[：:]\s*(\d{2,4})\s*条(?=[、，])", False),                   # 「数字只报实测值：159 条、…」顿号清单
+        (r"\|\s*\**(\d{3})\s*\**\s*＋", False),                        # 表格三库计数「| 159 ＋ 9 ＋ 私有 |」
+        (r"\|\s*\**(\d{3})\s*\**\s*条\s*\**\s*\|", False),             # 表格单元格「| **159 条** |」
+    )
+
+    # ---- 真源 6：交付物类型数（`--types` 的 slug）与脱敏两层类数 ----
+    # 难点是**同形不同义**。实测分布：`10 类交付物`（真源 `--types` 的 10 个 slug）、
+    # `10 类全脱`（真源 `desensitize.ALL_TYPES` 的 10 个字段类）、`审查用 6 类`
+    # （真源 `REVIEW_TYPES` 的 6 个）。三处数字恰好 10／10／6，**一条 `(\d+) 类`
+    # 会把三件事混成一个判据**——哪天脱敏扩到 12 而交付物仍 10，立刻假红。
+    # 故按语义词分流：全脱／外发用 → ALL_TYPES；审查用 → REVIEW_TYPES；其余 → --types。
+    # 同样宁漏不假红：`其余 8 类`（＝10 减默认两类）、`第 10 类`（序号）、
+    # `4 类维护触发词`、`15 项要素` 一概不碰。
+    real_types = real_mask = real_review = None
+    if os.path.exists(mk):
+        m = re.search(r'"--types".*?help="逗号分隔：([a-z,]+)', _read(mk), re.S)
+        if m:
+            real_types = len([x for x in m.group(1).split(",") if x])
+    if _ds is not None:
+        real_mask = len([x for x in _ds.ALL_TYPES.split(",") if x])
+        real_review = len([x for x in _ds.REVIEW_TYPES.split(",") if x])
+    TYPE_PATS = (
+        (r"(\d+)\s*类\s*[×xX]\s*(\d+)\s*(?:格式|家族)", "types2"),  # 10 类 × 8 格式
+        (r"(\d+)\s*类全脱", "mask"),
+        (r"外发用[^0-9\n]{0,12}?(\d+)\s*类", "mask"),
+        (r"(\d+)\s*类逐项", "mask"),
+        (r"审查用[^0-9\n]{0,12}?(\d+)\s*类", "review"),
+        (r"(\d+)\s*类(?:审查)?交付物", "types"),
+        (r"交付物\s*\**\s*(\d+)\s*\**\s*类", "types"),
+        (r"交付物类型[（(][^）)\n]{0,14}?(\d+)\s*类", "types"),
+        (r"类型[（(]\s*(\d+)\s*类", "types"),
+        (r"类型清单固定为(?:这)?\s*\**\s*(\d+)\s*类", "types"),
+        (r"上述\s*(\d+)\s*类中文名", "types"),
+        (r"(\d+)\s*类\s*Word", "types"),
+        (r"一次把\s*(\d+)\s*类全部列出", "types"),
+        (r"全部\s*(\d+)\s*类", "types"),
+        (r"(\d+)\s*类／(\d+)\s*类", "pair"),                      # 「6 类／10 类占位符替换」
+    )
+
+    rules_bad, types_bad = set(), set()
+    for rel in DOCS:
+        for ln, line in enumerate(_doc_lines(rel), 1):
+            if real_rules:
+                for pat, strong in RULE_PATS:
+                    for m in re.finditer(pat, line):
+                        v = int(m.group(1))
+                        if v == real_rules:
+                            continue
+                        ctx = line[max(0, m.start() - 20):m.end() + 12]
+                        if "AI味" in ctx or "ai-tells" in ctx:
+                            continue          # 去AI味规则库另有真源（33 条），不属本条
+                        # 法条豁免只认**句式**，不认"附近有法字"（I6）：`部法 725 条`／`第 585 条`。
+                        # 强措辞不豁免——那种话不可能是法条。
+                        if not strong and re.search(r"(?:部法|第)\s*\**\s*%d\s*\**\s*条" % v, ctx):
+                            continue
+                        rules_bad.add("%s:%d 写 %d 条（应为 %d）" % (rel, ln, v, real_rules))
+            for pat, kind in TYPE_PATS:
+                for m in re.finditer(pat, line):
+                    if kind == "types2":
+                        v, nf = int(m.group(1)), int(m.group(2))
+                        if real_types and v != real_types:
+                            types_bad.add("%s:%d 「类×格式」写 %d 类（应为 %d）"
+                                          % (rel, ln, v, real_types))
+                        if real_fmt and nf != real_fmt:
+                            types_bad.add("%s:%d 「类×格式」写 %d 格式（应为 %d）"
+                                          % (rel, ln, nf, real_fmt))
+                        continue
+                    if kind == "pair":
+                        v, v2 = int(m.group(1)), int(m.group(2))
+                        if real_review and v != real_review:
+                            types_bad.add("%s:%d 「审查用/外发用」写 %d 类（应为 %d）"
+                                          % (rel, ln, v, real_review))
+                        if real_mask and v2 != real_mask:
+                            types_bad.add("%s:%d 「审查用/外发用」写 %d 类（应为 %d）"
+                                          % (rel, ln, v2, real_mask))
+                        continue
+                    v = int(m.group(1))
+                    exp, label = {"types": (real_types, "交付物类型"),
+                                  "mask": (real_mask, "对外全脱"),
+                                  "review": (real_review, "审查用" )}[kind]
+                    if exp and v != exp:
+                        types_bad.add("%s:%d %s类数写 %d（应为 %d）" % (rel, ln, label, v, exp))
+
+    # 真源解析不到＝守卫失明。**不许静默**：与本函数前段那组（格式／菜单／要素／内置库）
+    # 同一口径——解析失败一律告警，逼人修正则，而不是让这三条守卫无声停用还报「通过」。
+    _blind_five = [n for n, v in (("通用规则条数", real_rules), ("交付物类型数", real_types),
+                                  ("对外全脱类数", real_mask), ("审查用类数", real_review))
+                   if v is None]
+    if _blind_five:
+        warn("数字口径：真源未能解析（%s），对应数量守卫已降级——请检查 core/01-general-risk-rules.md /"
+             " make-docx.py 的 --types 帮助串 / desensitize.py 的 ALL_TYPES 与 REVIEW_TYPES"
+             % "、".join(_blind_five))
+
+    if real_rules and not rules_bad:
+        src_note.append("规则 %d 条" % real_rules)
+    if real_types and not types_bad:
+        src_note.append("交付物 %d 类／全脱 %s 类／审查用 %s 类"
+                        % (real_types, real_mask if real_mask is not None else "?",
+                           real_review if real_review is not None else "?"))
+    if rules_bad:
+        err("通用规则条数失准（真源 core/01 实扫 %d 条）：%s"
+            % (real_rules, "；".join(sorted(rules_bad))))
+    if types_bad:
+        err("交付物类型／脱敏类数失准（真源 --types／ALL_TYPES／REVIEW_TYPES）：%s"
+            % "；".join(sorted(types_bad)))
+
+    if not (fmt_bad or menu_bad or seed_bad or elems_bad or law_bad or rules_bad or types_bad):
         note = src_note + (["法条 %d 部 %d 条" % (real_laws, real_arts)] if real_laws else [])
-        info("数字口径：格式／菜单项数／要素项数／内置库数／法规库规模与真源一致（%s）" % "、".join(note))
+        info("数字口径：格式／菜单项数／要素项数／内置库数／法规库规模／规则条数／交付物类数与真源一致（%s）"
+             % "、".join(note))
 
 
 def _check_doc_consistency():

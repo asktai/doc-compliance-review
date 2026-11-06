@@ -2698,6 +2698,45 @@ def main():
         if _b64 is not None:
             open(_sk64, "wb").write(_b64)      # 无论成败按字节还原，正式文件不留污染
 
+    print("\n[3.65] 文档数字守卫的区分度（159 条 / 交付物类数 / 计数口径分组）")
+    # 背景（H-15 收口，2026-11-06）：这三个数字此前**没有守卫**——文档写 159 的 12 行里，
+    # 门禁只咬住「规则数 N」与「通用库 N 条」两种措辞，SKILL.md 5 行全漏；`10 类` 18 处零守卫；
+    # `core/01` 第 9 行的「计数口径」与第 8 行的「规则数」是同一事实两处写，只查了一处。
+    # 而 README 对外写着「规则条数（159 条）已纳入常驻校验」——**承诺大于实际**（25.3）。
+    # 补完守卫后，此处按 16.2 钉住"它真的拦得住"：逐条改坏一处，门禁须报错且报出该条专属措辞。
+    # 只读门禁输出、不自己重写判据（13.2 边界）。
+    for _rel, _old, _new, _tag, _kw in [
+        ("SKILL.md", "159 条、内置 9 个行业库", "169 条、内置 9 个行业库",
+         "SKILL 数字清单里的规则条数", "通用规则条数失准"),
+        ("README.md", "**159 条** | **只读**", "**169 条** | **只读**",
+         "README 表格单元格里的规则条数", "通用规则条数失准"),
+        ("SKILL.md", "**10 类全脱**：＋ 信用代码", "**11 类全脱**：＋ 信用代码",
+         "对外出域脱敏类数", "交付物类型／脱敏类数失准"),
+        ("SKILL.md", "10 类交付物（多选）× 8 格式家族", "9 类交付物（多选）× 8 格式家族",
+         "交付物类型数", "交付物类型／脱敏类数失准"),
+        ("core/01-general-risk-rules.md", "·F29·", "·F28·",
+         "计数口径的明细加总", "计数口径"),
+        ("core/01-general-risk-rules.md", "21 个组全覆盖", "22 个组全覆盖",
+         "计数口径的组数", "计数口径"),
+    ]:
+        _p65 = os.path.join(os.path.dirname(HERE), _rel)
+        _b65 = None
+        try:
+            _b65 = open(_p65, "rb").read()
+            _t65 = _b65.decode("utf-8")
+            if _old not in _t65:
+                check("数字守卫注入锚点仍在（%s）" % _tag, False, "锚点丢失，注入无效")
+                continue
+            open(_p65, "wb").write(_t65.replace(_old, _new, 1).encode("utf-8"))
+            _r65 = run([PY, os.path.join(HERE, "check.py")])
+            check("注入[%s] 门禁须报错——证明这条数字守卫有区分度（不是恒绿）" % _tag,
+                  _r65.returncode != 0 and _kw in (_r65.stdout or ""), tail_line(_r65.stdout))
+        except Exception as e:
+            check("数字守卫注入（%s）" % _tag, False, repr(e))
+        finally:
+            if _b65 is not None:
+                open(_p65, "wb").write(_b65)   # 无论成败按字节还原，正式文件不留污染
+
     # --- 3.5 版本与依赖（分发与落地成本）---
     print("\n[3.5] 版本与依赖")
     try:

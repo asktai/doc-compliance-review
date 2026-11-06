@@ -3,22 +3,28 @@
   "product": "文档合规审查助手AI合同",
   "skill_id": "doc-compliance-review",
   "latest": {
-    "version": "v3.32.2",
+    "version": "v3.32.3",
     "date": "2026-11-06",
-    "summary": "精要总结入口与交付物导图收口：产物隔离到 _精要总结/、同源改由门禁断言、导图形态菜单统一为 SVG/HTML/PNG 三种＋MD 大纲附加",
+    "summary": "两条数字补上守卫：通用规则条数（159 条）与交付物类型数（10 类）此前无门禁，现按措辞＋语义分流咬合，并把 README 那句承诺的边界写明",
     "changes": [
-      "产物隔离：精要总结与精要导图一律落 _精要总结/ 子目录、文件名带 _精要总结导图_ 段，与审查交付物物理分离（合规承诺不同：审查件评级、精要件不评级，混放会误用）。",
-      "同源守卫：新增 check_mindmap_single_source 四条 AST 断言——两入口必须共用 mindmap_svg/html/png，精要入口必须调 summary_dir；「同源」由代码保证而非文档承诺。",
-      "口径统一：第二十一节导图形态菜单改为 SVG（默认）/交互 HTML/PNG 位图三种（与交付物同一套），MD 大纲降为附加项不再算导图形态。",
-      "冒烟新增注入⑯（精要入口另起渲染须红）、对照组扩到八个门禁。",
-      "附带修掉一项真缺陷：快速档用一条 skip 顶掉全量档四条 check，两档项数不守恒（265／270），会让 check_smoke_count 在别处误报「装完即红」；现已逐条对齐，台账分键记 total_full／total_fast 并由 check.py 断言相等。冒烟 271 项。"
+      "规则条数守卫：按 9 种明确措辞认「159 条」（规则数／通用库／规则库／N 条规则／对标／规则条数／数字清单／表格单元格），宁漏不假红——裸 N 条会把法条 725 条、第 585 条一并抓进来。",
+      "交付物类数与脱敏类数分流：N 类交付物／N 类 × M 格式对 --types，N 类全脱对应 ALL_TYPES，审查用 N 类对 REVIEW_TYPES；三者恰好 10／10／6，混成一条判据必假红。",
+      "core/01 计数口径四层互咬：明细加总＝总数、总数＝实扫、声明组数＝明细项数、每组数＝实扫该组，专抓「总数对、分组错」。",
+      "README 承诺句补边界：写明覆盖哪几类数字、认哪几种措辞、换说法须同步扩措辞表。",
+      "冒烟新增 [3.65] 六向注入逐条证明拦得住；冒烟项数 277 → 283。"
     ],
+    "download_page": "https://github.com/asktai/doc-compliance-review/releases",
     "files": {
-      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.32.2/文档合规审查助手AI合同_v3.32.2_20261106_(doc-compliance-review).skill",
-      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.32.2/文档合规审查助手AI合同_v3.32.2_20261106_(doc-compliance-review).zip"
+      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.32.3/文档合规审查助手AI合同_v3.32.3_20261106_(doc-compliance-review).skill",
+      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.32.3/文档合规审查助手AI合同_v3.32.3_20261106_(doc-compliance-review).zip"
     }
   },
   "history": [
+    {
+      "version": "v3.32.3",
+      "date": "2026-11-06",
+      "summary": "两条数字补上守卫：通用规则条数（159 条）与交付物类型数（10 类）此前无门禁，现按措辞＋语义分流咬合，并把 README 那句承诺的边界写明"
+    },
     {
       "version": "v3.32.2",
       "date": "2026-11-06",
@@ -1034,5 +1040,5 @@
   ],
   "_维护说明": "出包后请同步更新本文件（latest 段与 history）。真源是 SKILL.md 的 version 与 VERSION.md 的沿革；本文件是'对外公布的清单'，须与真源一致，否则使用者会被引向旧版。",
   "schema": 1,
-  "version": "3.32.2"
+  "version": "3.32.3"
 }
