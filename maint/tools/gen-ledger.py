@@ -290,6 +290,8 @@ def build(no_files=False):
         ("dev/maint/tools/smoke-dev-rules.py", "铁律全量冒烟（注入测试，证明守卫拦得住）"),
         ("dev/maint/tools/check-separation.py", "分离守卫（开发侧／技能侧分离，铁律第 9 条）"),
         ("dev/maint/samples-manifest.json", "素材准入清单（samples/ 逐条许可登记）"),
+        ("dev/maint/OPEN-ISSUES.md", "结转遗留清单（卡在哪、在等谁；铁律 18.2）"),
+        ("dev/maint/release/upload.sh", "GitHub Releases 上传脚本（幂等，按版本逐个建 release）"),
     ]
     for rel, desc in dev_files:
         full = os.path.join(ROOT, rel)
