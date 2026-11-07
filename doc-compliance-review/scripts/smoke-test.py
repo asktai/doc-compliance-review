@@ -2469,8 +2469,30 @@ def main():
     except Exception as e:
         check("产物验收判据自测", False, repr(e))
 
+    # --- [3.60]–[3.65] 六组注入统一改走「整目录镜像副本」----------------------
+    # 铁律 16.2：注入须在副本里做，且「副本操作不得污染正式文件（改完校验源码哈希未变）」。
+    # 此前这六组是「原地改正式文件 + finally 还原」——正常收工能还原，但异常中断
+    # （Ctrl-C／超时／进程被杀）时 finally 不执行，污染就固化在装机侧：2026-11-08
+    # 全检实测，运行实例 README.md:66 残留 [3.65] 的注入值 169 条（应为 159 条）。
+    # 现改为：整目录镜像到临时副本 → 只改副本 → 跑**副本自带的 check.py**（它按
+    # __file__ 反推技能根，读到的正是副本里的文档；已实证干净副本 0 错 0 警）→
+    # 还原副本。正式文件全程只读，段末另有一条哈希守恒用例把这件事钉成守卫。
+    _MROOT = tempfile.mkdtemp(prefix="dcr-gate-mirror-")
+    _mr = os.path.join(_MROOT, "doc-compliance-review")
+    shutil.copytree(os.path.dirname(HERE), _mr,
+                    ignore=shutil.ignore_patterns("__pycache__", "*.pyc", ".git"))
+    _GATE = os.path.join(_mr, "scripts", "check.py")
+    _MDOCS = ("SKILL.md", "README.md", "文档合规审查助手AI合同提示词版.md",
+              "core/01-general-risk-rules.md")
+
+    def _fhash(rel):
+        return hashlib.sha256(
+            open(os.path.join(os.path.dirname(HERE), rel), "rb").read()).hexdigest()
+
+    _MH0 = {r: _fhash(r) for r in _MDOCS}
+
     print("\n[3.60] 交互降级（清单一律无伪控件符号 · 选不中即逐条问）")
-    _skp = os.path.join(os.path.dirname(HERE), "SKILL.md")
+    _skp = os.path.join(_mr, "SKILL.md")
     _skbak = None
     try:
         _skbak = open(_skp, "rb").read()
@@ -2486,7 +2508,7 @@ def main():
                   "锚点丢失，注入无效")
         else:
             open(_skp, "wb").write(_skbad.encode("utf-8"))
-            _r8 = run([PY, os.path.join(HERE, "check.py")])
+            _r8 = run([PY, _GATE])
             check("把 ☐ 塞回清单，门禁须报错——证明「无伪控件符号」是真在查（不是恒绿）",
                   _r8.returncode != 0 and "伪控件" in (_r8.stdout or ""),
                   tail_line(_r8.stdout))
@@ -2494,10 +2516,10 @@ def main():
         check("交互降级", False, repr(e))
     finally:
         if _skbak is not None:
-            open(_skp, "wb").write(_skbak)      # 无论成败都按字节还原，正式文件不留污染
+            open(_skp, "wb").write(_skbak)      # 无论成败都按字节还原，正式文件全程只读（只动副本）
 
     print("\n[3.61] 提示词版正向断言（默认项不得含做不出的类型 · 行业须 9 个）")
-    _pvp = os.path.join(os.path.dirname(HERE), "文档合规审查助手AI合同提示词版.md")
+    _pvp = os.path.join(_mr, "文档合规审查助手AI合同提示词版.md")
     _pvbak = None
     try:
         _pvbak = open(_pvp, "rb").read()
@@ -2514,7 +2536,7 @@ def main():
                 check("提示词版注入锚点仍在（%s）" % _tag, False, "锚点丢失，注入无效")
                 continue
             open(_pvp, "wb").write(_pvt.replace(_old, _new).encode("utf-8"))
-            _r9 = run([PY, os.path.join(HERE, "check.py")])
+            _r9 = run([PY, _GATE])
             open(_pvp, "wb").write(_pvbak)
             check("注入[%s] 门禁须报错——证明这条正向断言有区分度（不是恒绿）" % _tag,
                   _r9.returncode != 0 and _kw in (_r9.stdout or ""),
@@ -2523,10 +2545,10 @@ def main():
         check("提示词版正向断言", False, repr(e))
     finally:
         if _pvbak is not None:
-            open(_pvp, "wb").write(_pvbak)      # 无论成败都按字节还原，正式文件不留污染
+            open(_pvp, "wb").write(_pvbak)      # 无论成败都按字节还原，正式文件全程只读（只动副本）
 
     print("\n[3.62] 功能菜单完整性（引擎在用，就必须在菜单里点得到）")
-    _skp = os.path.join(os.path.dirname(HERE), "SKILL.md")
+    _skp = os.path.join(_mr, "SKILL.md")
     _skbak = None
     try:
         _skbak = open(_skp, "rb").read()
@@ -2548,7 +2570,7 @@ def main():
         if _line:
             open(_skp, "wb").write(
                 _skt.replace(_blk, _blk.replace(_line.group(0), "", 1), 1).encode("utf-8"))
-            _r62 = run([PY, os.path.join(HERE, "check.py")])
+            _r62 = run([PY, _GATE])
             open(_skp, "wb").write(_skbak)
             check("注入[菜单删「法规检索」] 门禁须报错——证明这条断言有区分度",
                   _r62.returncode != 0 and "法规检索" in (_r62.stdout or ""),
@@ -2559,7 +2581,7 @@ def main():
         check("功能菜单完整性", False, repr(e))
     finally:
         if _skbak is not None:
-            open(_skp, "wb").write(_skbak)      # 无论成败按字节还原，正式文件不留污染
+            open(_skp, "wb").write(_skbak)      # 无论成败按字节还原，正式文件全程只读（只动副本）
 
     print("\n[3.63] frontmatter 平台必填字段（缺一个，平台就整包拒收）")
     # 背景（这条守卫的来历，别删）：v3.26.5 因「两段中文长文重复」把 `description_zh`
@@ -2567,7 +2589,7 @@ def main():
     # 开放平台字段表里 `description_zh` 是必填，缺失时解析器报
     # 「缺少 Skill 中文描述(description_zh)」。本地门禁全绿，因为它只认我们自己的断言。
     # 真病是「两个字段写成同一份长文」，修法是各归其位，不是删掉一个。
-    _skp2 = os.path.join(os.path.dirname(HERE), "SKILL.md")
+    _skp2 = os.path.join(_mr, "SKILL.md")
     _bak2 = None
     try:
         _bak2 = open(_skp2, "rb").read()
@@ -2602,7 +2624,7 @@ def main():
         # 区分度注入一：slug 写成中文，门禁必须报（kebab-case 断言真的在跑）
         open(_skp2, "wb").write(
             re.sub(r"(?m)^slug:.*$", "slug: 文档合规审查", _txt2).encode("utf-8"))
-        _rslug = run([PY, os.path.join(HERE, "check.py")])
+        _rslug = run([PY, _GATE])
         check("slug 写成中文 → 门禁报「不合 kebab-case」",
               _rslug.returncode != 0 and "kebab-case" in _rslug.stdout,
               "退出码 %d" % _rslug.returncode)
@@ -2610,7 +2632,7 @@ def main():
         # 区分度注入二：slug 用下划线——看着像 slug，其实不合 kebab-case（kebab 不是「随手一个 ASCII」）
         open(_skp2, "wb").write(
             re.sub(r"(?m)^slug:.*$", "slug: doc_compliance_review", _txt2).encode("utf-8"))
-        _rslug2 = run([PY, os.path.join(HERE, "check.py")])
+        _rslug2 = run([PY, _GATE])
         check("slug 用下划线 → 门禁报「不合 kebab-case」（区分 snake_case 与 kebab-case）",
               _rslug2.returncode != 0 and "kebab-case" in _rslug2.stdout,
               "退出码 %d" % _rslug2.returncode)
@@ -2618,7 +2640,7 @@ def main():
         # 区分度注入三：name 含半角冒号——最阴的一条，_safe_name 会静默剔除它
         open(_skp2, "wb").write(
             re.sub(r"(?m)^name:.*$", "name: 文档:合规审查", _txt2).encode("utf-8"))
-        _rname = run([PY, os.path.join(HERE, "check.py")])
+        _rname = run([PY, _GATE])
         check("name 含半角冒号 → 门禁报「文件名非法字符」（_safe_name 会静默剔除）",
               _rname.returncode != 0 and "文件名非法字符" in _rname.stdout,
               "退出码 %d" % _rname.returncode)
@@ -2631,7 +2653,7 @@ def main():
 
         # 区分度注入一：删掉 description_zh，门禁必须报
         open(_skp2, "wb").write(re.sub(r"(?m)^description_zh:.*\n", "", _txt2).encode("utf-8"))
-        _r63 = run([PY, os.path.join(HERE, "check.py")])
+        _r63 = run([PY, _GATE])
         open(_skp2, "wb").write(_bak2)
         check("注入[删 description_zh] 门禁须报「缺 description_zh」——"
               "这正是 v3.26.5 犯过的错，不能再静默通过",
@@ -2642,7 +2664,7 @@ def main():
         _d2 = _val("description") or ""
         open(_skp2, "wb").write(
             re.sub(r"(?m)^description_zh:.*$", "description_zh: " + _d2, _txt2).encode("utf-8"))
-        _r63b = run([PY, os.path.join(HERE, "check.py")])
+        _r63b = run([PY, _GATE])
         open(_skp2, "wb").write(_bak2)
         check("注入[description_zh 抄成长文] 门禁须报超 200 字——防「各归其位」退回「各写一遍」",
               _r63b.returncode != 0 and "200" in (_r63b.stdout or ""),
@@ -2659,7 +2681,7 @@ def main():
     # 3 档 × 4 档 = 12 种组合只给 4 个，用户想选的「严苛·均衡」根本没得选，
     # 还被迫在一个动作里同时决定两件事。文本早就分成两问（清单第 6、7 项），
     # 是**举例写法**「组合皆合法」被照抄成了选项清单。三项判据各自独立，缺一即留缺口。
-    _sk64 = os.path.join(os.path.dirname(HERE), "SKILL.md")
+    _sk64 = os.path.join(_mr, "SKILL.md")
     _b64 = None
     try:
         _b64 = open(_sk64, "rb").read()
@@ -2671,14 +2693,14 @@ def main():
               not _lack, ("缺：%s" % "、".join(_lack)) if _lack else "三项齐备")
 
         def _inj64(name, needle, repl, want):
-            """改坏 SKILL.md → 跑门禁 → 按字节还原；替换未命中判「锚点漂移」，不判据失效。"""
+            """改坏副本 SKILL.md → 跑副本门禁 → 按字节还原；替换未命中判「锚点漂移」，不判据失效。"""
             _mut = _t64.replace(needle, repl, 1)
             if _mut == _t64:
                 check("注入[%s] 锚点" % name, False, "锚点漂移，注入无效（先修锚点再谈判据）")
                 return
             open(_sk64, "wb").write(_mut.encode("utf-8"))
             try:
-                _r = run([PY, os.path.join(HERE, "check.py")])
+                _r = run([PY, _GATE])
             finally:
                 open(_sk64, "wb").write(_b64)
             check("注入[%s] 门禁须报错——证明判据有区分度" % name,
@@ -2696,7 +2718,7 @@ def main():
         check("提问结构：一屏一维度", False, repr(e))
     finally:
         if _b64 is not None:
-            open(_sk64, "wb").write(_b64)      # 无论成败按字节还原，正式文件不留污染
+            open(_sk64, "wb").write(_b64)      # 无论成败按字节还原，正式文件全程只读（只动副本）
 
     print("\n[3.65] 文档数字守卫的区分度（159 条 / 交付物类数 / 计数口径分组）")
     # 背景（H-15 收口，2026-11-06）：这三个数字此前**没有守卫**——文档写 159 的 12 行里，
@@ -2704,7 +2726,7 @@ def main():
     # `core/01` 第 9 行的「计数口径」与第 8 行的「规则数」是同一事实两处写，只查了一处。
     # 而 README 对外写着「规则条数（159 条）已纳入常驻校验」——**承诺大于实际**（25.3）。
     # 补完守卫后，此处按 16.2 钉住"它真的拦得住"：逐条改坏一处，门禁须报错且报出该条专属措辞。
-    # 只读门禁输出、不自己重写判据（13.2 边界）。
+    # 只读副本门禁输出、不自己重写判据（13.2 边界）；改坏的是镜像副本，不是正式文件。
     for _rel, _old, _new, _tag, _kw in [
         ("SKILL.md", "159 条、内置 9 个行业库", "169 条、内置 9 个行业库",
          "SKILL 数字清单里的规则条数", "通用规则条数失准"),
@@ -2719,7 +2741,7 @@ def main():
         ("core/01-general-risk-rules.md", "21 个组全覆盖", "22 个组全覆盖",
          "计数口径的组数", "计数口径"),
     ]:
-        _p65 = os.path.join(os.path.dirname(HERE), _rel)
+        _p65 = os.path.join(_mr, _rel)
         _b65 = None
         try:
             _b65 = open(_p65, "rb").read()
@@ -2728,14 +2750,22 @@ def main():
                 check("数字守卫注入锚点仍在（%s）" % _tag, False, "锚点丢失，注入无效")
                 continue
             open(_p65, "wb").write(_t65.replace(_old, _new, 1).encode("utf-8"))
-            _r65 = run([PY, os.path.join(HERE, "check.py")])
+            _r65 = run([PY, _GATE])
             check("注入[%s] 门禁须报错——证明这条数字守卫有区分度（不是恒绿）" % _tag,
                   _r65.returncode != 0 and _kw in (_r65.stdout or ""), tail_line(_r65.stdout))
         except Exception as e:
             check("数字守卫注入（%s）" % _tag, False, repr(e))
         finally:
             if _b65 is not None:
-                open(_p65, "wb").write(_b65)   # 无论成败按字节还原，正式文件不留污染
+                open(_p65, "wb").write(_b65)   # 无论成败按字节还原，正式文件全程只读（只动副本）
+
+    # 16.2 收口：六组注入跑完，正式文件须哈希一字未变——不是"看注释说会还原"。
+    # 这条本身也是守卫：日后若有人把某组注入改回原地写正式文件，它当场报红。
+    _MH1 = {r: _fhash(r) for r in _MDOCS}
+    _drift = [r for r in _MDOCS if _MH0[r] != _MH1[r]]
+    check("副本注入未污染正式文件（4 份文档哈希前后一致，铁律 16.2）",
+          not _drift, "漂移：%s" % (_drift or "无"))
+    shutil.rmtree(_MROOT, ignore_errors=True)
 
     # --- 3.66 库外条文联网核对（v3.33.0：本地优先、联网补位）---
     print("\n[3.66] 库外条文联网核对（本地优先、联网补位）")

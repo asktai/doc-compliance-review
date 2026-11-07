@@ -3,25 +3,27 @@
   "product": "文档合规审查助手AI合同",
   "skill_id": "doc-compliance-review",
   "latest": {
-    "version": "v3.33.0",
-    "date": "2026-11-06",
-    "summary": "法条检索改成条件路由：本地优先、联网补位——库外条文与司法解释由新脚本 legal-lookup.py 联网核对（只发法名＋条号）",
+    "version": "v3.33.1",
+    "date": "2026-11-08",
+    "summary": "冒烟区分度注入全量改走镜像副本，根治异常中断时注入值污染正式文件；新增哈希守恒守卫；装机侧按标准发布动作重建",
     "changes": [
-      "修掉一个假开关：legal-search.py 自标 E0、全文无网络库，却注册着 --online；该参数只在未命中分支打印一段说明，命中路径上被完全忽略。使用者打了它以为在联网，实际什么都没发生。现不再注册进 argparse，改为手动拦截并明确拒绝＋指路。",
-      "新增 legal-lookup.py（E2 档）：库外条文的联网核对。只接「法名＋条号」——没有 --ask/--file/--dir，也不是靠承诺不发，是压根没有能放使用者文本的入口。复用 legal-parse 的抓取链与 legal-crosscheck 的比对口径（4 字片段双向覆盖，阈值 0.985），双源一致才认，单源标「未核」不冒充已核。",
-      "路由定为本地优先、联网补位：本地库 725 条全部 ≥2 独立来源交叉验证、毫秒级；联网抓的是转载页、单源、45 秒超时。联网优先等于用单源覆盖双源验证过的真值源，精准度是降不是升。联网真正的价值在库外——库里 20 部法只有 1 部司法解释。",
-      "提示语四件事：走哪条路／出网发了什么／结果可不可信／没查成怎么办。两处脚本都不许说「大概是这样」。",
-      "config.json 增 legal.allow_online（默认 true）：机构与涉密场景一处关掉全部出网，不必逐个命令行加 --offline。",
-      "check.py 与 smoke-test.py 各补一条判据：E0 档脚本不得注册在线类开关（此前三条判据只查 E1/E2 的空头标签，反方向一条都没看）。",
-      "冒烟新增 [3.66] 五条用例与安全引擎两条，项数 283 → 291（两档守恒）。"
+      "修复装机侧污染：六组注入原是「原地改正式文件＋finally 还原」，异常中断时 finally 不执行，注入值会固化在技能文件里。全检实测运行实例 README.md 残留「169 条」（应为 159 条），开发源与分发包均干净。",
+      "六组注入统一改走整目录镜像副本：只改副本、跑副本自带的门禁（按自身位置反推根目录），正式文件全程只读。干净副本已实证 0 错 0 警，注入仍逐条报出专属措辞。",
+      "新增一条守卫：注入跑完核对四份文档哈希前后一致，把「副本操作不得污染正式文件」从注释承诺变成当场可验的判据。冒烟 292 → 293 项，两档守恒。",
+      "装机侧按标准发布动作重建抹平残留；分发包重新出包并做 UTF-8／GBK 双环境产物验收。"
     ],
     "download_page": "https://github.com/asktai/doc-compliance-review/releases",
     "files": {
-      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.33.0/文档合规审查助手AI合同_v3.33.0_20261106_(doc-compliance-review).skill",
-      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.33.0/文档合规审查助手AI合同_v3.33.0_20261106_(doc-compliance-review).zip"
+      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.33.1/文档合规审查助手AI合同_v3.33.1_20261108_(doc-compliance-review).skill",
+      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.33.1/文档合规审查助手AI合同_v3.33.1_20261108_(doc-compliance-review).zip"
     }
   },
   "history": [
+    {
+      "version": "v3.33.1",
+      "date": "2026-11-08",
+      "summary": "冒烟区分度注入全量改走镜像副本，根治异常中断时注入值污染正式文件；新增哈希守恒守卫"
+    },
     {
       "version": "v3.33.0",
       "date": "2026-11-06",
@@ -1047,5 +1049,5 @@
   ],
   "_维护说明": "出包后请同步更新本文件（latest 段与 history）。真源是 SKILL.md 的 version 与 VERSION.md 的沿革；本文件是'对外公布的清单'，须与真源一致，否则使用者会被引向旧版。",
   "schema": 1,
-  "version": "3.33.0"
+  "version": "3.33.1"
 }
