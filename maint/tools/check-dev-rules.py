@@ -6,7 +6,7 @@
 ==============================================================================
 对 `dev/DEV-RULES.md` 做机械自检，覆盖以下维度（**加维只往后排，不改既有编号**）：
 
-  (1) 结构        条号连续、**条标题格式统一**、章序号连续、章区间声明与覆盖
+  (1) 结构        节号连续、**节标题格式统一**、分组标题归属实算覆盖
   (2) 导读表      文首"三条铁律"导读表的条号与名称，须与正文标题一致（双源比对）
   (3) 条号引用    引用的条号必须存在（悬空引用即报错）；--refs 另打印引用上下文供人工复核
   (4) 用词        已废止词（维护侧／开发端／实例侧等）不得在正文残留；术语说明语境除外
@@ -20,7 +20,7 @@
   (12) 元规则归属  编号体系／书写／表格例外／字符须在正文条文中成文，不得退回文首导读区
   (13) 落实总表    第 24.3 表须覆盖正文全部条（漏登／多登／重登即报错），落点属四态
   (14) 在线版      目录去锚点的派生版须与源同步（零锚点残留 ＋ 正文逐字节一致）
-  (15) 承诺措辞    第 25 条须成文，且承诺句不得含含糊词（「基本上」「大体上」类）
+  (15) 承诺措辞    §25 须成文，且承诺句不得含含糊词（「基本上」「大体上」类）
   (16) 结转清单    遗留问题清单的「态」须属三态、标「转下轮」者须有再见条件
   (17) 零实现名    正文不得含本机实现名（角色称谓通用）；实现对照表路径须真实存在
   (18) 台账新鲜度  产出物台账的包数／版本数／版本区间须与 `dist/` 实扫值逐项相等
@@ -121,13 +121,13 @@ def no_of(s, keyword):
     教训：本脚本曾把「第 19 条」写死用于排除反例，V1.24.0 该条挪为第 20 条后，
     排除立即失效、连报 3 项误报（把该条自己的反例当成真问题）。
     """
-    m = re.search(r"^#{2,3} 第 (\d+) 条 [^\n]*" + re.escape(keyword), s, re.M)
+    m = re.search(r"^#{2,3} §(\d+) [^\n]*" + re.escape(keyword), s, re.M)
     return int(m.group(1)) if m else None
 
 
 def section_by_kw(s, keyword):
-    n = no_of(s, keyword)
-    return section(s, "### 第 %d 条" % n) if n else ""
+    m = re.search(r"^#{2,3} §(\d+) [^\n]*" + re.escape(keyword), s, re.M)
+    return section(s, m.group(0)) if m else ""
 
 
 def head(t):
@@ -157,7 +157,7 @@ def title_rows(s):
     这里改为二级、三级都认——`## 第X章` 因带"章"字不会误入。
     """
     return [(int(n), rest)
-            for n, rest in re.findall(r"^#{2,3} 第 (\d+) 条(.*)$", s, re.M)]
+            for n, rest in re.findall(r"^#{2,3} §(\d+)(.*)$", s, re.M)]
 
 
 def section(s, start_mark):
@@ -208,161 +208,203 @@ def check_structure(s):
     head("(1) 结构")
     rows = title_rows(s)
     if not rows:
-        err("未找到任何条标题（`### 第 N 条`）")
+        err("未找到任何节标题（`### §N 标题`）")
         return
     nums = [n for n, _ in rows]
     exp = list(range(1, len(nums) + 1))
     if nums != exp:
         miss = [i for i in exp if i not in nums]
         dup = sorted({n for n in nums if nums.count(n) > 1})
-        err("条号不连续：实际 %s；缺号 %s；重号 %s" % (nums, miss or "无", dup or "无"))
+        err("节号不连续：实际 %s；缺号 %s；重号 %s" % (nums, miss or "无", dup or "无"))
     else:
-        info("条号 1—%d 连续无缺" % len(nums))
+        info("节号 §1—§%d 连续无缺" % len(nums))
 
     bad_fmt = [n for n, rest in rows if rest and not rest.startswith(" ")]
     if bad_fmt:
-        err("条标题格式不统一（条号后缺空格）：第 %s 条；应写作 `### 第 N 条 标题`"
-            "（此格式会让按 `第 N 条␣` 匹配的工具漏抓该条）" % "、".join(map(str, bad_fmt)))
+        err("节标题格式不统一（§N 后缺空格）：§%s；应写作 `### §N 标题`"
+            "（此格式会让按 `§N␣` 匹配的工具漏抓该节）" % "、".join(map(str, bad_fmt)))
     else:
-        info("条标题格式统一（条号后均有空格）")
+        info("节标题格式统一（§N 后均有空格）")
 
-    # 2026-10-23 自检崩溃实录：原式 `CN = "一二三四五六七八九十"` 配 `[CN[i] for i in ...]`，
-    # **把"章数上限"写死进了字符串长度**——规范加到第十一章当天，自检 IndexError 裸崩，
-    # 连 err 都没机会报。故改为按需生成（支持 1—99），不再有隐式上限。
-    def _cn(n):
-        d = "一二三四五六七八九"
-        if n <= 9:
-            return d[n - 1]
-        if n == 10:
-            return "十"
-        if n < 20:
-            return "十" + d[n - 11]
-        return d[n // 10 - 1] + "十" + (d[n % 10 - 1] if n % 10 else "")
-
-    chaps = re.findall(r"^## 第(.+?)章", s, re.M)
-    want = [_cn(i + 1) for i in range(len(chaps))]
-    if not chaps:
-        # 2026-10-20 自检发现：原写法 `info("章序号一至%s连续" % want[-1])` 在"无章"时
-        # 直接 IndexError 崩溃（裸 traceback，连 err 都没机会报）。而"不分章、只列条"
-        # 是合法结构——精简版规范（16 条）就是这样。无章即跳过本项，不算错。
-        info("无章划分（只有条、不分章）——本维跳过")
-    elif chaps != want:
-        err("章序号不连续：实际 %s；应为 %s" % (chaps, want))
-    else:
-        info("章序号一至%s连续" % want[-1])
-
-    # 章区间标注：支持两种形态——区间「（第 A—B 条）」与单条「（第 N 条）」
-    # （单条章如第七章，只有一个条号，不写成 "21—21"）
-    rng = []
-    for name, a, b in re.findall(r"^## (第.+?章) .*?（第 (\d+)—(\d+) 条）\s*$", s, re.M):
-        rng.append((name, int(a), int(b)))
-    for name, a in re.findall(r"^## (第.+?章) .*?（第 (\d+) 条）\s*$", s, re.M):
-        rng.append((name, int(a), int(a)))
-    for name, a, b in rng:
-        have = [n for n in nums if a <= n <= b]
-        if len(have) != b - a + 1:
-            err("章区间不实：%s 声明第 %s—%s 条，实际仅 %s" % (name, a, b, have or "无"))
-    # 区间不得重叠：同一条被两章认领 = 章归属矛盾（本轮负向测试暴露的盲区）
-    seen, reported = {}, set()
-    for name, a, b in rng:
-        for n in range(a, b + 1):
-            if n in seen and n not in reported:
-                err("章区间重叠：第 %d 条同时被 %s 与 %s 覆盖" % (n, seen[n], name))
-                reported.add(n)
-            else:
-                seen.setdefault(n, name)
-    covered = set()
-    for _, a, b in rng:
-        covered |= set(range(a, b + 1))
-    uncov = sorted(set(nums) - covered)
-    if not rng:
-        # 无章划分（精简结构）：本项要求的"章标题带（第 X—Y 条）"本就不存在，
-        # 报"未被任何章区间覆盖"等于拿分章结构的标准去要求不分章的文档。
-        info("无章划分（只有条、不分章）——本维跳过")
-    elif uncov:
-        err("有条未被任何章区间覆盖：%s（该章标题缺「（第 X—Y 条）」标注）" % uncov)
-    else:
-        info("章区间覆盖全部条、互不重叠（共 %d 个章带区间标注）" % len(rng))
-
+    # v1.60.0（映射①）：章降为**无编号分组标题**、条改 `§N`。
+    # 原「章序号连续／章区间声明与覆盖」是拿**章标题里的区间声明**与正文双源比对；
+    # 现改为**按分组标题实切分、从正文实算归属**——单源，且不会漏「声明写错」这类漂移。
+    # 分组标题 = `## ` 级且不含「附录」；其后随的 `§N` 标题归该组所有。
+    groups, cur = [], None
+    for l in s.splitlines():
+        m = re.match(r"^## (?!附录)(\S.*)$", l)
+        if m:
+            cur = {"name": m.group(1).strip(), "secs": []}
+            groups.append(cur)
+            continue
+        m = re.match(r"^#{2,3} §(\d+)(?:\s|$)", l)
+        if m and cur is not None:
+            cur["secs"].append(int(m.group(1)))
+    if not groups:
+        info("无分组标题（只有节、不分组）——本维跳过")
+        return
+    if len(groups) != 12:
+        err("分组标题数 %d ≠ 12（映射①：12 章降为无编号分组标题）" % len(groups))
+    flat = []
+    for g in groups:
+        if not g["secs"]:
+            err("分组「%s」下无任何节——分组标题不得空挂" % g["name"])
+            continue
+        if g["secs"] != list(range(g["secs"][0], g["secs"][0] + len(g["secs"]))):
+            err("分组「%s」下节号不连续：%s" % (g["name"], g["secs"]))
+        flat.extend(g["secs"])
+    dup = sorted({n for n in flat if flat.count(n) > 1})
+    if dup:
+        err("同一节被多个分组认领：§%s" % "、".join(map(str, dup)))
+    uncov = sorted(set(nums) - set(flat))
+    if uncov:
+        err("有节未被任何分组覆盖：§%s（该节前缺 `## 分组标题`）" % "、".join(map(str, uncov)))
+    if not (uncov or dup) and len(groups) == 12:
+        info("12 个分组标题实算覆盖 §1—§%d、互不重叠（单源：归属从正文算，不读声明）" % len(nums))
 
 # ────────────────────────────── (2) 导读表 ──────────────────────────────
 
 def check_guide(s):
     head("(2) 导读表 vs 正文（双源比对）")
     body = {n: rest.strip() for n, rest in title_rows(s) if rest.strip()}
-    rows = re.findall(r"^\| \*\*第 (\d+) 条\*\* \| (.+?) \| (.+?) \|\s*$", s, re.M)
+    rows = re.findall(r"^\| \*\*§(\d+)\*\* \| (.+?) \| (.+?) \|\s*$", s, re.M)
     if not rows:
         # 导读表是**分章结构**的配套（每条一句话概览，供人速览全篇）；
         # 精简版只有 16 条、不分章，本就不设导读表——按缺失报错即误判。
-        if not re.search(r"^## 第.+?章", s, re.M):
-            info("无章划分（精简结构）——文首导读表不适用，本维跳过")
+        if not re.search(r"^## (?!附录)\S", s, re.M):
+            info("无分组标题（精简结构）——文首导读表不适用，本维跳过")
             return
-        err("未找到文首导读表（`| **第 N 条** | 名称 | 一句话 |`）")
+        err("未找到文首导读表（`| **§N** | 名称 | 一句话 |`）")
         return
     for n, name, _ in rows:
         n = int(n)
         if n not in body:
-            err("导读表引用第 %d 条，但正文无此条" % n)
+            err("导读表引用 §%d，但正文无此节" % n)
         elif name.strip() not in body[n]:
-            err("导读表「%s」与正文标题「%s」不符（第 %d 条）" % (name, body[n], n))
+            err("导读表「%s」与正文标题「%s」不符（§%d）" % (name, body[n], n))
         else:
-            info("第 %d 条：导读与正文一致" % n)
+            info("§%d：导读与正文一致" % n)
 
 
 # ────────────────────────────── (3) 条号引用 ──────────────────────────────
 
 def check_refs(s, show=False):
-    head("(3) 条号引用")
-    nums = {n for n, _ in title_rows(s)}
-    dangling = sorted({int(r) for r in re.findall(r"第 (\d+) 条", s)} - nums)
-    if dangling:
-        err("悬空引用（指向不存在的条）：%s" % dangling)
-    else:
-        info("无悬空引用（全部指向存在的条）")
+    """(3) 节号引用：§N 悬空、数字路径悬空、§ 引用可解析、旧号回流拦截。
 
-    # ⚠ 2026-10-20 补：原先只查"第 N 条"这一种形态，
-    #   而正文里大量引用写成数字路径（"见 19.6""按 12.5.4.3 办"）——
-    #   **写错一个号（如 19.6 根本不存在）此维一声不吭**。
-    #   实测：我自己写正文时凭空引了"19.6""8.5"两个不存在的款，本维全过。
-    #   现补第二道：把正文里出现的 N.M(.K) 与附录 A.N.M 逐一对照"已定义编号"。
-    #   **判据要有区分度**（12.5.4.3）：只认"该编号及其实父级都不存在"才算悬空，
-    #   父级存在而子款号写错（如 12.5.9 而 12.5 存在）**同样算**——见下 exist 判定。
+    v1.60.0 换号（映射①）：编号数字不变、只换外壳。四道断言：
+      A. `§N` 节级引用须指向存在的节；
+      B. 数字路径 N.M(.K) 须指向已定义款（沿用原第二道；加粗款号与行首裸编号是定义端）；
+      C. **§ 引用可解析**（对应外部 DR-B1 [F]）：§N.M 须能在定义集合或父级里找到；
+      D. **旧号回流拦截**（§21.7.4）：新写文字不得再出现「第 N 条」或裸 N.M 引用；
+         豁免 = 附录 D 换算表／§21.7 规则本体／述史行／围栏／反引号内／定义端
+                （加粗款号含表格首列 `| **N.M …** |`、行首裸编号段落）：
+                定义端编号在扫描前抹除，**不整行跳过**，行内其余裸号引用照抓。
+    """
+    head("(3) 节号引用与旧号回流")
+    nums = {n for n, _ in title_rows(s)}
+    lines = s.splitlines()
+    fenced = in_fence_lines(s)
+
+    # A. 节级悬空
+    dangling = sorted({int(r) for r in re.findall(r"§(\d+)(?![\d.])", s)} - nums)
+    if dangling:
+        err("悬空引用（指向不存在的节）：§%s" % "、".join(map(str, dangling)))
+    else:
+        info("无悬空引用（全部指向存在的节）")
+
+    # 定义集合：加粗款号 / 表格加粗编号 / 行首裸编号段落 / 附录字母编号 / 节号
     defined = set()
-    for l in s.splitlines():
-        for m in re.finditer(r"\*\*((?:A\.)?\d+(?:\.\d+)+)\s*[^\d.]", l):
+    for l in lines:
+        for m in re.finditer(r"\*\*((?:[A-Z]\.)?\d+(?:\.\d+)+)\s*[^\d.]", l):
+            defined.add(m.group(1))
+        m = re.match(r"^\s*(\d+(?:\.\d+)+)\s+\S", l)
+        if m:
             defined.add(m.group(1))
     for n in nums:
         defined.add(str(n))
-    # 版本号形态（v1.7.0 / 1.0.0）与日期不参与判定
-    VER = re.compile(r"(?<![\d.])(?:v)?\d+\.\d+\.\d+(?![\d.])")
+    VER = re.compile(r"v\d+\.\d+\.\d+")
 
+    def mask(line):
+        x = VER.sub(lambda m: " " * len(m.group(0)), line)
+        return re.sub(r"`[^`]*`", lambda m: " " * len(m.group(0)), x)
+
+    # B. 数字路径式悬空（§ 前缀不影响 N.M 匹配；述史行豁免）
     bad_num = []
-    fenced = in_fence_lines(s)
-    for i, line in enumerate(s.splitlines(), 1):
-        if i in fenced:
+    for i, line in enumerate(lines, 1):
+        if i in fenced or "〔述史〕" in line:
             continue
-        scan = VER.sub(lambda m: " " * len(m.group(0)), line)   # 先抹掉版本号
-        scan = re.sub(r"`[^`]*`", lambda m: " " * len(m.group(0)), scan)  # 抹掉反引号内
-        for m in re.finditer(r"(?<![\d.])((?:A\.)?\d+\.\d+(?:\.\d+)*)(?![\d.])", scan):
-            ref = m.group(1)
-            if ref in defined:
-                continue
-            # 父级已定义但本号未定义 → 这是"款号写错"，比整条悬空更常见，**必须报**
-            bad_num.append((i, ref))
+        scan = mask(line)
+        for m in re.finditer(r"(?<![\d.])((?:[A-Z]\.)?\d+\.\d+(?:\.\d+)*)(?![\d.])", scan):
+            if m.group(1) not in defined:
+                bad_num.append((i, m.group(1)))
     if bad_num:
         err("悬空编号引用（数字路径式，指向不存在的款）：%s"
             % "、".join("第 %d 行「%s」" % (i, r) for i, r in bad_num[:8]))
     else:
         info("数字路径式引用（N.M／A.N.M）全部指向已定义的款（已排除版本号与反引号内）")
 
+    # C. § 引用可解析（DR-B1 [F]）
+    def resolvable(ref):
+        if ref in defined:
+            return True
+        parts = ref.split(".")
+        return any(".".join(parts[:k]) in defined for k in range(1, len(parts)))
+
+    bad_sec = []
+    for i, line in enumerate(lines, 1):
+        if i in fenced:
+            continue
+        for m in re.finditer(r"§(\d+(?:\.\d+)*)", mask(line)):
+            if not resolvable(m.group(1)):
+                bad_sec.append((i, m.group(1)))
+    if bad_sec:
+        err("§ 引用不可解析（无对应节／款／父级）：%s"
+            % "、".join("第 %d 行 §%s" % (i, r) for i, r in bad_sec[:8]))
+    else:
+        info("§ 引用全部可解析到已定义的节／款（含父级）")
+
+    # D. 旧号回流拦截（§21.7.4）
+    app_d = tail_lines(s, "## 附录 D")
+    sec217, a, b = set(), None, None
+    for i, l in enumerate(lines, 1):
+        if a is None and l.startswith("**21.7 编号体系成文与选用"):
+            a = i
+        if a is not None and b is None and re.match(r"^### §22 ", l):
+            b = i
+            break
+    if a:
+        sec217 = set(range(a, b or len(lines) + 1))
+    old = []
+    BARE = re.compile(r"(?<![\d.§])(\d+\.\d+(?:\.\d+)*)(?![\d.])")
+    for i, line in enumerate(lines, 1):
+        if i in fenced or i in app_d or i in sec217 or "〔述史〕" in line:
+            continue
+        scan = mask(line)
+        for m in re.finditer(r"第\s*\d+\s*(?:\.\d+)*\s*条", scan):
+            old.append((i, m.group(0)))
+        # 加粗定义端（正文行首、列表项、表格首列 `| **N.M …** |`）都**不是引用**：
+        # 只把 `**N.M` 里的编号抹成等长空格再扫，行内其余裸号引用照抓、不整行跳过。
+        scan = re.sub(r"(\*\*)\d+(?:\.\d+)+",
+                      lambda m: m.group(1) + " " * (len(m.group(0)) - len(m.group(1))),
+                      scan)
+        # 行首裸编号段落（如 `27.4.1 标题`）同为定义端，与 (3)B 的 defined 提取同口径
+        scan = re.sub(r"^(\s*)(\d+(?:\.\d+)+)(?=\s+\S)",
+                      lambda m: m.group(1) + " " * len(m.group(2)), scan)
+        for m in BARE.finditer(scan):
+            old.append((i, m.group(1)))
+    if old:
+        err("旧号回流（新写文字须用 §N.M，见 §21.7.4）：%s"
+            % "、".join("第 %d 行「%s」" % (i, r) for i, r in old[:8]))
+    else:
+        info("无旧号回流（「第 N 条」与裸 N.M 引用零残留；述史／换算表／规则本体已豁免）")
+
     if show and not QUIET:
         print("  ── 引用上下文（供人工复核**指向是否正确**，脚本查不出语义）──")
-        for i, line in enumerate(s.splitlines(), 1):
-            if i in fenced or line.lstrip().startswith("- ["):   # 排除代码块与目录
+        for i, line in enumerate(lines, 1):
+            if i in fenced or line.lstrip().startswith("- ["):
                 continue
-            if re.search(r"第 \d+ 条|(?<!V)(?<![\d.])\d+\.\d+(?![\d.])", line):
+            if re.search(r"§\d+|(?<!V)(?<![\d.])\d+\.\d+(?![\d.])", line):
                 print("     %4d│ %s" % (i, line.strip()[:96]))
-
 
 # ────────────────────────────── (4) 用词 ──────────────────────────────
 
@@ -432,7 +474,7 @@ def check_external_refs(s):
                     continue
                 scanned += 1
                 for ln, line in enumerate(txt.splitlines(), 1):
-                    for m in re.finditer(r"铁律\s*(?:第\s*)?(\d+\.\d+(?:\.\d+)*)", line):
+                    for m in re.finditer(r"铁律\s*(?:§|第\s*)?(\d+\.\d+(?:\.\d+)*)", line):
                         ref = m.group(1)
                         if ref in defined or any(d.startswith(ref + ".") for d in defined):
                             continue
@@ -509,7 +551,7 @@ def check_expression(s):
             if any(p in _strip_quotes(l) for p in REL_REFS)]
     if hits:
         for h in hits:
-            err("相对引用（应为绝对编号，如「见第 %d 条」）：%s" % (no_of(s, "分发包命名") or 0, h))
+            err("相对引用（应为绝对编号，如「见 §%d」）：%s" % (no_of(s, "分发包命名") or 0, h))
     else:
         info("无相对引用（%s）" % "／".join(REL_REFS))
 
@@ -889,29 +931,20 @@ def check_cross_side(s_ignored=None):
 # ────────────────────── (9) 目录锚点一致性 ──────────────────────
 
 def _gh_anchor(n, title):
-    """按 GitHub 规则由条标题重算锚点。
+    """按 GitHub slugger 规则由**节标题**重算锚点。
 
-    **2026-10-17 复核更正**：原注释写"已实测 20/20 吻合"，但那是**用本函数自己
-    去比目录**——两边同源，吻合只证明"目录与本函数一致"，**不证明**与真实 GitHub 一致
-    （典型的"判据没有区分度"，见 12.5.4.3）。
-    现改为**按 github-slugger 的公开规则独立重算**（小写 → 删非字母数字／非空格／
-    非 `-` 字符 → 空格转连字符），并对全部 38 条目录项逐一核对，结果全部吻合。
-    **但它仍只回答"GitHub 上对不对"**：腾讯文档等阅读器不按此规则解析，
-    故另有第 (14) 维负责"在线版改纯文字大纲"。
+    v1.60.0 换号后标题为 `### §N 标题`：§ 与中文标点被删、空格转连字符，
+    故锚点形如 `#12-文档分层真源与漂移防治`（与目录生成脚本同一算法）。
     """
     t = title.lower()
-    t = re.sub(r"[（）、，：；／·]", "", t)
-    return "第-%d-条-%s" % (n, t.replace(" ", "-"))
+    t = re.sub(r"[^\w\s\-]", "", t, flags=re.UNICODE)
+    return "%d-%s" % (n, t.strip().replace(" ", "-"))
 
 
 def check_toc_anchor(s):
-    """(9) 目录的条标题／锚点须与正文同步。
-
-    目录是正文标题的**引用**——标题改了目录没改，即引用漂移（2.3.3）。
-    V1.30.0 改第 2 条标题时目录未跟，而当时七维查不出（只查条号连续性）。
-    """
+    """(9) 目录的节标题／锚点须与正文同步（目录是正文标题的引用）。"""
     head("(9) 目录锚点一致性")
-    toc = re.findall(r"^\s*- \[第 (\d+) 条 ([^\]]+)\]\(#([^)]+)\)", s, re.M)
+    toc = re.findall(r"^\s*- \[§(\d+) ([^\]]+)\]\(#([^)]+)\)", s, re.M)
     if not toc:
         info("无目录（跳过）")
         return
@@ -921,22 +954,21 @@ def check_toc_anchor(s):
         n = int(ns)
         bt = body.get(n)
         if bt is None:
-            bad.append("目录有第 %d 条，正文无此条" % n)
+            bad.append("目录有 §%d，正文无此节" % n)
             continue
         if bt != title:
-            bad.append("第 %d 条：目录「%s」≠ 正文「%s」" % (n, title, bt))
+            bad.append("§%d：目录「%s」≠ 正文「%s」" % (n, title, bt))
             continue
         exp = _gh_anchor(n, title)
         if exp != anchor:
-            bad.append("第 %d 条：锚点 `#%s` ≠ 重算 `#%s`" % (n, anchor, exp))
+            bad.append("§%d：锚点 `#%s` ≠ 重算 `#%s`" % (n, anchor, exp))
     if len(toc) != len(body):
-        bad.append("目录 %d 条 ≠ 正文 %d 条" % (len(toc), len(body)))
+        bad.append("目录 %d 节 ≠ 正文 %d 节" % (len(toc), len(body)))
     if bad:
         for b in bad:
             err(b)
     else:
-        info("目录 %d 条的标题与锚点均与正文一致" % len(toc))
-
+        info("目录 %d 节的标题与锚点均与正文一致" % len(toc))
 
 # ────────────────────── (10) 引用锚点完整性 ──────────────────────
 
@@ -973,7 +1005,7 @@ def check_ref_anchor(s):
         # **父级有两种合法形态**：款级 `17.3`、条级 `14` 或 `第 14 条`（实测都出现过）。
         for m in re.finditer(r"(?<![\.\d])(?<!M )第 (\d+) 行", scan):
             pre = scan[:m.start()]
-            ok_parent = re.search(r"(?:\d+\.\d+|\d+)\s*$", pre) or re.search(r"第\s*\d+\s*条\s*$", pre)
+            ok_parent = re.search(r"(?:\d+\.\d+|\d+)\s*$", pre) or re.search(r"§\s*\d+\s*$", pre)
             if ok_parent:
                 continue
             # ③ 明确标为**反例／错误写法**的引述 → 放行。
@@ -985,7 +1017,7 @@ def check_ref_anchor(s):
             #   否定词表原先只有"不得／禁止／…"，"不写"不在其中 → 反例被当真引用报出。
             if re.search(r"(不得|不写|不记作|误写|禁止|反例|错误写法|应写作|应改为|不得再)", seg20):
                 continue
-            bad.append("第 %d 行：裸写「第 %s 行」，应带父级（如 `17.3 第 %s 行`）：%s"
+            bad.append("第 %d 行：裸写「第 %s 行」，应带父级（如 `§17.3 第 %s 行`）：%s"
                        % (i, m.group(1), m.group(1), line.strip()[:60]))
     if bad:
         for b in bad:
@@ -1019,7 +1051,7 @@ def check_bold_heading(s):
     # 第 1 条标题行号
     first_art = None
     for i, l in enumerate(lines, 1):
-        if re.match(r"^#{2,3} 第 1 条", l):
+        if re.match(r"^#{2,3} §1 ", l):
             first_art = i
             break
     # 文首两个**结构单元**可免编号，边界一律由结构定，不按行号数：
@@ -1054,10 +1086,10 @@ def check_bold_heading(s):
                 break
         else:
             guide = set()
-        if not re.search(r"^## 第.+?章", s, re.M):
+        if not re.search(r"^## (?!附录)\S", s, re.M):
             # 导读区（卷首速览）同样是分章结构的配套；精简版无此结构，
             # 报"结构被改"是拿 24 条版的版式去量 16 条版。本维降级为提示。
-            info("无章划分（精简结构）——文首导读区不适用，按元信息块豁免")
+            info("无分组标题（精简结构）——文首导读区不适用，按元信息块豁免")
         else:
             err("找不到导读区起点（含「导读 ·」的段落）——结构被改，仅按元信息块豁免")
     else:
@@ -1146,7 +1178,7 @@ def check_meta_rules(s):
 
     故本守卫做两件事（缺一不可）：
       A. **正向**：这五条元规则的"特征短句"必须能在**带编号的正文单元**里找到；
-      B. **反向**：它们**不得**以无编号裸段的形式出现在 `### 第 1 条` 之前的导读区
+      B. **反向**：它们**不得**以无编号裸段的形式出现在 `### §1` 之前的导读区
          （即"退回导读区"这一具体病征须能被抓住）。
 
     归属：正文 = 第 1 条（文档结构与编号）。若将来挪号，须同步改本条守卫——
@@ -1159,11 +1191,11 @@ def check_meta_rules(s):
     # 正文起点：第 1 条标题行
     first_art = None
     for i, l in enumerate(lines, 1):
-        if re.match(r"^#{2,3} 第 1 条", l):
+        if re.match(r"^#{2,3} §1 ", l):
             first_art = i
             break
     if first_art is None:
-        err("未找到「第 1 条」标题——编号元规则的归属条缺失")
+        err("未找到「§1」标题——编号元规则的归属节缺失")
         return
 
     body = "\n".join(l for i, l in enumerate(lines, 1)
@@ -1333,13 +1365,13 @@ def check_closure_table(s):
 
     注：本维**只比集合与词表**，不判断"标得对不对"——那属人工复核（16.4）。
     """
-    head("(13) 落实总表须覆盖全部条")
+    head("(13) 落实总表须覆盖全部节")
     lines = s.splitlines()
 
     arts = [int(m.group(1)) for m in
-            (re.match(r"^#{2,3} 第 (\d+) 条", l) for l in lines) if m]
+            (re.match(r"^#{2,3} §(\d+)", l) for l in lines) if m]
     if not arts:
-        err("未解析出任何条——无法校验落实总表")
+        err("未解析出任何节——无法校验落实总表")
         return
 
     # 定位「落实总表」：本体的收束条款是 24.3。**精简版没有这一章**（16 条版不分章、
@@ -1347,7 +1379,7 @@ def check_closure_table(s):
     # 2026-10-20 自检发现：原写法硬编码 "24.3"，精简版必报一条假错。
     # 判据改为：先看本文有没有第 24 条；没有即判"本结构不含落实总表"，跳过本维。
     if 24 not in arts:
-        info("本文共 %d 条、无第 24 条（精简结构）——本维不适用，跳过" % len(arts))
+        info("本文共 %d 节、无 §24（精简结构）——本维不适用，跳过" % len(arts))
         return
     start = None
     for i, l in enumerate(lines, 1):
@@ -1363,9 +1395,9 @@ def check_closure_table(s):
         l = lines[i]
         if l.startswith("|"):
             # 表头：以「条」开头的那一行（如 `| 条 | 名称 | 落点 | 兜在何处 |`）
-            if header is None and re.match(r"^\|\s*条\s*\|", l):
+            if header is None and re.match(r"^\|\s*节\s*\|", l):
                 header = [c.strip() for c in l.strip().strip("|").split("|")]
-            elif re.match(r"^\|\s*\d+\s*\|", l):
+            elif re.match(r"^\|\s*§\d+\s*\|", l):
                 rows.append((i + 1, l))
         elif header is not None:
             # 2026-10-30 修（**读数越界**，此前让「表体删空」用例失效）：
@@ -1379,7 +1411,7 @@ def check_closure_table(s):
 
     # **表体不得为空**：只留标题、把表删干净，同样算缺失——此前漏判（2026-10-17 复核发现）。
     if header is None:
-        err("24.3 未找到表头（须为 `| 条 | 名称 | 落点 | 兜在何处 |`）——表可能已被删或改形")
+        err("24.3 未找到表头（须为 `| 节 | 名称 | 落点 | 兜在何处 |`）——表可能已被删或改形")
         return
     if not rows:
         err("24.3 表未解析出任何数据行——表体为空，等同缺失")
@@ -1403,20 +1435,20 @@ def check_closure_table(s):
             err("第 %d 行：24.3 表列数不足（表头 %d 列，此行 %d 列）"
                 % (lineno, len(header), len(cols)))
             continue
-        try:
-            n = int(cols[0])
-        except ValueError:
-            err("第 %d 行：首列不是条号" % lineno)
+        m = re.fullmatch(r"§(\d+)", cols[0])
+        if not m:
+            err("第 %d 行：首列不是节号（须写 `§N`）" % lineno)
             continue
+        n = int(m.group(1))
         table_nums.append(n)
         state = cols[i_state].replace("*", "").strip()
         if state not in VALID_STATES:
-            bad_state.append("第 %d 行（第 %d 条）落点「%s」不合四态：%s"
+            bad_state.append("第 %d 行（§%d）落点「%s」不合四态：%s"
                              % (lineno, n, state, "／".join(sorted(VALID_STATES))))
         if not cols[i_name].strip():
-            bad_state.append("第 %d 行（第 %d 条）「名称」为空" % (lineno, n))
+            bad_state.append("第 %d 行（§%d）「名称」为空" % (lineno, n))
         if not cols[i_where].strip():
-            bad_state.append("第 %d 行（第 %d 条）「兜在何处」为空——须写明落点位置"
+            bad_state.append("第 %d 行（§%d）「兜在何处」为空——须写明落点位置"
                              % (lineno, n))
 
     if bad_state:
@@ -1427,14 +1459,14 @@ def check_closure_table(s):
     extra = sorted(set(table_nums) - set(arts))
     dup = sorted({n for n in table_nums if table_nums.count(n) > 1})
     if missing:
-        err("24.3 表漏登记以下条（新增条款须同时登记落点，见 24.3.1）：第 %s 条"
+        err("24.3 表漏登记以下节（新增条款须同时登记落点，见 §24.3.1）：§%s"
             % "、".join(map(str, missing)))
     if extra:
-        err("24.3 表登记了不存在的条：第 %s 条" % "、".join(map(str, extra)))
+        err("24.3 表登记了不存在的节：§%s" % "、".join(map(str, extra)))
     if dup:
-        err("24.3 表重复登记：第 %s 条" % "、".join(map(str, dup)))
+        err("24.3 表重复登记：§%s" % "、".join(map(str, dup)))
     if not (missing or extra or dup or bad_state):
-        info("24.3 落实总表覆盖全部 %d 条，落点均合法（守卫／人工／流程／守卫＋人工）"
+        info("24.3 落实总表覆盖全部 %d 节，落点均合法（守卫／人工／流程／守卫＋人工）"
              % len(arts))
 
 
@@ -1460,13 +1492,13 @@ def check_promise(s):
     边界：本维**判不了"这句话是不是真的"**（那属 25.4 人工核对），
     只能判"这句话里有没有含糊词"。**不得据此认为"跑过＝承诺为真"**。
     """
-    head("(15) 承诺条文不得含糊（第 25 条）")
+    head("(15) 承诺条文不得含糊（§25）")
     if not _is_rules_itself(s):
         info("非铁律本体，本维跳过")
         return
-    m = re.search(r"(?ms)^### 第 25 条 .*?(?=^### 第 26 条 |^---\s*\n\s*## 附录)", s)
+    m = re.search(r"(?ms)^### §25 .*?(?=^### §26 |^---\s*\n\s*## 附录)", s)
     if not m:
-        err("未找到第 25 条（对外承诺的守门）——承诺约束缺失，SECURITY／README 里的"
+        err("未找到 §25（对外承诺的守门）——承诺约束缺失，SECURITY／README 里的"
             "承诺将无人看管")
         return
     body = m.group(0)
@@ -1511,10 +1543,10 @@ def check_promise(s):
                 break
     if hits:
         for w, seg in hits:
-            err("第 25 条承诺性文字里出现含糊词「%s」——按 25.3，用含糊词覆盖例外等于没承诺"
+            err("§25 承诺性文字里出现含糊词「%s」——按 25.3，用含糊词覆盖例外等于没承诺"
                 "（上下文：…%s…）" % (w, seg))
         return
-    info("第 25 条已成文，承诺句无含糊词（「基本上」类词只许出现在举例批判处）"
+    info("§25 已成文，承诺句无含糊词（「基本上」类词只许出现在举例批判处）"
          "——注意：本维只查措辞，承诺是否为真须人工按 25.4 核")
 
 # ──────────────── (14) 在线版须与源同步 ────────────────

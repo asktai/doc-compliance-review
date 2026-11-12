@@ -77,15 +77,15 @@ def _sub1(s, old, new):
 
 def inj_struct_gap(s):
     """(1) 条号连续性：把第 7 条改号为 8，造成缺 7。"""
-    return _sub1(s, "### 第 7 条", "### 第 8 条")
+    return _sub1(s, "### §7", "### §8")
 
 
 def inj_struct_fmt(s):
     """(1) 条标题格式：去掉条号后的空格。"""
-    m = re.search(r"^### 第 (\d+) 条 (\S)", s, re.M)
+    m = re.search(r"^### §(\d+) (\S)", s, re.M)
     if not m:
         return None
-    return s.replace("### 第 %s 条 " % m.group(1), "### 第 %s 条" % m.group(1), 1)
+    return s.replace("### §%s " % m.group(1), "### §%s" % m.group(1), 1)
 
 
 def inj_guide(s):
@@ -94,13 +94,13 @@ def inj_guide(s):
     注：最初改的是**正文标题**（在条号后插字），但导读表比对用 `name in 正文标题`，
     插入后名称仍是子串 → 抓不到。**注入须破坏被比对的那个字段本身。**
     """
-    return re.sub(r"(\| \*\*第 \d+ 条\*\* \| )([^|]+?)(\s*\|)",
+    return re.sub(r"(\| \*\*§\d+\*\* \| )([^|]+?)(\s*\|)",
                   lambda m: m.group(1) + "注入篡改" + m.group(3), s, count=1)
 
 
 def inj_refs(s):
-    """(3) 悬空引用：引用一条不存在的第 99 条。"""
-    return _sub1(s, "\n## 第一章", "\n注入测试：详见第 99 条的相关规定。\n\n## 第一章")
+    """(3) 悬空引用：引用一个不存在的 §99。"""
+    return _sub1(s, "\n## 总则与文档结构", "\n注入测试：详见 §99 的相关规定。\n\n## 总则与文档结构")
 
 
 def inj_refs_dotted(s):
@@ -109,7 +109,7 @@ def inj_refs_dotted(s):
     2026-10-20 补：原用例只覆盖"第 99 条"这一形态，
     而正文大量引用写成"见 19.6""按 12.5.4.3 办"——凭空写一个不存在的款号，守卫原先不报。
     """
-    return _sub1(s, "\n## 第一章", "\n注入测试：按 19.6 办。\n\n## 第一章")
+    return _sub1(s, "\n## 总则与文档结构", "\n注入测试：按 §19.6 办。\n\n## 总则与文档结构")
 
 
 def inj_ext_ref(s):
@@ -122,7 +122,7 @@ def inj_ext_ref(s):
 
 def inj_wording(s):
     """(4) 术语纪律：正文插入废止词。"""
-    return _sub1(s, "\n## 第一章", "\n注入测试：该工作由维护侧负责。\n\n## 第一章")
+    return _sub1(s, "\n## 总则与文档结构", "\n注入测试：该工作由维护侧负责。\n\n## 总则与文档结构")
 
 
 def inj_wording_neg(s):
@@ -130,22 +130,22 @@ def inj_wording_neg(s):
 
     2026-10-20 复核指出：原判据只看"紧前是不是'运行'"，于是**反义**写法也被放行。
     """
-    return _sub1(s, "\n## 第一章", "\n注入测试：非运行实例侧的改动须另走流程。\n\n## 第一章")
+    return _sub1(s, "\n## 总则与文档结构", "\n注入测试：非运行实例侧的改动须另走流程。\n\n## 总则与文档结构")
 
 
 def inj_reldir(s):
     """(5) 相对引用：插入"见下"。"""
-    return _sub1(s, "\n## 第一章", "\n注入测试：细节见下。\n\n## 第一章")
+    return _sub1(s, "\n## 总则与文档结构", "\n注入测试：细节见下。\n\n## 总则与文档结构")
 
 
 def inj_date(s):
     """(5) 日期形态：插入未补零日期。"""
-    return _sub1(s, "\n## 第一章", "\n注入测试：2026-1-5 记录。\n\n## 第一章")
+    return _sub1(s, "\n## 总则与文档结构", "\n注入测试：2026-1-5 记录。\n\n## 总则与文档结构")
 
 
 def inj_circle(s):
     """(5) 编号字符：插入圆圈编号。"""
-    return _sub1(s, "\n## 第一章", "\n注入测试：其一①其二②。\n\n## 第一章")
+    return _sub1(s, "\n## 总则与文档结构", "\n注入测试：其一①其二②。\n\n## 总则与文档结构")
 
 
 def inj_oldnum(s):
@@ -154,12 +154,12 @@ def inj_oldnum(s):
     注：须让 `(1)` 落在**行首**（守卫匹配 `^[ \\t]*(?:\\d+\\.|\\(\\d+\\))[ \\t]`）；
     写成「注入测试：(1) …」因不在行首而抓不到——**注入要落在正则的锚点上**。
     """
-    return _sub1(s, "\n## 第一章", "\n(1) 注入测试旧编号形态。\n\n## 第一章")
+    return _sub1(s, "\n## 总则与文档结构", "\n(1) 注入测试旧编号形态。\n\n## 总则与文档结构")
 
 
 def inj_paths(s):
     """(6) 路径引用真实性：引用一个不存在的文件。"""
-    return _sub1(s, "\n## 第一章", "\n注入测试：见 `dev/NoSuchFileForSmoke.md`。\n\n## 第一章")
+    return _sub1(s, "\n## 总则与文档结构", "\n注入测试：见 `dev/NoSuchFileForSmoke.md`。\n\n## 总则与文档结构")
 
 
 def inj_impl_name(s):
@@ -177,7 +177,7 @@ def inj_skill_ext(s):
 
     2026-10-20 补：原 `SKILL|Skill` 在白名单里，写了既不查也不报。
     """
-    return _sub1(s, "\n## 第一章", "\n注入测试：产物名须为 `xxx.Skill`。\n\n## 第一章")
+    return _sub1(s, "\n## 总则与文档结构", "\n注入测试：产物名须为 `xxx.Skill`。\n\n## 总则与文档结构")
 
 
 def inj_version(s):
@@ -188,10 +188,10 @@ def inj_version(s):
 def inj_toc(s):
     """(9) 目录锚点：篡改目录里**条级**条目的标题，使其与正文不符。
 
-    注：目录正则只认 `- [第 N 条 标题](#锚点)`；章级条目（`- [第一章 …]`）
+    注：目录正则只认 `- [§N 标题](#锚点)`；分组条目（`- [分组名 …]`）
     不在比对范围内，改它抓不到。
     """
-    return re.sub(r"(- \[第 \d+ 条 )([^\]]+)(\]\(#)",
+    return re.sub(r"(- \[§\d+ )([^\]]+)(\]\(#)",
                   lambda m: m.group(1) + "注入篡改" + m.group(3), s, count=1)
 
 
@@ -200,7 +200,7 @@ def inj_ref_anchor(s):
 
     注：本维只管「第 N 行」这一种形态；写「参见表 3」不在其判定范围内。
     """
-    return _sub1(s, "\n## 第一章", "\n注入测试：见第 4 行。\n\n## 第一章")
+    return _sub1(s, "\n## 总则与文档结构", "\n注入测试：见第 4 行。\n\n## 总则与文档结构")
 
 
 def inj_ref_anchor_table(s):
@@ -221,8 +221,8 @@ def inj_bold(s):
     注：须插在**正文区**（第 1 条之后）——插在文首块内仍会被放行；
     且上一行须为空行，否则被判为「续行」放行。文首地带的漏判见下一条用例。
     """
-    return _sub1(s, "\n### 第 2 条",
-                 "\n**注入测试的无编号加粗段落。**\n\n### 第 2 条")
+    return _sub1(s, "\n### §2",
+                 "\n**注入测试的无编号加粗段落。**\n\n### §2")
 
 
 def inj_bold_letter(s):
@@ -279,9 +279,9 @@ def inj_bold_headgap(s):
     现改为：只有"元信息块（第 1 行→导读起点前）＋ 导读区（导读·→其后第一条 ---）"
     这两个**结构单元**免检，其余须带编号。
     """
-    i = s.find("\n### 第 1 条")
+    i = s.find("\n### §1")
     if i < 0:
-        raise RuntimeError("找不到第 1 条标题")
+        raise RuntimeError("找不到 §1 标题")
     return s[:i] + "\n**注入测试：文首地带的无编号加粗段落。**\n" + s[i:]
 
 
@@ -329,7 +329,7 @@ def inj_dotdot(s):
     **不影响"路径编号连续性"**那条判定，从而单独证明**新的形态断言**有效
     （否则会被连续性那条掩盖：两条同时报错，分不清是谁拦住的）。
     """
-    return _sub1(s, "`16.4.7.3`", "`16.4..7.3`")
+    return _sub1(s, "`§16.4.7.3`", "`§16.4..7.3`")
 
 
 def inj_closure(s):
@@ -340,7 +340,7 @@ def inj_closure(s):
     """
     # 锚点随正文用词走：2026-10-30 正文把 `DEVLOG` 改为「开发日志」，
     # 锚点没跟上就会"注入点未命中"——报错文案改了，按文案匹配的用例须同步（16.2 连带判据）。
-    return _sub1(s, "| 7 | 前置提问 | 流程 | 无检测；留痕见开发日志 |\n", "")
+    return _sub1(s, "| §7 | 前置提问 | 流程 | 无检测；留痕见开发日志 |\n", "")
 
 
 def inj_closure_empty(s):
@@ -350,7 +350,7 @@ def inj_closure_empty(s):
     表被删干净但标题还在时**照样通过**。现要求"表体不得为空"。
     """
     import re as _re
-    return _re.sub(r"(\| 条 \| 名称 \| 落点 \| 兜在何处 \|\n\|[-| ]+\|\n)(?:\| \d+ \|.*\n)+",
+    return _re.sub(r"(\| 节 \| 名称 \| 落点 \| 兜在何处 \|\n\|[-| ]+\|\n)(?:\| §\d+ \|.*\n)+",
                    r"\1", s, count=1)
 
 
@@ -360,7 +360,7 @@ def inj_closure_hdr(s):
     同一轮复核发现的另一漏洞：不校验表头，列序一改就查错列且不报错。
     现要求表头存在且含 条／名称／落点／兜在何处 四列。
     """
-    return _sub1(s, "| 条 | 名称 | 落点 | 兜在何处 |\n", "")
+    return _sub1(s, "| 节 | 名称 | 落点 | 兜在何处 |\n", "")
 
 
 def inj_closure_colswap_hdr(s):
@@ -370,8 +370,8 @@ def inj_closure_colswap_hdr(s):
     实测两种改法——表头换序、数据换序——**均被拦住**，故各补一条用例固住，
     防日后改解析逻辑时退化（12.5.4.3：判据须有区分度，须正反验）。
     """
-    return _sub1(s, "| 条 | 名称 | 落点 | 兜在何处 |",
-                 "| 名称 | 条 | 落点 | 兜在何处 |")
+    return _sub1(s, "| 节 | 名称 | 落点 | 兜在何处 |",
+                 "| 名称 | 节 | 落点 | 兜在何处 |")
 
 
 def inj_closure_colswap_row(s):
@@ -380,8 +380,8 @@ def inj_closure_colswap_row(s):
     这类改动**表头完好**，只有解析"按列取值"的写法才拦得住；若守卫改成
     "整行文本匹配"就会漏，故单独成例。须报"漏登记第 1 条"。
     """
-    return _sub1(s, "| 1 | 适用与效力 | 流程 | 本文件自身即约束，无检测对象 |",
-                 "| 适用与效力 | 1 | 流程 | 本文件自身即约束，无检测对象 |")
+    return _sub1(s, "| §1 | 适用与效力 | 流程 | 本文件自身即约束，无检测对象 |",
+                 "| 适用与效力 | §1 | 流程 | 本文件自身即约束，无检测对象 |")
 
 
 def inj_promise_gone(s):
@@ -390,7 +390,7 @@ def inj_promise_gone(s):
     实证背景：25.2 的事故就是"承诺没有守卫盯着"，若连条文本身都能被无声删掉，
     这条约束等于不存在。注入方式：把条标题改成非条标题形态。
     """
-    old = "### " + "\u7b2c 25 \u6761 " + "对外承诺的守门：例外须显式，承诺须有门禁"
+    old = "### §25 对外承诺的守门：例外须显式，承诺须有门禁"
     return _sub1(s, old, "### 25 对外承诺的守门（标题被改坏）")
 
 
@@ -416,11 +416,11 @@ def inj_promise_vague2(s):
 
 
 CASES = [
-    (1, "条号连续性（缺一条）", inj_struct_gap, "条号"),
-    (1, "条标题格式（缺空格）", inj_struct_fmt, "标题格式"),
+    (1, "节号连续性（缺一节）", inj_struct_gap, "节号"),
+    (1, "节标题格式（缺空格）", inj_struct_fmt, "标题格式"),
     (2, "导读表与正文不一致", inj_guide, "导读"),
-    (3, "悬空引用（第 99 条）", inj_refs, "悬空"),
-    (3, "悬空款号（19.6 数字路径式）", inj_refs_dotted, "悬空编号引用"),
+    (3, "悬空引用（§99）", inj_refs, "悬空"),
+    (3, "悬空款号（§19.6 数字路径式）", inj_refs_dotted, "悬空编号引用"),
     (4, "废止词残留（维护侧）", inj_wording, "废止词"),
     (4, "「非运行实例侧」按反义废词拦（A.3.7 乙）", inj_wording_neg, "废止词"),
     (5, "相对引用（见下）", inj_reldir, "相对引用"),
@@ -446,7 +446,7 @@ CASES = [
     (13, "落实总表表头被删", inj_closure_hdr, "未找到表头"),
     (13, "落实总表表头列序互换", inj_closure_colswap_hdr, "未找到表头"),
     (13, "落实总表数据行列序互换", inj_closure_colswap_row, "漏登记"),
-    (15, "第 25 条被删（承诺约束消失）", inj_promise_gone, "未找到第 25 条"),
+    (15, "§25 被删（承诺约束消失）", inj_promise_gone, "未找到 §25"),
     (15, "承诺句出现含糊词（事故原话）", inj_promise_vague, "含糊词"),
     (15, "另一处承诺句被改成基本上零联网", inj_promise_vague2, "含糊词"),
     (17, "正文写回本机路径（实现名回流）", inj_impl_name, "实现名"),
@@ -663,7 +663,7 @@ def main():
 
                 # 病征二：把目录改回锚点链接（模拟"转换没做干净"）
                 stale = obak.decode("utf-8").replace(
-                    "- 第 1 条 适用与效力", "- [第 1 条 适用与效力](#第-1-条-适用与效力)", 1)
+                    "- §1 适用与效力", "- [§1 适用与效力](#1-适用与效力)", 1)
                 with open(ONLINE, "w", encoding="utf-8") as f:
                     f.write(stale)
                 rc14b, out14b = run_check()
@@ -683,13 +683,13 @@ def main():
                 #   · 守卫要报它（否则下次再出同样产物没人拦）；
                 #   · 归一化比对**不得**把「说明段行数不同」误算成正文漂移
                 #     （2026-10-19 曾因此报出"约 963 行有差异"的伪问题）。
-                ONELINE = "目录（在线版无锚点跳转，按条号定位；本地 Markdown 版保留可点击目录）"
+                ONELINE = "目录（在线版无锚点跳转，按节号定位；本地 Markdown 版保留可点击目录）"
                 broken = obak.decode("utf-8")
                 if ONELINE not in broken:
                     print("      跳过病征三：在线版说明行已非预期形态（%s）" % ONELINE[:12])
                 else:
                     broken = broken.replace(
-                        ONELINE, "目录（在线版无锚点跳转，按条号定位；\n由 `maint/tools/make-online-md.py` 派生，见第 23 条在线分发）", 1)
+                        ONELINE, "目录（在线版无锚点跳转，按节号定位；\n由 `maint/tools/make-online-md.py` 派生，见 §23 在线分发）", 1)
                     with open(ONLINE, "w", encoding="utf-8") as f:
                         f.write(broken)
                     rc14c, out14c = run_check()
@@ -852,8 +852,8 @@ def main():
             # 把一个真实存在的款号改成绝不存在的号（号在下面拼，不在此写字面量）。
             # **号要拼出来，不得在源码里写字面量**——(3b) 守卫会扫本文件，
             # 写死的假号会让冒烟自己变成违规样本（实测踩过：自指报错，守卫在骂自己）。
-            REAL = "铁律第 " + "9.4" + " 条"
-            FAKE = "铁律第 " + "77" + ".4 条"
+            REAL = "铁律 §" + "9.4"
+            FAKE = "铁律 §" + "77" + ".4"
             if REAL not in btxt:
                 fails.append((3, "外部条号悬空", "注入点未命中（check-separation.py 已改形）"))
                 print("  [E] (3b) 外部条号悬空            注入点未命中")
@@ -879,7 +879,7 @@ def main():
         else:
             print("  [OK] (3b) check-separation.py 已逐字节还原")
 
-    # ── 第 (12) 档：分离守卫（铁律第 9 条）──
+    # ── 第 (12) 档：分离守卫（铁律 §9）──
     # 分离守卫查的是"技能目录里有没有不该在那的东西"，与铁律正文的十六维不同源，
     # 故与第 (8) 维同法：**造真违规 → 断言拦住 → 立即还原**。
     # 三个用例覆盖三条判定（白名单混入／未登记素材／开发资料越界）。
@@ -921,6 +921,72 @@ def main():
             fails.append((12, "探针清理", "技能目录被污染"))
         else:
             print("  [OK] (12) 探针已清理，技能目录零污染")
+
+        # 常驻反证（2026-11-11）：钉死「read_pack_consts 不维护手写常量名单」这一
+        # 一劳永逸机制，防回潮。全部在临时副本上做（铁律 16.2），不碰正式 pack.py。
+        #   ① pack.py 新增一个常量并放进 FULL_DIRS → 守卫须自动解析（无需同步名单）
+        #   ② FULL_DIRS 引用一个未定义的名字 → 守卫须明确报错并点名（不得静默降级）
+        # 用例本身按行首定位 FULL_DIRS、在 ] 前插名字，不硬编码该行内容，
+        # 否则用例自己又变成一处漂移源。
+        try:
+            import importlib.util as _ilu
+            _spec = _ilu.spec_from_file_location("_sep_probe", SEP)
+            _sep = _ilu.module_from_spec(_spec)
+            _spec.loader.exec_module(_sep)
+            _pack_real = os.path.join(DEV, "doc-compliance-review", "scripts", "pack.py")
+            _pack_src = open(_pack_real, encoding="utf-8").read()
+            _plines = _pack_src.splitlines(True)
+            _fd = next((i for i, l in enumerate(_plines)
+                        if l.lstrip().startswith("FULL_DIRS")), None)
+            _ptmp = tempfile.mkdtemp(prefix="rules-smoke-packconst-")
+            try:
+                if _fd is None:
+                    raise RuntimeError("pack.py 里找不到 FULL_DIRS 赋值行")
+
+                def _inject(extra, define):
+                    ls = list(_plines)
+                    line = ls[_fd]
+                    k = line.rfind("]")
+                    if k < 0:
+                        raise RuntimeError("FULL_DIRS 行没有 ]")
+                    ls[_fd] = line[:k] + ", " + extra + line[k:]
+                    if define:
+                        ls.insert(_fd, '%s = "%s"\n' % (extra, extra.lower()))
+                    return "".join(ls)
+
+                # ① 未来常量：加定义并塞进 FULL_DIRS，守卫须自动解析出来
+                _p1 = os.path.join(_ptmp, "pack_future.py")
+                open(_p1, "w", encoding="utf-8").write(_inject("FUTURE_DIR", True))
+                _sep.ERRS.clear(); _sep.WARNS.clear()
+                _g1 = _sep.read_pack_consts(_p1)
+                _ok1 = "future_dir" in (_g1.get("FULL_DIRS") or []) and not _sep.ERRS
+
+                # ② 未定义引用：FULL_DIRS 里放一个没有定义的名字，守卫须报错点名
+                _p2 = os.path.join(_ptmp, "pack_ghost.py")
+                open(_p2, "w", encoding="utf-8").write(_inject("GHOST_DIR", False))
+                _sep.ERRS.clear(); _sep.WARNS.clear()
+                _sep.read_pack_consts(_p2)
+                _j2 = " ".join(_sep.ERRS)
+                _ok2 = ("FULL_DIRS" in _j2 and "GHOST_DIR" in _j2
+                        and "INTEGRITY_REL" not in _j2 and "STEM_RE" not in _j2)
+
+                for _nm, _ok, _why in (
+                    ("新增常量自动解析（无需同步名单）", _ok1,
+                     "FULL_DIRS 未含新常量或守卫报错"),
+                    ("未定义引用必须报错并点名", _ok2,
+                     "守卫未报错/未点名/混入噪声（静默降级复活）"),
+                ):
+                    if _ok:
+                        standalone_n[0] += 1
+                        print("  [OK] (12) %s" % _nm)
+                    else:
+                        fails.append((12, _nm, _why))
+                        print("  [E] (12) %s —— %s" % (_nm, _why))
+            finally:
+                shutil.rmtree(_ptmp, ignore_errors=True)
+        except Exception as e:
+            fails.append((12, "read_pack_consts 反证", "加载/执行异常：%s" % e))
+            print("  [E] (12) read_pack_consts 反证异常：%s" % e)
 
     # ── C 还原校验 ──
     print("\n[C] 还原：正式文件不得被污染（铁律 16.2）")

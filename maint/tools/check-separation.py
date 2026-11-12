@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""开发侧／技能侧分离守卫（铁律第 9 条）。
+"""开发侧／技能侧分离守卫（铁律 §9）。
 
 **为什么要有它**：分离此前只有"机制"（`pack.py` 的白名单／排除表），没有"守卫"——
 机制写错、或有人往技能目录塞东西，出包五项自检照样"全过"，`check.py` 也零反应。
@@ -12,7 +12,7 @@
   (1) 白名单目录防混入。`pack.py` 的 `FULL_DIRS`（core／industries／scripts／assets）
       是**整体递归打包**的——往里塞一份"AI 参考资料""测试数据"会被**照单全收且无声**。
       故：这些目录内出现**未登记**的条目即报错。
-  (2) 素材准入核验（铁律第 9.4 条准入制）。技能目录 `samples/` 属"必须随包的测试素材"，
+  (2) 素材准入核验（铁律 §9.4 准入制）。技能目录 `samples/` 属"必须随包的测试素材"，
       **默认拒绝随包**：须在开发侧准入清单 `maint/samples-manifest.json` 逐条登记
       「许可随包 ＋ 理由」。未登记 → 报错；已登记但文件缺失 → 报错；
       sha256 不符（文件被换过）→ 报错。
@@ -28,9 +28,10 @@
 """
 
 import os
-import re
 import sys
 import json
+import ast
+import copy
 import hashlib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -65,56 +66,93 @@ def digest(p):
 # ────────────────── 从 pack.py 读真源，避免两处硬编码漂移 ──────────────────
 # **不复制常量**：FULL_FILES／FULL_DIRS／EXCLUDE_* 的真源在 pack.py，
 # 本守卫读取它——若守卫另写一份，改了 pack.py 忘记同步守卫，就又是漂移源（铁律 12.3）。
+#
+# **也不维护"要读哪些常量"的手写名单**（2026-11-11 根治）：
+# 早期本函数带一份 `want = {...}` 白名单，只收名单里的 7 个常量名。于是 pack.py
+# 每新增一个 XXX_DIR（本次是 TPL_DIR），名单漏补一次，FULL_DIRS 里的名字就代入不了
+# → 整条解析失败 → 第 (1) 项形同虚设。那份手写名单本身就是第二处真源，是漂移的根。
+# 现改为：**自动收 pack.py 全部模块级赋值**（不筛选名字）→ 先收能字面量求值的进
+# 解析环境 → 再把含名字引用的常量代入环境求值。pack.py 以后无论加多少常量，
+# 守卫都自动认识，无需同步、永不漂移。
+# 历史教训仍在（DEVLOG 2026-10-14 Bug1）：解析失败**必须报错**，绝不 `except: pass`
+# 静默降级——那会让守卫表现为"永远绿"，比没有守卫更危险。
 
-def read_pack_consts():
-    """从 pack.py 抠出 FULL_FILES／FULL_DIRS／EXCLUDE_DIRS／EXCLUDE_FILES 等常量。
+# 第 (1) 项真正会用到的常量。前两个缺了＝整项没查，必须报错；
+# 后两个缺了＝少排除开发资料，可能误报，给警告。除此之外不设任何名单。
+_MUST = ("FULL_DIRS", "FULL_FILES")
+_SHOULD = ("EXCLUDE_DIRS", "EXCLUDE_FILES")
 
-    用 ast 解析比正则稳（列表里可能有注释、换行、字符串拼接）。但**列表里若引用了
-    同文件内其他常量**（实况：`FULL_DIRS = [..., SELFTEST_DIR]`），`ast.literal_eval`
-    会抛异常——**早期版本正是 `except: pass` 静默吞掉，导致 FULL_DIRS 整个丢失、
-    第 (1) 项扫描空集、永远"通过"**（2026-10-14 负测试当场暴露）。
-    故：先两遍收集（第一遍纯字面量，第二遍把已解析的名字代入再试），
-    且**解析失败必须报错，不得静默**——否则守卫自己就成了"摆样子"。
+
+class _InlineNames(ast.NodeTransformer):
+    """把表达式里的 Name 换成它字面量值的 Constant，再交给 literal_eval 求值。
+
+    只负责"名字 → 值"这一步；列表／集合／字典／字符串拼接等语义一概交给 Python
+    自己的 literal_eval，不自己重写表达式求值（少一处可漂移的实现）。遇到环境里
+    没有的名字，记进 unresolved，由调用方显式报错，绝不静默。
     """
-    import ast
-    src = open(PACK, encoding="utf-8").read()
+
+    def __init__(self, env):
+        self.env = env
+        self.unresolved = []
+
+    def visit_Name(self, node):
+        if node.id in self.env:
+            return ast.copy_location(ast.Constant(value=self.env[node.id]), node)
+        self.unresolved.append(node.id)
+        return node
+
+
+def read_pack_consts(pack_path=None):
+    """读 pack.py 全部模块级常量（含名字引用代入），返回 {名: 值}。
+
+    pack_path 可选：默认读正式 pack.py；传副本路径供冒烟验证"新增常量自动解析"
+    （铁律 16.2 副本操作，不碰正式文件）。
+    """
+    src = open(pack_path or PACK, encoding="utf-8").read()
     tree = ast.parse(src)
-    want = {"FULL_FILES", "FULL_DIRS", "EXCLUDE_DIRS", "EXCLUDE_FILES",
-            "PRIVATE_DIR", "SELFTEST_DIR", "NONREC_DIRS"}
-    raw = {}
+    # 第一遍：收全部模块级赋值，能直接字面量求值的进解析环境 env
+    env, assigns = {}, {}
     for node in tree.body:
         if isinstance(node, ast.Assign):
             for t in node.targets:
-                if isinstance(t, ast.Name) and t.id in want:
-                    raw[t.id] = node.value
+                if isinstance(t, ast.Name):
+                    assigns[t.id] = node.value
+                    try:
+                        env[t.id] = ast.literal_eval(node.value)
+                    except Exception:
+                        pass
+    # 第二遍：对含名字引用的常量，代入 env 后再求值（FULL_DIRS 走这里）
+    got = dict(env)
+    unresolved = []
+    for name, node in assigns.items():
+        if name in got:
+            continue
+        inl = _InlineNames(env)
+        val_node = inl.visit(copy.deepcopy(node))
+        ast.fix_missing_locations(val_node)
+        if inl.unresolved:
+            # 只诊断守卫真正要用的常量。INTEGRITY_REL=os.path.join(...)、
+            # STEM_RE=re.compile(...) 里的 os／re 是模块名，属设计内跳过的非字面量
+            # 表达式，不该混进"未解析引用"里稀释报错（否则点不准到底哪个名字没定义）。
+            if name in _MUST or name in _SHOULD:
+                unresolved.append("%s→%s" % (name, "/".join(sorted(set(inl.unresolved)))))
+            continue
+        try:
+            got[name] = ast.literal_eval(val_node)
+        except Exception:
+            # os.path.join(...)、re.compile(...) 等非字面量表达式：守卫本就不用，
+            # 跳过即可（pack.py 自己会正常执行它们）。
+            pass
 
-    got = {}
-    # 两遍解析：先收纯字面量，再用已知名字代入递归解析
-    for _ in range(3):
-        for name, node in raw.items():
-            if name in got:
-                continue
-            try:
-                got[name] = ast.literal_eval(node)
-            except Exception:
-                # 尝试把已解析的名字替换为字面量后再解析
-                try:
-                    repl = {k: repr(v) for k, v in got.items()}
-                    code = ast.unparse(node)
-                    for k, v in repl.items():
-                        code = re.sub(r"\b%s\b" % re.escape(k), v, code)
-                    got[name] = ast.literal_eval(code)
-                except Exception:
-                    continue
-    missing = want - set(got)
-    # FULL_DIRS 是第 (1) 项的命脉：缺了它整项等于没查，必须报错
-    if "FULL_DIRS" not in got:
-        err("无法从 pack.py 解析 FULL_DIRS（第 (1) 项白名单防混入将形同虚设）——"
-            "请检查 pack.py 的写法或本守卫的解析逻辑")
-    if "FULL_FILES" not in got:
-        err("无法从 pack.py 解析 FULL_FILES")
-    if missing:
-        warn("未解析出的常量：%s（可能无碍，仅提示）" % sorted(missing))
+    # 命脉常量：缺了第 (1) 项等于没查，必须报错，并点名是哪几个引用没定义
+    hint = ("；未解析的名字引用：%s" % "，".join(unresolved)) if unresolved else ""
+    for key in _MUST:
+        if key not in got:
+            err("无法从 pack.py 解析 %s（第 (1) 项白名单防混入将形同虚设）"
+                "——请检查 pack.py 的写法%s" % (key, hint))
+    for key in _SHOULD:
+        if key not in got:
+            warn("%s 未能解析（按空集处理，可能少排除开发资料）" % key)
     return got
 
 
@@ -260,7 +298,7 @@ def main():
     if "--help" in sys.argv or "-h" in sys.argv:
         print(__doc__)
         return 0
-    print("开发侧／技能侧分离守卫（铁律第 9 条）")
+    print("开发侧／技能侧分离守卫（铁律 §9）")
     print("=" * 62)
 
     if not os.path.isdir(SKILL):

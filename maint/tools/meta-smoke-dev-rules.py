@@ -29,7 +29,7 @@ SMOKE = os.path.join(DEV, "maint", "tools", "smoke-dev-rules.py")
 #   对不上的打瘸点等于**没验**（元自测自己踩了 12.5.4.3 的坑）。
 #   改为按**调用语句**打瘸，与各维内部实现解耦。
 CRIPPLES = [
-    (1, "条号连续性", "check_structure(s)"),
+    (1, "节号连续性", "check_structure(s)"),
     (2, "导读表", "check_guide(s)"),
     (3, "悬空引用", 'check_refs(s, show="--refs" in args)'),
     (4, "废止词", "check_wording(s)"),
@@ -133,7 +133,7 @@ def main():
 
     print("\n" + "=" * 62)
     # 数字**从两张表派生**，不手写常量——写死过一次：两组各改各的，
-    # 结论行仍报"12 个打瘸点"，而实际跑了 14 个（铁律第 12 条：同一事实两处写必漂）。
+    # 结论行仍报"12 个打瘸点"，而实际跑了 14 个（铁律 §12：同一事实两处写必漂）。
     total = len(CRIPPLES) + len(CRIPPLES_FN)
     if fails:
         print("元自测未通过：%d／%d 个打瘸点未被发现（该项判据无区分度）"
