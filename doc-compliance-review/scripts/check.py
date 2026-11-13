@@ -2467,6 +2467,7 @@ def _check_menu_entries():
         "法规汇编": "legal-compile",
         "引用核验": "legal-verify",
         "公文写作": "gb9704 版式与体检",
+        "套用模板": "tpl-engine.py use（模板库复用）",
     }
     miss = [k for k in MUST if k not in block]
     if miss:
@@ -3723,6 +3724,49 @@ def check_sample_baseline():
         pass
 
 
+def check_template_library():
+    """模板库三真源咬合（v3.34.0）：目录／清单／指纹基线，缺一即报。
+
+    为什么单设一条：此前 `tpl-engine.py` 的 manifest_md() 注释写着「check.py 会比对
+    两者是否一致」，实际 check.py 里**根本没有**这条判据；template-guide.md 又承诺
+    「改了模板没换版本号，脚本会拦下」，而 parse_meta_line 只校验 X.Y.Z 格式。
+    两句都是「注释／文档说了、代码没做」。本守卫把两句兑现成机械判据：
+      · 清单与实扫不一致 → 报出双方读数；
+      · 正文改了但版本号没换（或版本换了正文没动）→ 报错；
+      · 库目录不存在／没有 .tpl.md／基线缺失 → 一律 err，不静默跳过（12.5.4.2）。
+    「有守卫」本身也要验：smoke-test.py 配反向注入，改坏清单或正文须当场报红。
+    """
+    td = os.path.join(ROOT, "templates")
+    if not os.path.isdir(td):
+        err("模板库目录缺失：templates/（随包内置示范模板＋清单＋指纹基线）")
+        return
+    tpls = [f for f in sorted(os.listdir(td)) if f.endswith(".tpl.md")]
+    if not tpls:
+        err("模板库 templates/ 内没有任何 .tpl.md 模板——库为空，清单与基线无从生效")
+        return
+    # 打包白名单：库不在 FULL_DIRS 里，则包里根本没有库，门禁却在开发源上判绿＝假绿
+    pack = os.path.join(HERE, "pack.py")
+    if os.path.exists(pack):
+        pk = _read(pack)
+        if not re.search(r"(?m)^TPL_DIR\s*=\s*[\"']templates[\"']", pk) or \
+           "TPL_DIR" not in re.search(r"(?m)^FULL_DIRS\s*=.*$", pk).group(0):
+            err("模板库 templates/ 未登记进 pack.py 的 FULL_DIRS——包内会缺库，"
+                "本地门禁判绿属假绿")
+    try:
+        import importlib.util as _ilu
+        spec = _ilu.spec_from_file_location("_ck_tpl_lib", os.path.join(HERE, "tpl-engine.py"))
+        m = _ilu.module_from_spec(spec)
+        spec.loader.exec_module(m)
+    except Exception as e:
+        err("模板库守卫无法加载 tpl-engine.py：%s" % e)
+        return
+    problems = m.verify_manifest(td) + m.verify_baseline(td)
+    if problems:
+        err("模板库三真源不一致（%d 项）：%s" % (len(problems), "；".join(problems[:4])))
+    else:
+        info("模板库：%d 份模板，清单与指纹基线均与实扫一致" % len(tpls))
+
+
 def check_tpl_engine():
     """模板引擎自洽：引擎在、能加载、正例过、负例拦得住。
 
@@ -4181,6 +4225,7 @@ def main():
         check_net_tier_consistency()
         check_security_matrix()
         check_tpl_engine()
+        check_template_library()
         check_verify_engine()
         check_tier_requirement()
         check_format_matrix()

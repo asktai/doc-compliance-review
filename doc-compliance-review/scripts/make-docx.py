@@ -1437,6 +1437,26 @@ def doc_template(spec):
         doc.add_paragraph("留痕来源：%s"
                           % ("模板正文首行 <!-- tpl: … --> 注释" if _meta.get("source") == "body"
                              else "spec.template.meta"))
+    # v3.34.0：兑现 template-guide.md 第 5 步与 SKILL 第十七节的承诺——出件附《转模板溯源说明》。
+    # 只在有 provenance 时出（撰写模板链路无源件，硬造一节等于编造来源）；逐项照录，不补写、不推断。
+    pr = t.get("provenance") or {}
+    if pr:
+        doc.add_heading("六、转模板溯源说明", level=2)
+        doc.add_paragraph("源件名称：%s　源件日期：%s"
+                          % (pr.get("source_name") or "—", pr.get("source_date") or "—"))
+        doc.add_paragraph("占位符对照来源：%s" % (pr.get("placeholder_map_from") or "—"))
+        for label, key in (("剔除的本案一次性条款", "removed"),
+                           ("按标准立场改写的条款（改了什么／为什么）", "rewritten"),
+                           ("补齐的必备条款", "added")):
+            items = pr.get(key) or []
+            doc.add_paragraph("%s：" % label)
+            if isinstance(items, list) and items:
+                for x in items:
+                    doc.add_paragraph("· %s" % (x if isinstance(x, str) else str(x)))
+            else:
+                doc.add_paragraph("· 无（或本次未登记）")
+        doc.add_paragraph("说明：本表由转模板流程据实填写，供下次复用时反查来源；"
+                          "模板不替代个案审查，占位符填实后须经执业律师复核。")
     return doc
 
 

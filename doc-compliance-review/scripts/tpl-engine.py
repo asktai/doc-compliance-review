@@ -25,6 +25,13 @@
   python scripts/tpl-engine.py check  <spec.json>              # 只体检，不出件
   python scripts/tpl-engine.py render <spec.json> [--switch 有第三方=1 ...]
   python scripts/tpl-engine.py manifest <模板目录>              # 派生模板清单
+  python scripts/tpl-engine.py use <spec.json> --value 名=值      # 套用模板，填实占位符出具体合同
+  python scripts/tpl-engine.py audit <spec.json>                 # 通用化加固自检（只报疑似，不判对错）
+  python scripts/tpl-engine.py baseline <模板目录> [--update]     # 指纹基线校验／重刷
+
+**render 与 use 的分工（别混）**：render 出的是「模板版」——正文**保留** `{{占位符}}`，
+那是给使用者下次填的骨架；use 才是「套用模板」——把值填实、展开条件段，出一份**具体合同草案**。
+两者共用同一套校验（必填／开关／版本留痕），但产物语义相反，故不合并成一个函数。
 """
 import sys as _sys
 _sys.dont_write_bytecode = True   # 不在技能目录留下 __pycache__（避免缓存残留）
@@ -61,6 +68,30 @@ SOFT_NAME_HINT = ("签字", "签章", "盖章", "签名", "日期", "年月日",
 class TplError(Exception):
     pass
 
+
+# ------------------------------------------------------------------ 加固自检（v3.34.0）
+# 只查**形态**，不做法律判断：命中只报「疑似残留」，由执业律师复核决定改不改。
+# 词表收的是「个案限定语」这类一看就是某一次交易专属的写法，不是条款实体是否妥当。
+CASE_SPECIFIC_PATS = (
+    (r"就本合同项下[^，。；\n]{0,40}而言", "个案限定语「就本合同项下…而言」"),
+    (r"\d{4}\s*年\s*\d{1,2}\s*月\s*批次", "具体年月批次"),
+    (r"(?:本项目|本次交易|该批次|本批次|上述批次|这一次)", "个案指代（本项目／本次交易／该批次）"),
+    (r"\d{4}\s*年\s*\d{1,2}\s*月\s*\d{1,2}\s*日\s*(?:签订|签署|生效)", "具体签约/生效日期"),
+    (r"(?:甲方|乙方)\s*于\s*\d{4}", "个案时间锚点"),
+    (r"(?:特定|一次性)\s*(?:项目|报价|豁免|安排)", "一次性条款用语"),
+)
+# 合同八大核心条款（真源：SKILL.md 第五节 B 组）。只查**关键词是否露面**，
+# 不判条款写得对不对、全不全——故名称一律带「须人工核对」，不作通过/不通过结论。
+CORE_CLAUSE_HINTS = (
+    ("定义条款", ("定义", "术语")),
+    ("标的条款", ("标的", "规格", "型号", "数量")),
+    ("价格与支付", ("价款", "价格", "支付", "付款", "含税")),
+    ("交付与验收", ("交付", "交货", "验收")),
+    ("质量保证", ("质量保证", "保证期", "质保", "售后")),
+    ("知识产权", ("知识产权", "成果归属", "许可")),
+    ("违约责任", ("违约责任", "违约金", "赔偿")),
+    ("争议解决", ("争议解决", "管辖", "仲裁", "诉讼")),
+)
 
 # ------------------------------------------------------------------ 元数据
 def parse_meta_line(text):
@@ -304,19 +335,151 @@ def render(spec, switches=None):
     return out, r["info"]
 
 
+# ------------------------------------------------------------------ 套用模板（v3.34.0）
+def fill_placeholders(body, values):
+    """把 `{{名}}` 填实。返回 (正文, 未填名列表)。**不猜、不补**：没给值就报名字。"""
+    v = {_norm_name(k): val for k, val in (values or {}).items()}
+    missing = []
+
+    def _sub(m):
+        n = m.group(1).strip()
+        if n not in v or str(v[n]).strip() == "":
+            missing.append(n)
+            return m.group(0)
+        return str(v[n])
+
+    out = PH_RE.sub(_sub, body or "")
+    return out, sorted(set(missing))
+
+
+def use_template(spec, switches=None):
+    """套用：按出件口径校验 → 展开条件段 → 填实占位符 → 查残留。
+
+    与 render() 的差别：render 保留 `{{…}}`（那是模板版），use 把值填进去（那是具体合同）。
+    校验口径完全一致（必填、开关、版本留痕），不另立一套判据。
+    """
+    sw = switches or {}
+    r = check(spec, sw, filling=True)
+    if r["errors"]:
+        raise TplError("套用前校验未通过：\n  - " + "\n  - ".join(r["errors"]))
+    seg_errs = []
+    out = _render_segments(r["info"]["body"], sw, seg_errs)
+    if seg_errs:
+        raise TplError("条件段渲染失败：\n  - " + "\n  - ".join(seg_errs))
+    t = spec.get("template") if isinstance(spec.get("template"), dict) else {}
+    out, missing = fill_placeholders(out, t.get("values"))
+    if missing:
+        raise TplError("以下占位符未给值（套用不替使用者猜）：%s"
+                       % "、".join("{{%s}}" % n for n in missing))
+    left = scan_placeholders(out)
+    if left:
+        raise TplError("填实后仍有占位符残留：%s" % "、".join("{{%s}}" % n for n in left))
+    # 与 render() 同口径：条件段被裁掉后留下的空行堆积要收掉，别出一份空行连篇的合同
+    out = re.sub(r"\n{3,}", "\n\n", out).strip()
+    return out, r["info"]
+
+
+def spec_from_tpl(path, values=None, switches=None):
+    """把库里一份 `.tpl.md` 读成 spec——「存→取→用」闭环的「取」。
+
+    没有这份转换，use 只认 spec.json，使用者得手工把模板抄成 spec 才能套用，
+    模板存下来也等于没用。占位符一律按**必填**处理（不猜哪些可选），
+    开关须显式给值，沿用「不替使用者决定」的口径。
+    """
+    text = io.open(path, encoding="utf-8").read()
+    lines = text.splitlines()
+    m = META_RE.search(lines[0]) if lines else None
+    if not m:
+        raise TplError("模板文件首行缺版本留痕：%s" % os.path.basename(path))
+    meta = parse_meta_line(m.group(0))
+    body = strip_meta(text)
+    used = scan_placeholders(body)
+    sw_names, sw_errs = find_switches(body)
+    if sw_errs:
+        raise TplError("模板条件段结构有误：%s" % "；".join(sw_errs))
+    return {"template": {
+        "name": meta.get("name") or os.path.basename(path),
+        "body": text,                      # 保留首行留痕，resolve_meta 从它取版本
+        "placeholders": [{"name": "{{%s}}" % n, "meaning": "（由模板正文扫描，必填）",
+                          "required": True} for n in used],
+        "values": values or {},
+        "switches": switches or {},
+        "_from_tpl": os.path.basename(path),
+    }}
+
+
+def load_any(path, values=None, switches=None):
+    """use/audit 的输入既可是 spec.json，也可是库里的 .tpl.md。"""
+    if path.endswith(".tpl.md"):
+        return spec_from_tpl(path, values, switches)
+    return _read_spec(path)
+
+
+# ------------------------------------------------------------------ 通用化加固自检（v3.34.0）
+def audit_reinforcement(spec):
+    """转模板第 4 步「通用化与加固」的**机械可检出部分**。
+
+    返回 (疑似残留列表, 未见条款关键词列表, 留痕提示列表)。三条都只是「提示」级：
+    条款实体是否合适、不利条款该不该改、必备条款是否真齐——全是法律判断，
+    本函数一律不下结论，措辞固定带「须人工核对」。
+    """
+    t = spec.get("template") if isinstance(spec.get("template"), dict) else {}
+    body = strip_meta(t.get("body") or "")
+    suspects = []
+    for i, line in enumerate(body.splitlines(), 1):
+        for pat, label in CASE_SPECIFIC_PATS:
+            if re.search(pat, line):
+                suspects.append("第 %d 行疑似%s：%s" % (i, label, line.strip()[:60]))
+                break
+    unseen = [name for name, kws in CORE_CLAUSE_HINTS
+              if not any(k in body for k in kws)]
+    pr = t.get("provenance") if isinstance(t.get("provenance"), dict) else {}
+    notes = []
+    if not pr:
+        notes.append("未附《转模板溯源说明》——源件、剔除项、改写项均无从反查")
+    else:
+        if not pr.get("rewritten"):
+            notes.append("溯源说明未登记「按标准立场改写的条款」——须人工核对是否有不利条款被固化")
+        if not pr.get("removed"):
+            notes.append("溯源说明未登记「剔除的一次性条款」——须人工核对个案信息是否清干净")
+    return suspects, unseen, notes
+
+
+def audit_md(spec):
+    """把自检结果排成人读的提示清单。**不产出通过/不通过结论**。"""
+    suspects, unseen, notes = audit_reinforcement(spec)
+    L = ["# 转模板加固自检（机械可检出部分）", "",
+         "> 本清单只报**形态**疑点，不判条款对错；每条都须执业律师人工核对。",
+         "> 「未见关键词」不等于条款缺失——可能是用了别的措辞，机器读不出来。", ""]
+    L.append("## 一、个案限定语疑似残留（%d 处）" % len(suspects))
+    L += ["- " + s for s in suspects] or ["- 未检出明显个案限定语形态（仍须人工通读）"]
+    L += ["", "## 二、未见关键词的核心条款（%d 项）" % len(unseen)]
+    L += ["- %s —— 须人工核对是否已用其他措辞写明" % n for n in unseen] or ["- 八组关键词均露面（仍须人工核对条款实体）"]
+    L += ["", "## 三、溯源留痕提示（%d 条）" % len(notes)]
+    L += ["- " + s for s in notes] or ["- 溯源说明三项齐备"]
+    return "\n".join(L) + "\n"
+
+
 # ------------------------------------------------------------------ 清单派生
 def scan_dir(d):
-    """扫模板目录里所有 *.tpl.md（或 .md），抽版本留痕，派生清单。"""
+    """扫模板目录里所有 `*.tpl.md`，抽**首行**版本留痕，派生清单。
+
+    两条收窄（v3.34.0 修）：① 只认 `.tpl.md` 后缀——原先连 `.md` 一起扫，
+    派生的《模板清单.md》自己写着 `<!-- tpl: … -->` 这句示例，会被 META_RE
+    当成又一份模板收进清单，清单越扫越胖；② 只认**首行**留痕，正文里引用
+    这句写法的地方不再误命中。真源约定本来就是「首行写」，这里对齐它。
+    """
     rows = []
     for fn in sorted(os.listdir(d)):
-        if not fn.endswith((".tpl.md", ".md")):
+        if not fn.endswith(".tpl.md"):
             continue
         p = os.path.join(d, fn)
         try:
             text = io.open(p, encoding="utf-8").read()
         except Exception:
             continue
-        m = META_RE.search(text)
+        first = text.splitlines()[0] if text.splitlines() else ""
+        m = META_RE.search(first)
         if not m:
             continue
         try:
@@ -337,7 +500,7 @@ def scan_dir(d):
 def manifest_md(rows):
     L = ["# 模板清单（自动派生，勿手改）", "",
          "> 真源是各模板首行的 `<!-- tpl: … -->` 留痕；本清单由 `scripts/tpl-engine.py manifest` 扫描生成，",
-         "> `check.py` 会比对两者是否一致——改了模板忘更新清单会直接报错。", "",
+         "> `check.py` 的 check_template_library() 会比对两者是否一致——改了模板忘更新清单会直接报错。", "",
          "| 模板 | 版本 | 日期 | 占位符 | 条件开关 | 正文指纹 | 变更 |", "|---|---|---|---|---|---|---|"]
     for r in rows:
         if r.get("error"):
@@ -347,6 +510,103 @@ def manifest_md(rows):
                  % (r["name"], r["version"], r["date"], len(r["placeholders"]),
                     "、".join(r["switches"]) or "—", r["sha256"], r["change"]))
     return "\n".join(L) + "\n"
+
+
+# ------------------------------------------------------------------ 模板库真源（v3.34.0）
+MANIFEST_NAME = "模板清单.md"
+BASELINE_NAME = "_tpl-baseline.json"
+
+
+def manifest_path(d):
+    return os.path.join(d, MANIFEST_NAME)
+
+
+def verify_manifest(d):
+    """清单 ↔ 实扫 逐项比对。返回问题列表（空＝一致）。
+
+    这是把 tpl-engine.py 注释里那句「check.py 会比对」兑现成真判据：
+    · 清单缺一行／多一行 → 报出双方读数；
+    · 同一模板的版本、占位符数、开关、正文指纹任一项不符 → 报出双方读数；
+    · 清单不存在 → 视作未建库（调用方决定要不要报错，不静默跳过）。
+    """
+    want = manifest_md(scan_dir(d))
+    p = manifest_path(d)
+    if not os.path.exists(p):
+        return ["模板清单缺失：%s（跑 tpl-engine.py manifest <目录> --out <文件> 生成）" % p]
+    got = io.open(p, encoding="utf-8").read()
+    if got.strip() == want.strip():
+        return []
+    # 逐行报差，别只说「不一致」（12.5 要求报出双方读数）
+    wl, gl = want.strip().splitlines(), got.strip().splitlines()
+    diffs = []
+    for i in range(max(len(wl), len(gl))):
+        w = wl[i] if i < len(wl) else "<缺行>"
+        g = gl[i] if i < len(gl) else "<缺行>"
+        if w != g:
+            diffs.append("第 %d 行：实扫「%s」／清单「%s」" % (i + 1, w[:70], g[:70]))
+        if len(diffs) >= 6:
+            break
+    return ["模板清单与实扫不一致（改了模板须重刷清单）：" + "；".join(diffs)]
+
+
+def baseline_scan(d):
+    """实扫：{文件名: {ver, sha256(正文全文)}}。"""
+    out = {}
+    for r in scan_dir(d):
+        if r.get("error"):
+            out[r["file"]] = {"error": r["error"]}
+            continue
+        p = os.path.join(d, r["file"])
+        body = strip_meta(io.open(p, encoding="utf-8").read())
+        out[r["file"]] = {"ver": r["version"],
+                          "sha256": hashlib.sha256(body.encode("utf-8")).hexdigest()}
+    return out
+
+
+def verify_baseline(d):
+    """「改了模板没换版本号，脚本会拦下」这句承诺的判据（template-guide.md 第 23 行）。
+
+    逐模板比对：正文 sha256 变了而 ver 没变 → 报错（改了内容必须升版本）；
+    ver 变了而 sha256 没变 → 也报（版本号不能空转，须同时重刷基线）；
+    基线缺该文件 → 报「未登记」，不许静默放行。返回问题列表。
+    """
+    p = os.path.join(d, BASELINE_NAME)
+    if not os.path.exists(p):
+        return ["模板指纹基线缺失：%s（跑 tpl-engine.py baseline <目录> --update 建立）" % p]
+    try:
+        base = json.loads(io.open(p, encoding="utf-8").read()).get("templates") or {}
+    except Exception as e:
+        return ["模板指纹基线解析失败：%s" % e]
+    real = baseline_scan(d)
+    bad = []
+    for fn, cur in real.items():
+        old = base.get(fn)
+        if not old:
+            bad.append("%s 未登记基线（跑 baseline --update）" % fn)
+            continue
+        if cur.get("error"):
+            bad.append("%s 留痕不合规：%s" % (fn, cur["error"]))
+            continue
+        if old.get("ver") != cur["ver"] and old.get("sha256") == cur["sha256"]:
+            bad.append("%s 版本号从 %s 改成 %s 但正文未变（空转，须同步说明）"
+                       % (fn, old.get("ver"), cur["ver"]))
+        elif old.get("sha256") != cur["sha256"] and old.get("ver") == cur["ver"]:
+            bad.append("%s 正文已改但版本号仍是 %s（改模板须换版本号并重刷基线）"
+                       % (fn, cur["ver"]))
+    for fn in base:
+        if fn not in real:
+            bad.append("基线里的 %s 在库中已不存在（删模板须重刷基线）" % fn)
+    return bad
+
+
+def write_baseline(d):
+    """重刷指纹基线（人工确认改动后跑）。"""
+    p = os.path.join(d, BASELINE_NAME)
+    io.open(p, "w", encoding="utf-8").write(json.dumps({
+        "_说明": "模板正文指纹基线（tpl-engine.py baseline --update 生成）。"
+                 "改模板须同时换版本号并重刷本文件；check.py 的 check_template_library() 会比对。",
+        "templates": baseline_scan(d)}, ensure_ascii=False, indent=2) + "\n")
+    return p
 
 
 # ------------------------------------------------------------------ CLI
@@ -382,6 +642,23 @@ def main():
     m.add_argument("dir")
     m.add_argument("--out", default=None)
 
+    u = sub.add_parser("use", help="套用模板：填实占位符出具体合同草案（不是模板版）")
+    u.add_argument("spec")
+    u.add_argument("--switch", action="append", default=[])
+    u.add_argument("--value", action="append", default=[], help="占位符名=值，可重复")
+    u.add_argument("--out", default=None)
+
+    au = sub.add_parser("audit", help="转模板加固自检（只报疑似残留，不判条款对错）")
+    au.add_argument("spec")
+    au.add_argument("--out", default=None)
+
+    b = sub.add_parser("baseline", help="模板指纹基线：校验／--update 重刷")
+    b.add_argument("dir")
+    b.add_argument("--update", action="store_true")
+
+    v = sub.add_parser("verify", help="模板库总检：清单咬合＋指纹基线")
+    v.add_argument("dir")
+
     a = ap.parse_args()
 
     if a.cmd == "manifest":
@@ -392,6 +669,66 @@ def main():
             print("已写：%s（%d 个模板）" % (a.out, len(rows)))
         else:
             print(md)
+        return 0
+
+    if a.cmd == "baseline":
+        if a.update:
+            print("已重刷基线：%s" % write_baseline(a.dir))
+            return 0
+        bad = verify_baseline(a.dir)
+        print("[E] 基线不一致（%d 项）" % len(bad) if bad else "[OK] 基线一致")
+        for x in bad:
+            print("  - " + x)
+        return 1 if bad else 0
+
+    if a.cmd == "verify":
+        bad = verify_manifest(a.dir) + verify_baseline(a.dir)
+        print("[E] 模板库总检（%d 项）" % len(bad) if bad else "[OK] 模板库清单与基线均一致")
+        for x in bad:
+            print("  - " + x)
+        return 1 if bad else 0
+
+    # 各分支各自读输入：audit 可吃 .tpl.md，use 还要等 --value 解析完才构造 spec，
+    # check/render 才用 JSON。**不要**在这里统一 _read_spec——会把 .tpl.md 当 JSON 解析而崩。
+    if a.cmd == "audit":
+        spec = load_any(a.spec)
+        md = audit_md(spec)
+        if a.out:
+            io.open(a.out, "w", encoding="utf-8").write(md)
+            print("已写：%s" % a.out)
+        else:
+            print(md)
+        return 0   # 自检只出提示，不用退出码判「过不过」——那是法律判断，不归机器
+
+    if a.cmd == "use":
+        # --value 覆盖/补齐 spec.template.values（命令行优先，便于一次性套用）
+        vals, swi = {}, _parse_switches(a.switch)
+        for pair in a.value:
+            if "=" not in pair:
+                raise SystemExit("占位符值须写成 名称=值，收到：%s" % pair)
+            k, val = pair.split("=", 1)
+            vals[k.strip()] = val.strip()
+        # .tpl.md 直接入库取值；spec.json 则命令行覆盖 spec 里的 values/switches
+        if a.spec.endswith(".tpl.md"):
+            spec = load_any(a.spec, vals, swi)
+        else:
+            spec = _read_spec(a.spec)
+            t = spec.setdefault("template", {})
+            t.setdefault("values", {}).update(vals)
+            t.setdefault("switches", {}).update(swi)
+            swi = dict(t.get("switches") or {})
+        try:
+            body, info = use_template(spec, swi)
+        except TplError as e:
+            print("[E] " + str(e))
+            return 1
+        if a.out:
+            io.open(a.out, "w", encoding="utf-8").write(body)
+            print("[OK] 已套用：%s（模板 %s ver %s）"
+                  % (a.out, info["template_name"] or "未命名", info["meta"].get("version")))
+        else:
+            print("-" * 60)
+            print(body)
         return 0
 
     spec = _read_spec(a.spec)

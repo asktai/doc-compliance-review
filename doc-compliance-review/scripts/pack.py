@@ -109,7 +109,10 @@ FULL_FILES = ["SKILL.md", "README.md", "安装使用教程.md", "LICENSE.md",
 # 合同的 OCR、真实敏感信息脱敏、以及 A/B 两版比对。
 # 若使用者自行删掉这些样本（例如只留提示词版），smoke-test 相关项一律 SKIP 而非 FAIL。
 SELFTEST_DIR = "samples"
-FULL_DIRS = ["assets", "core", "industries", "scripts", SELFTEST_DIR]
+# templates/ 内置模板库（v3.34.0）：只读示范件＋清单＋指纹基线，随包分发。
+# 与 samples/ 一样只放顶层文件（平台两级目录约束），不放子目录。
+TPL_DIR = "templates"
+FULL_DIRS = ["assets", "core", "industries", "scripts", SELFTEST_DIR, TPL_DIR]
 NONREC_DIRS = {"samples"}   # 只带该目录下的文件，不递归其子目录（子目录为开发侧素材）
 PRIVATE_DIR = "private"
 EXCLUDE_DIRS = {"_归档", "_分发包", "_发布包", "测试合同", "__pycache__"}

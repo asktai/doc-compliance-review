@@ -3,22 +3,27 @@
   "product": "文档合规审查助手AI合同",
   "skill_id": "doc-compliance-review",
   "latest": {
-    "version": "v3.33.1",
-    "date": "2026-11-08",
-    "summary": "冒烟区分度注入全量改走镜像副本，根治异常中断时注入值污染正式文件；新增哈希守恒守卫；装机侧按标准发布动作重建",
+    "version": "v3.34.0",
+    "date": "2026-11-13",
+    "summary": "模板功能强化正式发布（H-19 收口）：内置模板库、套用模板菜单项与溯源说明落地；补 SKILL.md 第二十三节并修正两处错误引用；按标准发布动作重建运行实例与分发包",
     "changes": [
-      "修复装机侧污染：六组注入原是「原地改正式文件＋finally 还原」，异常中断时 finally 不执行，注入值会固化在技能文件里。全检实测运行实例 README.md 残留「169 条」（应为 159 条），开发源与分发包均干净。",
-      "六组注入统一改走整目录镜像副本：只改副本、跑副本自带的门禁（按自身位置反推根目录），正式文件全程只读。干净副本已实证 0 错 0 警，注入仍逐条报出专属措辞。",
-      "新增一条守卫：注入跑完核对四份文档哈希前后一致，把「副本操作不得污染正式文件」从注释承诺变成当场可验的判据。冒烟 292 → 293 项，两档守恒。",
-      "装机侧按标准发布动作重建抹平残留；分发包重新出包并做 UTF-8／GBK 双环境产物验收。"
+      "内置模板库落地：templates/ 示范件＋模板清单＋正文指纹基线三真源，由 check.py 的 check_template_library() 逐项咬合；tpl-engine.py 扩为 check／render／manifest／use／audit／baseline／verify 七个命令，use 可直接吃库里的 .tpl.md，填实占位符出具体合同草案。",
+      "功能总菜单补第 20 项「套用模板」（0–20 共 21 项，按 21.6 取末位空号、不重排既有编号）；转模板出件增《转模板溯源说明》，doc-ir／make-docx 透传 provenance。",
+      "补 SKILL.md 第二十三节「套用模板向导」（入口／三真源／七个命令／出件前硬校验／四条红线），把菜单第 20 项与去向表里错指「第十八节」的两处引用改指本节；触发词映射表同步补一行。",
+      "收口发布：check.py --sign 重签脚本指纹、清 __pycache__；按 publish.py --pack 标准动作重建运行实例（抹平第 (8) 维 13 处跨侧漂移）并出正式分发包，模板库随包分发。"
     ],
     "download_page": "https://github.com/asktai/doc-compliance-review/releases",
     "files": {
-      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.33.1/文档合规审查助手AI合同_v3.33.1_20261108_(doc-compliance-review).skill",
-      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.33.1/文档合规审查助手AI合同_v3.33.1_20261108_(doc-compliance-review).zip"
+      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.34.0/文档合规审查助手AI合同_v3.34.0_20261113_(doc-compliance-review).skill",
+      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.34.0/文档合规审查助手AI合同_v3.34.0_20261113_(doc-compliance-review).zip"
     }
   },
   "history": [
+    {
+      "version": "v3.34.0",
+      "date": "2026-11-13",
+      "summary": "模板功能强化发布＋补第二十三节修引用＋H-19 收口"
+    },
     {
       "version": "v3.33.1",
       "date": "2026-11-08",
@@ -1049,5 +1054,5 @@
   ],
   "_维护说明": "出包后请同步更新本文件（latest 段与 history）。真源是 SKILL.md 的 version 与 VERSION.md 的沿革；本文件是'对外公布的清单'，须与真源一致，否则使用者会被引向旧版。",
   "schema": 1,
-  "version": "3.33.1"
+  "version": "3.34.0"
 }

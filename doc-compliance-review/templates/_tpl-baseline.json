@@ -1,0 +1,9 @@
+{
+  "_说明": "模板正文指纹基线（tpl-engine.py baseline --update 生成）。改模板须同时换版本号并重刷本文件；check.py 的 check_template_library() 会比对。",
+  "templates": {
+    "设备采购合同.tpl.md": {
+      "ver": "1.0.0",
+      "sha256": "edc1ffbdde064ce623e868035f1c012f23c43b6763479f3fed202eb07429b99d"
+    }
+  }
+}

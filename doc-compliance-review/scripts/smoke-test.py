@@ -2557,8 +2557,8 @@ def main():
         _blk = _mm.group(1) if _mm else ""
         _nums = [int(x) for x in re.findall(r"(?m)^\s*(\d+)\.\s", _blk)]
         # 编号连续是硬要求：跳号的话用户回「12」会打空，而菜单看上去毫无异样
-        check("功能菜单 20 项、编号 0–19 连续",
-              len(_nums) == 20 and _nums == list(range(20)),
+        check("功能菜单 21 项、编号 0–20 连续",
+              len(_nums) == 21 and _nums == list(range(21)),
               "实有 %d 项：%s" % (len(_nums), _nums))
         # 七类曾漏掉（或从未有过入口）的能力必须在场——正面断言，缺一项即红
         _need = ["格式转换", "OCR", "结构化", "法规检索", "法规汇编", "引用核验", "公文写作"]

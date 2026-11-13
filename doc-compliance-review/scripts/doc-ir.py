@@ -138,7 +138,10 @@ def template_spec(spec):
             "placeholders": [p for p in (t.get("placeholders") or []) if isinstance(p, dict)],
             "body": body,
             "optional": [o for o in (t.get("optional") or []) if isinstance(o, dict)],
-            "notes": (t.get("notes") or "").strip()}
+            "notes": (t.get("notes") or "").strip(),
+            # v3.34.0：《转模板溯源说明》的数据源。缺该段＝撰写模板链路（本来就没有源件），
+            # 出件时不硬造一节；有该段才出，且逐项照录、不替使用者补写。
+            "provenance": t.get("provenance") if isinstance(t.get("provenance"), dict) else {}}
 
 
 def template_name(spec):
