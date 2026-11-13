@@ -435,6 +435,13 @@ def check_external_refs(s):
       · 只认带"铁律"二字的引用——裸写"第 9.4 条"可能是别家文档的编号；
       · 只认**款号形态**（N.M 起），条号（"铁律第 9 条"）另由 (3) 管；
       · 开发日志与历史记录**豁免**（DEVLOG 记述的是当时的条号，属史实，改了反而失真）。
+
+    **2026-11-12 补第二道断言「同文件多处引用」**（§12.5.1.1.1 (戊)，v1.60.1）：
+    上面三点是**第一道（悬空）**的边界；第二道以**文件**为校验单元——
+    文件内只要有一处带"铁律"的引用即确立语境，同文件内其余同形态但省略前缀的
+    "§N 第 K 行／第 N 条 第 K 行"一并校验：主节号须在 §1—§28 实算集合内；
+    同一第 K 行对应 ≥2 个不同节号且两处均无〔述史〕，即报"改号后只搬了一处"。
+    豁免：行内〔述史〕／反引号内片段／纯裸号无前缀文件；不查语义漂移。
     """
     head("(3b) 外部文件里的铁律条号引用")
     if not _is_rules_itself(s):
@@ -449,6 +456,10 @@ def check_external_refs(s):
     for l in s.splitlines():
         for m in re.finditer(r"\*\*((?:A\.)?\d+(?:\.\d+)+)\s*[^\d.]", l):
             defined.add(m.group(1))
+    # 第二道断言的真源：现行节号集合（实算，不写死 §1—§28）
+    sections = {int(n) for n in re.findall(r"^#{2,3} §(\d+)", s, re.M)}
+    ROW = re.compile(r"(?:§|第\s*)(\d+(?:\.\d+)*)\s*(?:条)?\s*第\s*(\d+)\s*行")
+    BTICK = re.compile(r"`[^`]*`")
 
     roots = [os.path.join(DEV, "maint", "tools"),
              os.path.join(DEV, "maint", "doc-compliance-review"),
@@ -456,6 +467,7 @@ def check_external_refs(s):
     EXEMPT_FILES = {"DEVLOG.md", "CHANGELOG.md"}
     EXEMPT_DIRS = ("scratch", "ai-notes", "test-data", "__pycache__")
     bad = []
+    same_bad = []
     scanned = 0
     for root in roots:
         if not os.path.isdir(root):
@@ -480,9 +492,32 @@ def check_external_refs(s):
                             continue
                         bad.append("%s:%d「铁律 %s」"
                                    % (os.path.relpath(p, DEV), ln, ref))
+                # ── 第二道：同文件多处引用（§12.5.1.1.1 (戊)）──
+                # 入口＝文件内已有带"铁律"的引用；纯裸号文件不进本维。
+                if "铁律" not in txt:
+                    continue
+                by_row = {}
+                for ln2, line2 in enumerate(txt.splitlines(), 1):
+                    if "〔述史〕" in line2:
+                        continue
+                    clean2 = BTICK.sub("", line2)       # 反引号内是举例，不判
+                    for m2 in ROW.finditer(clean2):
+                        num, k = m2.group(1), m2.group(2)
+                        if int(num.split(".")[0]) not in sections:
+                            bad.append("%s:%d「§%s 第 %s 行」"
+                                       % (os.path.relpath(p, DEV), ln2, num, k))
+                        by_row.setdefault(k, {}).setdefault(num, []).append(ln2)
+                for k, nums in sorted(by_row.items(), key=lambda x: int(x[0])):
+                    if len(nums) >= 2:
+                        same_bad.append("%s 第 %s 行 → %s"
+                                        % (os.path.relpath(p, DEV), k,
+                                           "／".join(sorted(nums))))
     if bad:
         err("外部文件里的铁律条号已悬空（真源改号后未同步搬迁）：%s" % "、".join(bad[:8]))
-    else:
+    if same_bad:
+        err("同文件多处引用条号不一致（改号后只搬了一处，见 §12.5.1.1.1 (戊)）：%s"
+            % "、".join(same_bad[:8]))
+    if not bad and not same_bad:
         info("外部文件（%d 份）里的铁律条号引用全部对得上现行条号" % scanned)
 
 

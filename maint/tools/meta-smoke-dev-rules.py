@@ -52,6 +52,9 @@ TAG = "元自测"
 # 改为**让该维函数一进就 return**：维度标题照出，只是不报任何错。
 # 判据：冒烟须报"守卫失效"，**且不得是靠"基线未过"蒙对的**。
 CRIPPLES_FN = [
+    # (3b) 读磁盘文件，不能从 main 删调用（同 8/14/16/18 理）；
+    # 2026-11-12 补：新增「同文件多处引用」断言后，该维须有自己的打瘸点。
+    (19, "同文件多处引用", "def check_external_refs(s):"),
     (8, "跨侧一致性", "def check_cross_side(s_ignored=None):"),
     (14, "在线版同步", "def check_online_md(s):"),
     (16, "结转清单", "def check_open_issues(s_ignored=None):"),

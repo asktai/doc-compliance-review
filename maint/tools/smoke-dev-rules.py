@@ -879,6 +879,46 @@ def main():
         else:
             print("  [OK] (3b) check-separation.py 已逐字节还原")
 
+    # ── (3b) 新增：「同文件多处引用条号不一致」正例 ＋〔述史〕豁免反例 ──
+    # 复现 v1.37.0 漏网：同一文件里两处指向同一表格行，真源改号后只搬了一处
+    # （§12.5.1.1.1 (戊)）。**探针内容一律拼接**：(3b) 会扫本文件，
+    # 源码里写死引用形态会让自己变成违规样本（与上面「外部条号悬空」同一教训）。
+    PROBE3B = os.path.join(DEV, "maint", "tools", "_3b_probe.md")
+    SIG, A, B, K = "§", "9", "12", "4"
+    line_a = "规则依铁律 " + SIG + A + " 第 " + K + " 行。"
+    line_b = "另见 " + SIG + B + " 第 " + K + " 行。"
+    line_hist = "〔述史〕旧号写作 " + SIG + B + " 第 " + K + " 行，是当时的条号。"
+    try:
+        with open(PROBE3B, "w", encoding="utf-8") as f:
+            f.write("# (3b) 注入探针（临时，用完即删）\n\n" + line_a + "\n" + line_b + "\n")
+        rc_sf, out_sf = run_check()
+        if rc_sf != 0 and "同文件多处引用" in out_sf:
+            standalone_n[0] += 1
+            print("  [OK] (3b) %-22s 拦住（报「同文件多处引用条号不一致」）"
+                  % "同文件多处引用")
+        else:
+            fails.append((3, "同文件多处引用", "未报条号不一致（守卫失效）"))
+            print("  [E] (3b) 同文件多处引用        未拦住（守卫失效）")
+
+        # 反例：同样的不一致，但第二处带〔述史〕→ 须**不误报**
+        with open(PROBE3B, "w", encoding="utf-8") as f:
+            f.write("# (3b) 注入探针（临时，用完即删）\n\n" + line_a + "\n" + line_hist + "\n")
+        rc_sf2, out_sf2 = run_check()
+        if "同文件多处引用" not in out_sf2:
+            standalone_n[0] += 1
+            print("  [OK] (3b) %-22s 未误报（〔述史〕豁免生效）" % "述史豁免")
+        else:
+            fails.append((3, "述史豁免", "〔述史〕行仍被判不一致（豁免失效）"))
+            print("  [E] (3b) 述史豁免              〔述史〕行被误判")
+    finally:
+        if os.path.exists(PROBE3B):
+            os.remove(PROBE3B)
+    if os.path.exists(PROBE3B):
+        fails.append((3, "探针清理", "临时探针未删除——正式目录被污染"))
+        print("  [E] (3b) 探针清理              临时探针未删除")
+    else:
+        print("  [OK] (3b) 临时探针已删除，正式目录零污染")
+
     # ── 第 (12) 档：分离守卫（铁律 §9）──
     # 分离守卫查的是"技能目录里有没有不该在那的东西"，与铁律正文的十六维不同源，
     # 故与第 (8) 维同法：**造真违规 → 断言拦住 → 立即还原**。
