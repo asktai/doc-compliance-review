@@ -2258,11 +2258,13 @@ def main():
     except Exception as e:
         check("法规汇编引擎自检", False, repr(e))
 
-    # --- 3.55 品牌头标（横幅／图标／技能卡片：一次出齐 5 张，卡片不许成孤儿）---
-    # 为什么单列一段：skill-card.png 的生成器曾是临时脚本 make-card.py（从未入 git、用完即丢），
-    # 升级后没人记得怎么重刷，头标守卫两次拦下「第 5 张图仍是旧版本」（v3.25.1、v3.25.7）。
-    # v3.25.7 把卡片并入 make-header.py，这里补上独立用例，防它再退化回孤儿。
-    print("\n[3.55] 品牌头标（5 张，含技能卡片）")
+    # --- 3.55 品牌头标（v3.35.0 起只出 banner-dark 一张）---
+    # 历史教训两段都留着：skill-card.png 的生成器曾是临时脚本 make-card.py（从未入 git、
+    # 用完即丢），v3.25.7 把五张图并入 make-header.py 并立守卫「卡片不许成孤儿」；
+    # v3.35.0 明确撤销「五张」口径——仅 banner-dark 被 SKILL/README 顶部引用，其余四张是
+    # 无引用孤儿图，白占 530 KB 包容量。守卫的下半句仍然有效：**删图须连生成器一起删**，
+    # 否则下次重绘它们会长回来——本段四条用例把「只出一张」钉住，防口径悄悄回潮。
+    print("\n[3.55] 品牌头标（1 张横幅）")
     try:
         import re as _re3
         with open(os.path.join(HERE, "..", "SKILL.md"), encoding="utf-8-sig") as _sf:
@@ -2271,35 +2273,35 @@ def main():
         _hd = os.path.join(work, "hdr")
         _lst = run([PY, os.path.join(HERE, "make-header.py"), "--list"])
         _items = [x.strip() for x in (_lst.stdout or "").splitlines() if x.strip().endswith(".png")]
-        check("品牌头标：--list 列出 5 个产物且含 skill-card.png（卡片不许从产出清单里消失）",
-              len(_items) == 5 and any("skill-card.png" in x for x in _items),
+        check("品牌头标：--list 只列 1 个产物且含 banner-dark.png（孤儿图不许悄悄回潮）",
+              len(_items) == 1 and any("banner-dark.png" in x for x in _items),
               "%d 项：%s" % (len(_items), "、".join(os.path.basename(x) for x in _items)))
         run([PY, os.path.join(HERE, "make-header.py"), "--out", _hd])
-        _card = os.path.join(_hd, "skill-card.png")
-        _ok, _detail, _spread = False, "卡片未生成", -1
+        _card = os.path.join(_hd, "banner-dark.png")
+        _ok, _detail, _spread = False, "横幅未生成", -1
         if os.path.exists(_card):
             from PIL import Image as _Im3
             _im3 = _Im3.open(_card)
             _gray = _im3.convert("L")
             _lo, _hi = _gray.getextrema()
             _spread = _hi - _lo
-            _ok = (_im3.format == "PNG" and _im3.size == (810, 1080)
+            _ok = (_im3.format == "PNG" and _im3.size == (1600, 420)
                    and _im3.info.get("Skill-Version") == "v" + _ver)
             _detail = "%s %s 版本戳=%r（期望 v%s）" % (
                 _im3.format, _im3.size, _im3.info.get("Skill-Version"), _ver)
-        check("品牌头标：技能卡片实跑生成（PNG 810×1080 竖版，版本戳＝当前版本）", _ok, _detail)
+        check("品牌头标：横幅实跑生成（PNG 1600×420，版本戳＝当前版本）", _ok, _detail)
         # 版本戳必须是**真参数**而非写死：换一个版本串重出，元数据须跟着变
         _hd2 = os.path.join(work, "hdr-v0")
         run([PY, os.path.join(HERE, "make-header.py"), "--out", _hd2, "--version", "v0.0.0"])
-        _c2 = os.path.join(_hd2, "skill-card.png")
+        _c2 = os.path.join(_hd2, "banner-dark.png")
         _v2 = None
         if os.path.exists(_c2):
             from PIL import Image as _Im4
             _v2 = _Im4.open(_c2).info.get("Skill-Version")
-        check("品牌头标：卡片版本戳随 --version 变化（烧的是参数，不是写死值）",
+        check("品牌头标：横幅版本戳随 --version 变化（烧的是参数，不是写死值）",
               _v2 == "v0.0.0", "实测 %r" % (_v2,))
-        # 非空白：卡片由多色区块与文字构成，灰度极差过小＝只出了一张底色
-        check("品牌头标：卡片非空白（灰度极差 > 60，防生成一张纯色图）",
+        # 非空白：横幅由多色区块与文字构成，灰度极差过小＝只出了一张底色
+        check("品牌头标：横幅非空白（灰度极差 > 60，防生成一张纯色图）",
               _spread > 60, "灰度极差 %d" % _spread)
     except Exception as e:
         check("品牌头标自检", False, repr(e))

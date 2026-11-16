@@ -16,11 +16,15 @@
     长名称不被迫缩小字号。
 
 用法：
-  python make-header.py                    生成全部（2 套配色 × 横幅/图标）到 ../assets
-  python make-header.py --theme dark       只生成深色（深蓝金）一套
+  python make-header.py                    生成横幅一张（深色 1600×420）到 ../assets
   python make-header.py --out <目录>       指定输出目录
   python make-header.py --version Vx.y.z     覆盖版本串（默认自动读 SKILL.md，无需手填）
   python make-header.py --list             只看将产出哪些文件，不实际绘制
+
+v3.35.0 起**只出 banner-dark 一张**：此前五张（横幅/图标 × 明暗 + 技能卡片）中仅
+banner-dark 被 SKILL/README 顶部引用，其余四张是无引用的孤儿图，白占 530 KB 包容量、
+每次重绘多画四张。v3.25.7 曾立守卫「卡片不许成孤儿」——本版明确撤销：不是忘了刷，
+是决定不要了。历史教训保留下半句：删图须连生成器一起删，否则下次重绘它们会长回来。
 
 依赖：Pillow（pip install Pillow）；Windows 自带中文字体（msyh/simhei），
       非 Windows 请用 --font 指定一个中文字体文件。
@@ -88,20 +92,6 @@ THEMES = {
         seal_paper=(252, 249, 242),  # 印面：白底（朱文印）
         seal_ink=(179, 39, 30),      # 印文与边框：朱红
         scan=(46, 107, 168),
-    ),
-    "light": dict(
-        bg_top=(250, 247, 240), bg_bot=(240, 234, 222),
-        glow_gold=(154, 123, 51, 26), glow_blue=(46, 107, 168, 14),
-        gold=(154, 123, 51), gold_lt=(139, 108, 40),
-        fg=(23, 38, 60), fg2=(85, 103, 126), fg3=(133, 146, 163),
-        rule=(154, 123, 51, 110), sep=(23, 38, 60, 40),
-        seal=(179, 39, 30),
-        accent=(179, 39, 30),        # 副行/胶囊：朱红
-        caps_fill=(179, 39, 30),
-        caps_fg=(250, 247, 240),
-        seal_paper=(254, 252, 247),  # 印面：白底（朱文印）
-        seal_ink=(179, 39, 30),      # 印文与边框：朱红
-        scan=(154, 123, 51),
     ),
 }
 
@@ -369,12 +359,6 @@ def render_banner(theme_name, version, font_bold, font_reg, ss=4, k=1.0, font_se
     # 光晕
     img.alpha_composite(radial((int(CW * 0.62), int(CH * 1.5)), t["glow_gold"]), (-int(CW * 0.08), -int(CH * 0.35)))
     img.alpha_composite(radial((int(CW * 0.55), int(CH * 1.6)), t["glow_blue"]), (int(CW * 0.52), -int(CH * 0.4)))
-    if theme_name == "light":
-        # 极淡纸张颗粒（幅度过大会让 PNG 体积翻倍，压到 ±4）
-        noise = paper_noise(240, 64, amount=4).resize((CW, CH), Image.BICUBIC)
-        img = Image.composite(Image.new("RGBA", (CW, CH), (255, 255, 255, 255)), img,
-                              noise.point(lambda v: max(0, min(255, int((v - 124) * 0.6)))))
-
     d = ImageDraw.Draw(img, "RGBA")
     U = S                                  # 1 设计单位 = U 像素
 
@@ -468,198 +452,6 @@ def render_banner(theme_name, version, font_bold, font_reg, ss=4, k=1.0, font_se
     return img.convert("RGB").resize((W, H), Image.LANCZOS)
 
 
-def render_icon(theme_name, font_bold, ss=4, font_seal=None):
-    t = THEMES[theme_name]
-    fseal = font_seal or font_bold
-    S = ss
-    C = ICON * S
-    img = Image.new("RGBA", (C, C), (0, 0, 0, 0))
-    d = ImageDraw.Draw(img, "RGBA")
-
-    # 底板：先在不透明层做「渐变＋光晕」，最后才用圆角蒙版裁切
-    # （顺序反了光晕会溢出圆角、在透明区留下黄斑）
-    tile = vgrad(C, C, t["bg_top"], t["bg_bot"]).convert("RGBA")
-    gc = t["glow_gold"]
-    tile.alpha_composite(radial((int(C * 0.95), int(C * 0.95)), (gc[0], gc[1], gc[2], int(gc[3] * 0.7))),
-                         (int(C * 0.05), int(C * 0.04)))
-    mask = Image.new("L", (C, C), 0)
-    ImageDraw.Draw(mask).rounded_rectangle([0, 0, C - 1, C - 1], radius=int(112 * S), fill=255)
-    img.paste(tile, (0, 0), mask)
-    d = ImageDraw.Draw(img, "RGBA")
-
-    # 内描边
-    d.rounded_rectangle([int(26 * S), int(26 * S), C - 1 - int(26 * S), C - 1 - int(26 * S)],
-                        radius=int(88 * S), outline=t["gold"] + (120,), width=max(2, int(2.4 * S)))
-
-    # 扫描线（限制在内描边之内，避免压到圆角区）
-    inner = Image.new("RGBA", (C, C), (0, 0, 0, 0))
-    idr = ImageDraw.Draw(inner, "RGBA")
-    scan_lines(idr, C, C, t["scan"], unit=S, alpha=10)
-    imask = Image.new("L", (C, C), 0)
-    ImageDraw.Draw(imask).rounded_rectangle([int(28 * S), int(28 * S), C - int(28 * S), C - int(28 * S)],
-                                            radius=int(86 * S), fill=255)
-    cut = Image.new("RGBA", (C, C), (0, 0, 0, 0))
-    cut.paste(inner, (0, 0), imask)
-    img.alpha_composite(cut, (0, 0))
-    d = ImageDraw.Draw(img, "RGBA")
-
-    # 主图形：朱方章 + 四角取景框（小尺寸辨识度优于天平）
-    # 印面 0.50→0.58：卡片上图标仅几十像素，印面越大印文越清楚；
-    # 取景框位置按 ICON_FRAME_K 冻结，不随印章放大而外移
-    draw_seal_scan(img, C / 2, C * 0.44, C * ICON_SEAL_K, t, S, font_heavy=fseal,
-                   frame_size=C * ICON_FRAME_K)
-    # 三色风险点
-    draw_risk_dots(d, C / 2, C * 0.815, t["fg2"] + (255,), font_bold, S * 1.32)
-
-    # 收尾：圆角之外保留**透明**，圆角之内维持既往观感不逐像素改变。
-    #   · 不能直接 convert("RGB")：那会把透明区压成不透明黑，四角露出黑块；
-    #   · 也不能拿半透明笔画去叠底：alpha 170/150 的框线与扫描线叠加后会变浅，
-    #     与既往版本观感不一致。
-    # 故：内容层原样取 RGB（含半透明笔画的既有取值），只在圆角外用同款渐变补底
-    # （alpha=0 处不可见，仅为边界抗锯齿不留黑边），最后把圆角蒙版写回 alpha。
-    base = vgrad(C, C, t["bg_top"], t["bg_bot"]).convert("RGB")
-    out = Image.composite(img.convert("RGB"), base, mask).convert("RGBA")
-    out.putalpha(mask)
-    return out.resize((ICON, ICON), Image.LANCZOS)
-
-
-def render_card(version, font_bold, font_reg, date_str=None, ss=2, font_seal=None):
-    """技能卡片（810×1080）：发布页/商店卡片用。
-
-    为什么并入本脚本：此前卡片由临时脚本 make-card.py 生成、用完即删，
-    skill-card.png 成了无生成器的孤儿——升版后没人记得怎么重刷，
-    门禁「头标版本串过期」守卫已两次拦下漏刷（v3.25.1、v3.25.7）。
-    并入后 make-header.py 一次出齐 5 张，孤儿问题根治。
-    版式复刻 v3.25.6 卡片：深蓝金底、三色信息区块、朱印「审」、格式胶囊。
-    """
-    import datetime as _dt
-    date_str = date_str or _dt.date.today().strftime("%Y-%m-%d")
-    W, H = 810 * ss, 1080 * ss
-    U = ss                                   # 1 单位 = 810 宽坐标系下的 1px
-    t = dict(THEMES["dark"])                 # 卡片固定深色版
-    img = Image.new("RGBA", (W, H), t["bg_top"])
-    img.paste(vgrad(W, H, t["bg_top"], t["bg_bot"]), (0, 0))
-    d = ImageDraw.Draw(img, "RGBA")
-
-    # 顶部装饰：扫描线 + 取景框角
-    scan_lines(d, W, H, t["scan"], unit=U)
-    gold, gold_lt, fg, fg2, fg3 = t["gold"], t["gold_lt"], t["fg"], t["fg2"], t["fg3"]
-
-    f_caps = font(font_bold, 15 * U)         # 英文小标题
-    f_title = font(font_bold, 46 * U)        # 主标题
-    f_badge = font(font_bold, 22 * U)        # 徽章行
-    f_meta = font(font_reg, 17 * U)          # 作者·日期
-    f_sub = font(font_reg, 16 * U)           # 副题
-    f_h2 = font(font_bold, 24 * U)           # 区块标题
-    f_item = font(font_reg, 16 * U)          # 区块条目
-    f_note = font(font_reg, 12 * U)          # 底部免责
-    f_tag = font(font_bold, 15 * U)          # 格式胶囊主字
-    f_tag2 = font(font_reg, 10 * U)          # 格式胶囊小字
-
-    def pill(x, y, txt, f, pad_x, pad_y, fill, fg_, radius=None, outline=None):
-        w_ = text_w(d, txt, f) + pad_x * 2 * U
-        h_ = f.size + pad_y * 2 * U
-        d.rounded_rectangle((x, y, x + w_, y + h_), radius=radius or h_ / 2,
-                            fill=fill, outline=outline, width=2 * U if outline else 0)
-        # 垂直居中按**墨迹实测**（getbbox）：CJK 字体 ascent 大、拉丁字面偏下，
-        # 按 f.size 居中会让字母贴底（实测 AI 徽章贴底）。y0/y1＝ink 上下界。
-        x0, y0, x1, y1 = d.textbbox((0, 0), txt, font=f)
-        d.text((x + pad_x * U - x0, y + (h_ - (y1 - y0)) // 2 - y0), txt, font=f, fill=fg_)
-        return w_, h_
-
-    def section(x, y, w_, title, items, bg, head, item_bg, row_h=None):
-        """三色信息区块：圆角底 + 标题 + 条目（隔行底条）。"""
-        rh = row_h or 34 * U
-        pad = 18 * U
-        h_ = pad + 34 * U + len(items) * rh + 10 * U
-        d.rounded_rectangle((x, y, x + w_, y + h_), radius=14 * U, fill=bg)
-        d.text((x + pad, y + pad), title, font=f_h2, fill=head)
-        d.line((x + pad, y + pad + 30 * U, x + w_ - pad, y + pad + 30 * U),
-               fill=head + (70,), width=1 * U)
-        iy = y + pad + 38 * U
-        for i, it in enumerate(items):
-            if i % 2 == 0:
-                d.rounded_rectangle((x + pad - 6 * U, iy - 2 * U, x + w_ - pad + 6 * U, iy + rh - 8 * U),
-                                    radius=6 * U, fill=item_bg)
-            d.ellipse((x + pad + 2 * U, iy + rh / 2 - 9 * U, x + pad + 2 * U + 8 * U, iy + rh / 2 - 1 * U),
-                      fill=head)
-            d.text((x + pad + 18 * U, iy + 2 * U), it, font=f_item, fill=head)
-            iy += rh
-        return h_
-
-    # ---- 顶部文字区
-    y = 46 * U
-    draw_tracked(d, (36 * U, y), "DOCUMENT COMPLIANCE REVIEW ASSISTANT",
-                 f_caps, gold, tracking=4 * U)
-    y += 30 * U
-    d.text((36 * U, y), "文档合规审查助手", font=f_title, fill=fg)
-    # 右上朱印「审」+ 取景框
-    draw_seal_scan(img, 726 * U, 96 * U, 96 * U, t, unit=U, font_heavy=font_seal,
-                   frame_size=126 * U)
-    d = ImageDraw.Draw(img, "RGBA")
-    y += 66 * U
-    bx = 36 * U
-    w_, h_ = pill(bx, y, "AI", f_badge, 18, 6, gold, t["bg_top"]); bx += w_ + 10 * U
-    d.text((bx, y + 2 * U), "AI 合同", font=f_badge, fill=gold_lt); bx += text_w(d, "AI 合同", f_badge) + 16 * U
-    w_, h_ = pill(bx, y, version, f_badge, 10, 3, gold, t["bg_top"]); bx += w_ + 14 * U
-    d.text((bx, y + 6 * U), "胡皓 · " + date_str, font=f_meta, fill=fg2)
-    y += h_ + 14 * U
-    d.text((36 * U, y), "逐条对标标准立场 · 风险三分级 · 出可交付的审查成果", font=f_sub, fill=fg2)
-
-    # ---- 三色区块
-    X, WD = 36 * U, 738 * U
-    y = 252 * U
-    y += section(X, y, WD, "能做什么", [
-        "逐条审查：三分分级＋标准立场＋可用话术",
-        "原稿级修订：Word 原生修订痕迹，逐条取舍",
-        "改稿比对：条款级差异，夹带私货藏不住",
-        "涉密纯本地：全量脱敏，正文不出电脑",
-        "起草文书：合同与各类文书，可选公文风排版",
-        "非合同也审：授权书／制度／NDA／SLA",
-        "法规检索：原文＋出处＋适用要件，不下结论",
-        "法规汇编：按主题编成册，带目录与时效",
-    ], bg=(223, 243, 228), head=(31, 122, 69), item_bg=(210, 236, 217))
-    y += 16 * U
-    y += section(X, y, WD, "凭什么可信", [
-        "法条原文：逐条比对，不靠模型记忆",
-        "法规库校验：本地＋云，双源双向核对",
-        "机制登记：逐条钉着在跑的代码判据",
-        "数字实扫：门禁核对，对不上出不了包",
-    ], bg=(251, 221, 227), head=(179, 39, 30), item_bg=(248, 203, 210))
-    y += 16 * U
-    # 黄块：标题 + 一行说明 + 格式胶囊
-    bh = 18 * U + 34 * U + 30 * U + 58 * U
-    d.rounded_rectangle((X, y, X + WD, y + bh), radius=14 * U, fill=(251, 239, 200))
-    hx = (139, 108, 40)
-    d.text((X + 18 * U, y + 18 * U), "交付什么", font=f_h2, fill=hx)
-    d.line((X + 18 * U, y + 18 * U + 30 * U, X + WD - 18 * U, y + 18 * U + 30 * U),
-           fill=hx + (70,), width=1 * U)
-    d.text((X + 18 * U, y + 56 * U),
-           "审查意见报告 · 原稿级修订版 · 比对台账 · 脱敏版 · 模板版 · 文档汇编 · 摘要与思维导图",
-           font=f_item, fill=(23, 38, 60))
-    tags = [("Word", "可编辑原稿"), ("Markdown", "纯文本"), ("Excel", "差异台账"),
-            ("HTML", "在线查阅"), ("PDF", "归档发送")]
-    tx = X + 18 * U
-    ty = y + 86 * U
-    for name, cap in tags:
-        tw = text_w(d, name, f_tag) + 20 * U
-        d.rounded_rectangle((tx, ty, tx + tw, ty + 48 * U), radius=8 * U,
-                            fill=(255, 253, 248), outline=gold, width=1 * U)
-        d.text((tx + 10 * U, ty + 5 * U), name, font=f_tag, fill=(23, 38, 60))
-        d.text((tx + 10 * U, ty + 27 * U), cap, font=f_tag2, fill=(120, 120, 110))
-        tx += tw + 12 * U
-    y += bh
-
-    # ---- 底部免责 + 金条
-    y = max(y + 14 * U, H - 62 * U)
-    d.text((36 * U, y), "仅辅助用途，不构成法律意见；须经执业律师复核后方可据此决策。",
-           font=f_note, fill=fg3)
-    d.text((36 * U, y + 20 * U), "个人使用授权 · 商业使用须取得书面授权", font=f_note, fill=fg3)
-    d.rectangle((0, H - 8 * U, W, H), fill=gold)
-
-    return img.resize((W // ss, H // ss), Image.LANCZOS).convert("RGB")
-
-
 def read_version():
     p = os.path.join(ROOT, "SKILL.md")
     try:
@@ -675,16 +467,14 @@ def read_version():
 
 
 def main():
-    ap = argparse.ArgumentParser(description="文档合规审查助手AI合同 · 头标（横幅/图标）生成")
+    ap = argparse.ArgumentParser(description="文档合规审查助手AI合同 · 头标（横幅）生成")
     ap.add_argument("--out", default=os.path.join(ROOT, "assets"), help="输出目录（默认 ../assets）")
-    ap.add_argument("--theme", default="all", choices=["all", "dark", "light"], help="配色：all/dark/light")
     ap.add_argument("--version", default=None, help="覆盖版本串（默认读 SKILL.md frontmatter）")
     ap.add_argument("--font", default=None, help="中文字体文件（非 Windows 环境用）")
     ap.add_argument("--scale", type=float, default=1.0, help="横幅尺寸倍率（1=1600×420，2=3200×840）")
     ap.add_argument("--list", action="store_true", help="只列出将产出的文件")
     a = ap.parse_args()
 
-    themes = ["dark", "light"] if a.theme == "all" else [a.theme]
     ver = a.version or read_version()
     if not ver:
         print("无法从 SKILL.md 读取版本号（frontmatter 缺 version 或过长）；"
@@ -698,15 +488,10 @@ def main():
     # 印文用细体（粗体膨胀会糊成墨团），取不到时退回粗体
     fseal = pick_font("seal", a.font) or fb
 
+    # v3.35.0 只出 banner-dark 一张（被 SKILL/README 顶部引用的那张）。
+    # 不要把 icon／card／light 加回来：它们已随本版删除，重新加回即孤儿图复活。
     sfx = "" if abs(a.scale - 1.0) < 1e-6 else "@%gx" % a.scale
-    jobs = []
-    for th in themes:
-        jobs.append((os.path.join(a.out, "banner-%s%s.png" % (th, sfx)), "banner", th))
-        if abs(a.scale - 1.0) < 1e-6:
-            jobs.append((os.path.join(a.out, "icon-%s.png" % th), "icon", th))
-    # 技能卡片固定深色版一张（skill-card.png）；卡片无 --scale 缩放，仅原尺寸产出
-    if abs(a.scale - 1.0) < 1e-6 and a.theme in ("all", "dark"):
-        jobs.append((os.path.join(a.out, "skill-card.png"), "card", "dark"))
+    jobs = [(os.path.join(a.out, "banner-dark%s.png" % sfx), "banner", "dark")]
 
     if a.list:
         for p, kind, _ in jobs:
@@ -715,12 +500,7 @@ def main():
 
     os.makedirs(a.out, exist_ok=True)
     for path, kind, th in jobs:
-        if kind == "banner":
-            im = render_banner(th, ver, fb, fr, ss=4, k=a.scale, font_seal=fseal)
-        elif kind == "card":
-            im = render_card(ver, fb, fr, ss=2, font_seal=fseal)
-        else:
-            im = render_icon(th, fb, ss=4, font_seal=fseal)
+        im = render_banner(th, ver, fb, fr, ss=4, k=a.scale, font_seal=fseal)
         # 把绘制时的版本串写进 PNG 元数据（tEXt），供 check.py 校验
         # 「图片里烧的版本」与 SKILL.md 版本是否一致——升版忘了重绘时会当场报警。
         _info = PngInfo()
