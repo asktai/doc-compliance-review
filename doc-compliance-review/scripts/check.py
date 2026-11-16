@@ -2292,6 +2292,30 @@ def check_version_consistency():
     else:
         info("版本一致性: %s（frontmatter / 正文 / README / SECURITY / 提示词版）一致；脚本数 %d 口径同步" % (v, n_py))
 
+    # 预写未来版本号（H-20）：脚本里出现**同 major、严格大于当前**的版本串。
+    # 这类漂移的形状是「把下一版提前写进注释/常量」，等真升版时它就悄悄对上了，
+    # 于是没有任何一处报错——H-18 就是这么埋了整整两个版本才被发现。
+    # 为什么锚定同 major：预写的真实形态必然是「当前 major 内 +1」；跨 major 的数字
+    # （测试固件里自造的占位版本、早期述史）不属此类。锚定 major 即可覆盖真实场景，
+    # 且**不需要任何白名单**——白名单一旦存在，就是一个合法的绕过口。
+    # 匹配要求带 v 前缀、前后不粘连数字与点，避免把更长的版本串切出片段来误判。
+    cur = tuple(int(x) for x in ver.split("."))
+    pre = []
+    sdir = os.path.join(ROOT, "scripts")
+    if os.path.isdir(sdir):
+        for fn in sorted(os.listdir(sdir)):
+            if not fn.endswith(".py"):
+                continue
+            for ln, line in enumerate(_read(os.path.join(sdir, fn)).splitlines(), 1):
+                for mm in re.finditer(r"(?<![\d.])v(\d+)\.(\d+)\.(\d+)(?![\d.])", line):
+                    g = tuple(int(x) for x in mm.groups())
+                    if g[0] == cur[0] and g > cur:
+                        pre.append("%s:%d(%s)" % (fn, ln, mm.group(0)))
+    if pre:
+        err("脚本内出现未来版本号（预写漂移）：%s —— 当前为 %s。注释/常量不得提前写死下一版，"
+            "请改为运行时读取 version.json，或等真正升版后再写；共 %d 处"
+            % ("、".join(pre[:6]) + ("…" if len(pre) > 6 else ""), v, len(pre)))
+
 
 def check_net_tier_consistency():
     """联网档位一致性（安全声明同型病灶第三次复发）。

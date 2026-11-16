@@ -3,22 +3,27 @@
   "product": "文档合规审查助手AI合同",
   "skill_id": "doc-compliance-review",
   "latest": {
-    "version": "v3.34.0",
-    "date": "2026-11-13",
-    "summary": "模板功能强化正式发布（H-19 收口）：内置模板库、套用模板菜单项与溯源说明落地；补 SKILL.md 第二十三节并修正两处错误引用；按标准发布动作重建运行实例与分发包",
+    "version": "v3.34.1",
+    "date": "2026-11-16",
+    "summary": "预写版本号守卫（H-20 收口）：脚本里出现同 major 且高于当前的版本号即报错，从机制上拦住「注释提前写死下一版、真升版时悄悄对上」这类无报错漂移",
     "changes": [
-      "内置模板库落地：templates/ 示范件＋模板清单＋正文指纹基线三真源，由 check.py 的 check_template_library() 逐项咬合；tpl-engine.py 扩为 check／render／manifest／use／audit／baseline／verify 七个命令，use 可直接吃库里的 .tpl.md，填实占位符出具体合同草案。",
-      "功能总菜单补第 20 项「套用模板」（0–20 共 21 项，按 21.6 取末位空号、不重排既有编号）；转模板出件增《转模板溯源说明》，doc-ir／make-docx 透传 provenance。",
-      "补 SKILL.md 第二十三节「套用模板向导」（入口／三真源／七个命令／出件前硬校验／四条红线），把菜单第 20 项与去向表里错指「第十八节」的两处引用改指本节；触发词映射表同步补一行。",
-      "收口发布：check.py --sign 重签脚本指纹、清 __pycache__；按 publish.py --pack 标准动作重建运行实例（抹平第 (8) 维 13 处跨侧漂移）并出正式分发包，模板库随包分发。"
+      "check.py 的版本一致性维新增第三段断言：扫 scripts/*.py，凡出现「同 major 且严格大于当前」的版本串即报「预写漂移」，并点名文件:行号。这是 H-18 的根因形态——注释里提前写死下一版，等真升版时自己就对上了，全程无一处报错，整整埋了两个版本。",
+      "口径锚定同 major 而非全量扫：预写的真实形态必然是当前 major 内 +1；verify-dist.py 有 3 处自造的 9.9.9 测试固件，全量扫会当场打红并逼人加白名单，而白名单一旦存在就是一条合法绕过路径。锚定 major 后覆盖真实场景、零白名单、零误报。",
+      "冒烟补两条反向注入：注释预写下一版必须红、同位置换跨 major 占位版本必须不报（前者一个见谁咬的判据也能过）。注入版本号运行期从 frontmatter 算出再拼，不写字面量——写死会随升版自动失效变假绿。冒烟 293 → 295 项，两档守恒。",
+      "零行为变更、零产物变更：不涉及任何审查链路、交付物与配置项，只加一道校验。铁律侧本轮零触碰。"
     ],
     "download_page": "https://github.com/asktai/doc-compliance-review/releases",
     "files": {
-      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.34.0/文档合规审查助手AI合同_v3.34.0_20261113_(doc-compliance-review).skill",
-      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.34.0/文档合规审查助手AI合同_v3.34.0_20261113_(doc-compliance-review).zip"
+      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.34.1/文档合规审查助手AI合同_v3.34.1_20261116_(doc-compliance-review).skill",
+      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.34.1/文档合规审查助手AI合同_v3.34.1_20261116_(doc-compliance-review).zip"
     }
   },
   "history": [
+    {
+      "version": "v3.34.1",
+      "date": "2026-11-16",
+      "summary": "预写版本号守卫（H-20 收口）：同 major 高于当前的版本号即报错，零白名单零误报"
+    },
     {
       "version": "v3.34.0",
       "date": "2026-11-13",
@@ -1054,5 +1059,5 @@
   ],
   "_维护说明": "出包后请同步更新本文件（latest 段与 history）。真源是 SKILL.md 的 version 与 VERSION.md 的沿革；本文件是'对外公布的清单'，须与真源一致，否则使用者会被引向旧版。",
   "schema": 1,
-  "version": "3.34.0"
+  "version": "3.34.1"
 }

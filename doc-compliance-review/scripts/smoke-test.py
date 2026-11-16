@@ -251,6 +251,8 @@ try:
         m.check_ai_tells_rules()
     elif which == "ind_list":
         m._check_questionnaire_libraries()
+    elif which == "ver_pre":
+        m.check_version_consistency()
     else:
         m._check_no_bytecode()
 except BaseException as e:
@@ -695,6 +697,41 @@ def _inject_gate_tests(tmp):
         else:
             out.append(("反向注入㉒：行业顺序漂移 → 必须红", False, "注入点未命中"))
 
+    # ㉓㉔ 预写未来版本号（H-20）：注释里提前写死下一版，是最难发现的一类漂移——
+    #      等真升版时它自己就对上了，全程无一处报错。判据只认「同 major 内 +1」。
+    #      版本号必须运行期算出来再拼：写死字面量的话，将来真升到那一版，用例会**自动失效
+    #      变假绿**——「用例自己会过期」比没有用例更危险。
+    _skm = re.search(r"(?m)^version:\s*(\d+)\.(\d+)\.(\d+)\s*$",
+                     open(os.path.join(base, "SKILL.md"), encoding="utf-8").read())
+    if _skm:
+        _a, _b, _c = (int(x) for x in _skm.groups())
+        _future = "v%d.%d.%d" % (_a, _b, _c + 1)   # 同 major 内 +1：预写的典型形状
+        _alien = "v%d.9.9" % (_a + 6)              # 跨 major 占位：与真预写不同形，不该被抓
+        _vp = os.path.join(tgt, "version.py")
+        _vorig = open(_vp, encoding="utf-8").read()
+        try:
+            with open(_vp, "w", encoding="utf-8") as _f:
+                _f.write(_vorig + "\n# probe: %s\n" % _future)
+            bad, errs, _ = run_gate("ver_pre")
+            hit = any("预写漂移" in m and _future in m for m in errs)
+            case("反向注入㉓：脚本注释预写下一版版本号 → 必须红",
+                 hit, "已报预写漂移", "未报；" + (bad or "errs=%s" % errs))
+
+            # 对照：同位置换成跨 major 的占位版本 → 必须**不报**。
+            # 只验「改坏了会报」不够：一个见谁都咬的判据同样能通过上面那条，
+            # 而它落地当天就会把测试固件里的占位版本全部打红，逼人加白名单。
+            with open(_vp, "w", encoding="utf-8") as _f:
+                _f.write(_vorig + "\n# probe: %s\n" % _alien)
+            bad, errs, _ = run_gate("ver_pre")
+            hit2 = not any("预写漂移" in m for m in errs)
+            case("反向注入㉔（对照）：跨 major 占位版本不得误判为预写",
+                 hit2, "未误报", "误报；" + (bad or "errs=%s" % errs))
+        finally:
+            with open(_vp, "w", encoding="utf-8") as _f:
+                _f.write(_vorig)
+    else:
+        out.append(("反向注入㉓：预写版本号判据 → 必须红", False, "注入点未命中"))
+
     # ④ 对照组：副本**没改坏**时两个门禁都必须零 ERR。
     #    为什么要这一组：只验"改坏了会报"还不够——一个见谁报谁的门禁同样能通过 ①②③。
     #    必须同时证明"没改坏时不报"，才能说明报错是被注入的那一处触发的。
@@ -709,14 +746,15 @@ def _inject_gate_tests(tmp):
     bad9, errs9, _ = run_gate("fmt_matrix")      # 含 image 第 7 条
     bad10, errs10, _ = run_gate("ai_tells")
     bad11, errs11, _ = run_gate("ind_list")
+    bad12, errs12, _ = run_gate("ver_pre")
     clean = not (errs or errs2 or errs3 or errs4 or errs5 or errs6 or errs7 or errs8 or errs9
-                 or errs10 or errs11)
-    out.append(("反向注入④（对照）：副本未改坏时十一个门禁必须零报错",
+                 or errs10 or errs11 or errs12)
+    out.append(("反向注入④（对照）：副本未改坏时十二个门禁必须零报错",
                 clean,
                 "均零报错" if clean
                 else ("误报：" + (bad or bad2 or bad3 or bad4 or bad5 or bad6 or bad7 or bad8
                                  or str(errs + errs2 + errs3 + errs4 + errs5 + errs6 + errs7
-                                        + errs8 + errs9 + errs10 + errs11)))))
+                                        + errs8 + errs9 + errs10 + errs11 + errs12)))))
 
     shutil.rmtree(tmp, ignore_errors=True)
     return out
