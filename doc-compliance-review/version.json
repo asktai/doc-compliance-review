@@ -3,21 +3,25 @@
   "product": "文档合规审查助手AI合同",
   "skill_id": "doc-compliance-review",
   "latest": {
-    "version": "v3.35.1",
+    "version": "v3.35.2",
     "date": "2026-11-17",
-    "summary": "形象定稿换成方案C·深蓝西装半身：avatar-card 整图替换（PNG→JPG 218 KB），候选目录删其余四方案",
+    "summary": "在线源如实关闭：分发仓库非公开，公开可读的版本清单并不存在，故 manifest_url 与 download_page 留空，检查更新明确答「未配置在线源」而非撞 404；升级一律走离线目录/zip",
     "changes": [
-      "assets/avatar-card.jpg 整图替换为形象定稿「方案C·深蓝西装-半身」：1024×1536，源 PNG 2.0 MB 压成 JPG 218 KB；文件名与 README 顶部引用零改动，清单行尺寸描述同步更新。形象由米色插画版换成写实深蓝西装版。",
-      "形象候选目录只留方案C 一张（删方案A 律师袍全身、方案B 职业马甲、方案D 丸子头马甲、方案E 现代律师袍，−7.8 MB）。上一轮「只保留方案c图」的「方案c」至此对上：指的就是这五个候选里的方案C。",
-      "审查链路、交付物、配置项零变化；banner-dark 横幅与冒烟 295 项不受影响。"
+      "config.json 的 update.manifest_url 与 download_page 一并留空（原先写的是按命名规则预设的地址，从未真正存在）。空值在此是**声明**：本分发只走离线升级。留着一个必然 404 的地址，等于让使用者每次点「检查更新」都撞空——那不是私有，是假承诺。",
+      "version.py 行为无需改动，但结果变准了：manifest_url 为空时 `--check-online` 直接答「未配置在线源」并返回 2，不发请求、不假装查过；`--notice` 照旧零请求。升级通道不受影响（`--watch` 登记本地目录或已下载 zip，同一套校验／预演／备份／安装）。",
+      "顺手修一处守卫撒谎：check.py 的清单校验原先只有「占位／其他」两分支，**空值会掉进 else 被报成「下载页已配置」**——一个什么都没配的清单，门禁却给出已配置的结论。改为三分支（空＝离线分发而是合规态／占位＝警告／其他＝已配置），空值不再被说成已配置。",
+      "五份文档同步改口径（SKILL 第十八节、README 三处、安装使用教程五处）：把「只读一份公开的版本清单」改为「本分发未配在线源、实际零请求」，并写明将来要恢复须同时具备公开清单与公开下载页，缺一不成。",
+      "审查链路、交付物、配置项语义零变化；铁律侧本轮零触碰。"
     ],
     "download_page": "https://github.com/asktai/doc-compliance-review/releases",
-    "files": {
-      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.35.1/文档合规审查助手AI合同_v3.35.1_20261117_(doc-compliance-review).skill",
-      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.35.1/文档合规审查助手AI合同_v3.35.1_20261117_(doc-compliance-review).zip"
-    }
+    "files": {}
   },
   "history": [
+    {
+      "version": "v3.35.2",
+      "date": "2026-11-17",
+      "summary": "在线源如实关闭：仓库非公开故清单不可匿名读，manifest_url/download_page 留空，检查更新明示未配置"
+    },
     {
       "version": "v3.35.1",
       "date": "2026-11-17",
@@ -1068,5 +1072,5 @@
   ],
   "_维护说明": "出包后请同步更新本文件（latest 段与 history）。真源是 SKILL.md 的 version 与 VERSION.md 的沿革；本文件是'对外公布的清单'，须与真源一致，否则使用者会被引向旧版。",
   "schema": 1,
-  "version": "3.35.1"
+  "version": "3.35.2"
 }

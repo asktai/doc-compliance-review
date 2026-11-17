@@ -32,10 +32,10 @@
  "legal": {
   "allow_online": true
  },
- "_update_说明": "在线检查更新（**默认关闭**）。check_online_by_default 是总闸：仅当它被**显式设为 true** 时，`version.py --notice` 才会自动联网检查；留 false 或删掉该键＝一个请求都不发（此时仍可用 `version.py --check-online` 手动查一次）。manifest_url＝在线版本清单地址（version.json）；download_page＝下载指引页（人去看的页面）。**只读、不上传任何信息**；连不上或读不到时静默降级、不报错。这是本技能唯一会联网的地方，默认关是为了让联网永远由人先开口。",
+ "_update_说明": "在线检查更新（**默认关闭，且本分发未配在线源**）。check_online_by_default 是总闸：仅当它被**显式设为 true** 时，`version.py --notice` 才会自动联网检查。manifest_url 故意留空——分发仓库为非公开仓库，公开可匿名读取的版本清单并不存在，写上任何地址都只会让「检查更新」撞 404；空值在这里是**明确的声明**（本分发只走离线升级），不是漏填，别拿一个地址去填它。download_page 同理留空（非公开仓库的页面对外不可见）。升级通道＝`--watch` 登记本地目录或已下载的 zip（教程 7.2），功能不降级。若将来改为公开分发，再同时填 manifest_url 与 download_page，两处缺一都不成立。",
  "update": {
-  "manifest_url": "https://raw.githubusercontent.com/asktai/doc-compliance-review/main/version.json",
-  "download_page": "https://github.com/asktai/doc-compliance-review/releases",
+  "manifest_url": "",
+  "download_page": "",
   "check_online_by_default": false
  }
 }

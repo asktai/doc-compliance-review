@@ -198,11 +198,19 @@ def online_check(quiet=False, forced=False):
         enabled = bool((u.get("manifest_url") or "").strip())
     if not enabled:
         if not quiet:
-            print("[version] 在线检查已关闭（config.json 的 update.manifest_url 未填，"
-                  "或 update.check_online_by_default 未显式设为 true）。")
-            print("[version] 想启用：把 manifest_url / download_page 填成你自己的在线地址，"
-                  "并把 check_online_by_default 设为 true；留空即纯本地模式。")
-            print("[version] 只查这一次不改配置：python version.py --check-online")
+            if not (u.get("manifest_url") or "").strip():
+                # v3.35.2：本分发故意不配在线源（清单所在仓库非公开，匿名读不到）。
+                # 此时再建议「只查这一次：--check-online」是自相矛盾的——使用者正是在跑它，
+                # 等于让命令自己推荐自己。故按"有没有源"分叉，而不是沿用同一句话。
+                print("[version] 本分发未配在线源（config.json 的 update.manifest_url 留空）——"
+                      "本次不发请求、也不假装查过。")
+                print("[version] 升级走纯本地方式：--watch <目录或 zip>，"
+                      "走同一套校验／预演／备份／安装，功能不降级。")
+            else:
+                print("[version] 在线检查已关闭（config.json 的 update.check_online_by_default "
+                      "未显式设为 true）。")
+                print("[version] 想长期开启：把 check_online_by_default 设为 true；留空即纯本地模式。")
+                print("[version] 只查这一次不改配置：python version.py --check-online")
         return 2
     m = _fetch_manifest(u["manifest_url"])
     if m is None:

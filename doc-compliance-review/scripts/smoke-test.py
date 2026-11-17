@@ -253,13 +253,18 @@ try:
         m._check_questionnaire_libraries()
     elif which == "ver_pre":
         m.check_version_consistency()
+    elif which == "manifest":
+        # v3.35.2：清单门禁的结论有一半落在 INFO 里（「已配置」还是「未配下载页」），
+        # 只回传 errs/warns 就验不到「守卫有没有撒谎」，故下方一并回传 infos。
+        m.check_manifest_version()
     else:
         m._check_no_bytecode()
 except BaseException as e:
     import traceback
     print(json.dumps({"crash": repr(e), "tb": traceback.format_exc()}, ensure_ascii=False))
     sys.exit(0)
-print(json.dumps({"errs": m.ERRS, "warns": m.WARNS}, ensure_ascii=False))
+print(json.dumps({"errs": m.ERRS, "warns": m.WARNS,
+                  "infos": getattr(m, "INFOS", [])}, ensure_ascii=False))
 '''
 
 
@@ -301,6 +306,12 @@ def _inject_gate_tests(tmp):
             _src_f = os.path.join(_root_dir, _f)
             if os.path.exists(_src_f):
                 shutil.copy(_src_f, base)
+        # v3.35.2：带上 version.json 与 VERSION.md —— 清单门禁两个文件缺一就早早 return，
+        # 副本里没有它们时用例会「通过」但什么都没验（假绿的典型形状）。
+        for _f in ("version.json", "VERSION.md"):
+            _src_f = os.path.join(_root_dir, _f)
+            if os.path.exists(_src_f):
+                shutil.copy(_src_f, base)
         _ind_dst = os.path.join(base, "industries")
         if os.path.isdir(os.path.join(_root_dir, "industries")):
             shutil.copytree(os.path.join(_root_dir, "industries"), _ind_dst,
@@ -311,6 +322,8 @@ def _inject_gate_tests(tmp):
     runner = os.path.join(tmp, "_inject_runner.py")
     with open(runner, "w", encoding="utf-8") as f:
         f.write(_INJECT_RUNNER)
+
+    _gate_last = {}   # 旁路：最后一次门禁的完整结果（含 infos），供需要看"说了什么"的用例读
 
     def run_gate(which, cfgp=None):
         """跑单个门禁，返回 (是否崩溃说明, errs, warns)。崩溃时 errs=[崩溃说明]。"""
@@ -339,6 +352,7 @@ def _inject_gate_tests(tmp):
             # 「门禁没跑成」误判为「通过」——假绿比失败更糟。
             msg = "门禁无输出（退出码 %s）：%s" % (r.returncode, tail_line(r.stderr or r.stdout))
             return msg, [msg], []
+        _gate_last["d"] = d
         return "", d.get("errs") or [], d.get("warns") or []
 
     def rewrite(fn, old, new):
@@ -731,6 +745,52 @@ def _inject_gate_tests(tmp):
                 _f.write(_vorig)
     else:
         out.append(("反向注入㉓：预写版本号判据 → 必须红", False, "注入点未命中"))
+
+    # ㉕—㉗ 版本清单门禁的三态（v3.35.2）
+    # 起因：清单校验原先只有「占位／其他」两分支——**空值掉进 else，被报成「下载页已配置」**。
+    # 一个什么都没配的清单，门禁却给出"已配置"的结论；这比不查更坏（铁律 §28：守卫不能撒谎）。
+    # 三条成组：空值→未配（㉕）、填了→已配置（㉖ 反证"见谁都报未配"）、占位→警告（㉗ 防改造中丢掉旧判据）。
+    _mp = os.path.join(tgt, "..", "version.json")
+    _morig = ""
+    try:
+        import json as _json5
+        with open(_mp, encoding="utf-8") as _f:
+            _morig = _f.read()
+        _mdoc = _json5.loads(_morig)
+
+        def _set_page(val):
+            _mdoc.setdefault("latest", {})["download_page"] = val
+            _mdoc["latest"]["files"] = {}
+            with open(_mp, "w", encoding="utf-8") as _f:
+                _f.write(_json5.dumps(_mdoc, ensure_ascii=False, indent=2))
+
+        def _infos_of():
+            return " ".join(_gate_last.get("d", {}).get("infos") or [])
+
+        _set_page("")
+        run_gate("manifest")
+        _i5 = _infos_of()
+        out.append(("反向注入㉕：清单未配下载页 → 门禁须报「未配下载页」，不得说「已配置」",
+                    ("未配下载页" in _i5) and ("下载页已配置" not in _i5),
+                    "info=%s" % (_i5[:90] or "（无）")))
+
+        _set_page("https://example.invalid/releases")
+        run_gate("manifest")
+        _i6 = _infos_of()
+        out.append(("反向注入㉖（对照）：清单填了下载页 → 门禁须报「已配置」",
+                    "下载页已配置" in _i6, "info=%s" % (_i6[:90] or "（无）")))
+
+        _set_page("https://github.com/<your-org>/x/releases")
+        _, _, _w7 = run_gate("manifest")
+        out.append(("反向注入㉗：清单下载页仍是占位地址 → 必须警告",
+                    any("占位地址" in m for m in _w7),
+                    "warns=%s" % ("；".join(_w7)[:90] or "（无）")))
+    except Exception as e:
+        out.append(("反向注入㉕—㉗：版本清单三态", False, repr(e)))
+    finally:
+        if _morig:
+            with open(_mp, "w", encoding="utf-8") as _f:
+                _f.write(_morig)
 
     # ④ 对照组：副本**没改坏**时两个门禁都必须零 ERR。
     #    为什么要这一组：只验"改坏了会报"还不够——一个见谁报谁的门禁同样能通过 ①②③。

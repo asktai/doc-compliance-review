@@ -2960,8 +2960,14 @@ def check_manifest_version():
             "对外清单错一位，使用者会被引向旧版（铁律 19.3）" % (lat.get("version"), truth))
         return
     # 顺带核：下载页与文件直链不能留占位（占位＝尚未配置真源）
+    # v3.35.2：原来只有「占位／其他」两分支，**空值会掉进 else 被说成「下载页已配置」**——
+    # 一个什么都没配的清单，门禁却报「已配置」，这比不报更坏（守卫替使用者做了假证明）。
+    # 故改三分支：空＝离线分发（合规，显式说明）／占位＝真未填（警告）／其他＝已配置。
     page = str(lat.get("download_page") or "")
-    if "<your-org>" in page:
+    if not page:
+        info("对外版本清单 version.json：latest=%s 与 SKILL.md 一致；未配下载页"
+             "（离线分发形态，符合预期）" % truth)
+    elif "<your-org>" in page:
         warn("version.json 的 download_page 仍是占位地址（<your-org>）——"
              "正式发布前须替换为真实仓库地址")
     else:
