@@ -3,22 +3,26 @@
   "product": "文档合规审查助手AI合同",
   "skill_id": "doc-compliance-review",
   "latest": {
-    "version": "v3.35.0",
-    "date": "2026-11-16",
-    "summary": "头标五张并一张：只保留顶部在用的 banner-dark，删零引用孤儿图三张与介绍卡一张，包容量减 523 KB、重绘运算减八成",
+    "version": "v3.35.1",
+    "date": "2026-11-17",
+    "summary": "形象定稿换成方案C·深蓝西装半身：avatar-card 整图替换（PNG→JPG 218 KB），候选目录删其余四方案",
     "changes": [
-      "assets/ 从 6 个文件收到 2 个：保留 banner-dark.png（SKILL/README 顶部在用）与 avatar-card.jpg（使用者上传的定稿形象卡）；删除 banner-light、icon-dark、icon-light（零引用孤儿图）与 skill-card（仅 README 清单一行引用），头图总体积 658 KB → 128 KB。",
-      "生成器同步精简：make-header.py 736 → 516 行，删 light 主题、icon、card 三段绘制逻辑与 --theme 参数，每次重绘只画一张（运算量降八成）；此前的「卡片不许成孤儿」守卫口径就此撤销——不是忘了刷，是决定不要了。",
-      "教训保留并写进两处注释：删图必须连生成器一起删，否则下次重绘孤儿图会长回来；冒烟 [3.55] 四条用例改锚 banner-dark（--list 只许 1 项、实跑 1600×420、版本戳随 --version 变、非纯色），项数 295 不变、两档守恒。",
-      "README 文件清单同步删 skill-card 行；审查链路、交付物、配置项零变化，铁律侧本轮零触碰。"
+      "assets/avatar-card.jpg 整图替换为形象定稿「方案C·深蓝西装-半身」：1024×1536，源 PNG 2.0 MB 压成 JPG 218 KB；文件名与 README 顶部引用零改动，清单行尺寸描述同步更新。形象由米色插画版换成写实深蓝西装版。",
+      "形象候选目录只留方案C 一张（删方案A 律师袍全身、方案B 职业马甲、方案D 丸子头马甲、方案E 现代律师袍，−7.8 MB）。上一轮「只保留方案c图」的「方案c」至此对上：指的就是这五个候选里的方案C。",
+      "审查链路、交付物、配置项零变化；banner-dark 横幅与冒烟 295 项不受影响。"
     ],
     "download_page": "https://github.com/asktai/doc-compliance-review/releases",
     "files": {
-      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.35.0/文档合规审查助手AI合同_v3.35.0_20261116_(doc-compliance-review).skill",
-      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.35.0/文档合规审查助手AI合同_v3.35.0_20261116_(doc-compliance-review).zip"
+      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.35.1/文档合规审查助手AI合同_v3.35.1_20261117_(doc-compliance-review).skill",
+      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.35.1/文档合规审查助手AI合同_v3.35.1_20261117_(doc-compliance-review).zip"
     }
   },
   "history": [
+    {
+      "version": "v3.35.1",
+      "date": "2026-11-17",
+      "summary": "形象定稿换成方案C·深蓝西装半身；候选目录只留方案C"
+    },
     {
       "version": "v3.35.0",
       "date": "2026-11-16",
@@ -1064,5 +1068,5 @@
   ],
   "_维护说明": "出包后请同步更新本文件（latest 段与 history）。真源是 SKILL.md 的 version 与 VERSION.md 的沿革；本文件是'对外公布的清单'，须与真源一致，否则使用者会被引向旧版。",
   "schema": 1,
-  "version": "3.35.0"
+  "version": "3.35.1"
 }
