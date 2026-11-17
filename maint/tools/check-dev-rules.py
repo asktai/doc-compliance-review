@@ -24,6 +24,7 @@
   (16) 结转清单    遗留问题清单的「态」须属三态、标「转下轮」者须有再见条件
   (17) 零实现名    正文不得含本机实现名（角色称谓通用）；实现对照表路径须真实存在
   (18) 台账新鲜度  产出物台账的包数／版本数／版本区间须与 `dist/` 实扫值逐项相等
+  (19) 记忆层      项目记忆文件（CODEBUDDY.md）存在·带「不是判据」声明·未抄判据·未写死版本号（§29）
 
 
 归属说明
@@ -243,8 +244,8 @@ def check_structure(s):
     if not groups:
         info("无分组标题（只有节、不分组）——本维跳过")
         return
-    if len(groups) != 12:
-        err("分组标题数 %d ≠ 12（映射①：12 章降为无编号分组标题）" % len(groups))
+    if len(groups) != 13:
+        err("分组标题数 %d ≠ 13（12 原章 ＋ §29 起新增的「项目记忆」组）" % len(groups))
     flat = []
     for g in groups:
         if not g["secs"]:
@@ -259,8 +260,8 @@ def check_structure(s):
     uncov = sorted(set(nums) - set(flat))
     if uncov:
         err("有节未被任何分组覆盖：§%s（该节前缺 `## 分组标题`）" % "、".join(map(str, uncov)))
-    if not (uncov or dup) and len(groups) == 12:
-        info("12 个分组标题实算覆盖 §1—§%d、互不重叠（单源：归属从正文算，不读声明）" % len(nums))
+    if not (uncov or dup) and len(groups) == 13:
+        info("13 个分组标题实算覆盖 §1—§%d、互不重叠（单源：归属从正文算，不读声明）" % len(nums))
 
 # ────────────────────────────── (2) 导读表 ──────────────────────────────
 
@@ -1875,6 +1876,63 @@ def check_ledger_fresh(s_ignored=None):
              % (files, len(vers), s_lo, s_hi))
 
 
+# ────────────────────── (19) 记忆层（CODEBUDDY.md） ──────────────────────
+
+def check_memory_layer(s):
+    """(19) 项目记忆文件存在·不抄判据·不写死版本号（§29）。
+
+    **本条守卫的是一件结构性缺失**：铁律做到 v1.61.0 才补上记忆层（§29）。
+    没有记忆层时，AI 每次开新会话都得从目录结构里重新推"东西在哪、改完跑什么"，
+    推错一次就是一轮返工，**而这类返工不出现在任何日志里**；有了记忆层而把判据
+    抄进去，则长出第二份规范——两份迟早不同，届时没人知道自己该信哪一份（§29.1）。
+
+    §29 里可机械判的共四件（缺一即报）：
+      A. **文件在**——§29.3：技能类项目两份都是必备结构；
+      B. **「是项目记忆，不是判据」声明在**——没有这句，读者分不清哪份说了算；
+      C. **未抄判据**——判据层任一**节标题全文**出现在记忆层即报（指针写 `§N`
+         合法，把整条标题连同内容搬过来不合法）；款号定义端形态（行首 `**N.M`）
+         同判——那是判据条文的身份证形态；
+      D. **未写死版本号**——§29.4：版本号每版都变，写进记忆层即欠一笔维护债，
+         而债主不会来催。
+
+    **判不了的不假装已覆盖**：内容四样是否齐、是否过期（写了会随版本变的东西）、
+    「这句话会不会随判据改版而失效」——均属人工复核（§16.4），据实登记在 §24.3 表。
+    """
+    head("(19) 记忆层存在·不抄判据·不写死版本号")
+    mem = os.path.join(DEV, "CODEBUDDY.md")
+    if not os.path.exists(mem):
+        err("记忆层文件缺失（%s）——§29.3：技能类项目判据层与记忆层都是必备结构" % mem)
+        return
+    txt = open(mem, encoding="utf-8").read()
+
+    if "项目记忆，不是判据" not in txt:
+        err("记忆层缺「本文件是项目记忆，不是判据」声明——没有它，读者分不清哪份说了算（§29.0）")
+    else:
+        info("「是项目记忆，不是判据」声明在")
+
+    # C. 抄判据：节标题全文（`§N 标题文字`）与款号定义端形态都算条文搬家
+    stolen = []
+    for n, rest in title_rows(s):
+        full = ("§%d %s" % (n, rest.strip())) if rest.strip() else ("§%d" % n)
+        if len(full) > len("§N") and full in txt:
+            stolen.append("含节标题全文「%s」" % full)
+    for i, l in enumerate(txt.splitlines(), 1):
+        if re.match(r"^\s*\*\*\d+\.\d+", l):
+            stolen.append("第 %d 行是款号定义端形态（行首 `**N.M`）——这是判据条文的写法" % i)
+    if stolen:
+        err("记忆层抄了判据条文（%s）——只许写指针，不许抄判据（§29.1）" % "；".join(stolen))
+    else:
+        info("记忆层未抄判据（%d 个节标题全文均未出现，无款号定义端形态）" % len(list(title_rows(s))))
+
+    # D. 写死版本号
+    stale = re.findall(r"[Vv]\d+\.\d+\.\d+", txt)
+    if stale:
+        err("记忆层写死了版本号（%s）——版本号每版都变，写进去即欠维护债（§29.4）"
+            % "、".join(sorted(set(stale))))
+    else:
+        info("记忆层未写死版本号")
+
+
 def main():
     global QUIET, RULES
     args = sys.argv[1:]
@@ -1910,6 +1968,7 @@ def main():
     check_open_issues(s)
     check_impl_table(s)
     check_ledger_fresh()
+    check_memory_layer(s)
     print("=" * 62)
     if ERRS:
         print("结果：错误 %d 项，警告 %d 项 —— **未通过**" % (len(ERRS), len(WARNS)))

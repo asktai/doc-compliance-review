@@ -25,6 +25,7 @@
 | 素材目录 | `doc-compliance-review/samples/` | 随包但须逐条准入登记（9.4） |
 | 准入清单 | `maint/samples-manifest.json` | 字段 `name`／`purpose`／`reason`；出包前核验 |
 | 铁律本体 | `dev/DEV-RULES.md` | 即本表同目录那一份 |
+| 项目记忆（记忆层） | `dev/CODEBUDDY.md` | §29 落地：只写指针不写判据；由铁律自检第 (19) 维守（存在·声明·未抄判据·未写死版本号） |
 | 铁律在线版 | `maint/scratch/DEV-RULES.online.md` | 由 `maint/tools/make-online-md.py` 派生，去锚点纯文字大纲 |
 | 产出物台账 | `/workspace/产出物台账.md` | 派生件，由 `maint/tools/gen-ledger.py` 全量重建 |
 
@@ -34,7 +35,7 @@
 
 | 正文角色称谓 | 脚本 | 职责 |
 |---|---|---|
-| 铁律自检 | `check-dev-rules.py` | 铁律全文十八维自检；**唯一**判铁律自身合规的入口（维数以脚本实际输出为准，2026-11-06 校正：原文写「十六维」，与实际 18 维不符） |
+| 铁律自检 | `check-dev-rules.py` | 铁律全文十九维自检；**唯一**判铁律自身合规的入口（维数以脚本实际输出为准；2026-11-06 校正：原文写「十六维」，与实际 18 维不符；2026-11-17 §29 落地后为 19 维） |
 | 分离守卫 | `check-separation.py` | 白名单目录混入开发资料、未登记素材、开发资料越界；发布链内调用 |
 | 元自测脚本 | `meta-smoke-dev-rules.py` | 自检脚本自身的注入式反向用例（打瘸后须红） |
 | 台账生成器 | `gen-ledger.py` | 全量重建产出物台账，**不含任何断言**（故 24.3 第 23 行记「人工」） |

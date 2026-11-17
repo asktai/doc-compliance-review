@@ -104,12 +104,17 @@ def inj_refs(s):
 
 
 def inj_refs_dotted(s):
-    """(3) 悬空引用（数字路径式）：引用一个不存在的款号 19.6。
+    """(3) 悬空引用（数字路径式）：引用一个不存在的款号。
 
     2026-10-20 补：原用例只覆盖"第 99 条"这一形态，
     而正文大量引用写成"见 19.6""按 12.5.4.3 办"——凭空写一个不存在的款号，守卫原先不报。
+    2026-11-17 改靶子：原注入 §19.6，而 v1.61.0 真新增了 §19.6（变更分级）——
+    **号一成真，用例就失效**。改为运行期从真源现算一个绝不存在的款号（最大节号 +1），
+    与 (3b) 的"号要拼出来"同法，今后加节不再需要回来改用例。
     """
-    return _sub1(s, "\n## 总则与文档结构", "\n注入测试：按 §19.6 办。\n\n## 总则与文档结构")
+    nums = [int(m.group(1)) for m in re.finditer(r"(?m)^#{2,3} §(\d+) ", s)]
+    fake = "§" + str(max(nums) + 1) + ".9"
+    return _sub1(s, "\n## 总则与文档结构", "\n注入测试：按 %s 办。\n\n## 总则与文档结构" % fake)
 
 
 def inj_ext_ref(s):
@@ -420,7 +425,7 @@ CASES = [
     (1, "节标题格式（缺空格）", inj_struct_fmt, "标题格式"),
     (2, "导读表与正文不一致", inj_guide, "导读"),
     (3, "悬空引用（§99）", inj_refs, "悬空"),
-    (3, "悬空款号（§19.6 数字路径式）", inj_refs_dotted, "悬空编号引用"),
+    (3, "悬空款号（运行期现算的假号）", inj_refs_dotted, "悬空编号引用"),
     (4, "废止词残留（维护侧）", inj_wording, "废止词"),
     (4, "「非运行实例侧」按反义废词拦（A.3.7 乙）", inj_wording_neg, "废止词"),
     (5, "相对引用（见下）", inj_reldir, "相对引用"),
@@ -473,7 +478,7 @@ CROSS_SIDE_PROBE = "SKILL.md"
 # 单列档的维度（改磁盘文件才能注入，无法用 CASES 的字符串机制表达）**也算"有注入用例"**，
 # 故一并纳入派生——2026-10-30 加第 (18) 维时暴露：只在 CASES 里取 max 的话，
 # 若最大维恰好是单列档，EXPECTED_DIMS 会少一维，`absent` 检查就漏掉它（守卫缺了不报）。
-STANDALONE_DIMS = {8, 14, 16, 18}
+STANDALONE_DIMS = {8, 14, 16, 18, 19}
 EXPECTED_DIMS = max([d for d, _, _, _ in CASES] + sorted(STANDALONE_DIMS)) if CASES else 0
 
 
@@ -538,9 +543,9 @@ def main():
     print("  [OK] 基线通过；自检共 %d 维：%s" % (len(covered), covered))
 
     # 覆盖性自检：脚本声称的每一维，用例表里都得有对应注入
-    # 第 8 维（跨侧）、第 14 维（在线版）、第 16 维（结转清单）、第 18 维（台账新鲜度）
-    # 都要**改磁盘文件**才能注入，无法用 CASES 的"只改字符串"机制表达，各自单列一档，
-    # 故在上方模块级 STANDALONE_DIMS 里登记为已覆盖。
+    # 第 8 维（跨侧）、第 14 维（在线版）、第 16 维（结转清单）、第 18 维（台账新鲜度）、
+    # 第 19 维（记忆层）都要**改磁盘文件**才能注入，无法用 CASES 的"只改字符串"机制表达，
+    # 各自单列一档，故在上方模块级 STANDALONE_DIMS 里登记为已覆盖。
     cased = sorted({c[0] for c in CASES} | STANDALONE_DIMS)
     absent = sorted(set(range(1, EXPECTED_DIMS + 1)) - set(covered))
     if absent:
@@ -836,6 +841,77 @@ def main():
             print("  [E] (18) 还原失败——**台账被污染**，请立即检查 %s" % LEDGER)
         else:
             print("  [OK] (18) 台账已逐字节还原")
+
+    # ── 第 (19) 档：记忆层（CODEBUDDY.md，2026-11-17 新增）──
+    # 本维读的是**项目侧记忆文件**，改铁律副本碰不到 → 与其他单列档同法：
+    # 造真坏形态 → 断言拦住 → 立即还原。三个病征对应 §29 可机械判的其中三条：
+    # 文件被删（29.3 必备结构缺失）、把判据条文抄进记忆层（29.1）、写死版本号（29.4）。
+    # 注入内容一律**运行期现算**，不在本文件写死字面量——写死节标题／版本号，
+    # 升版或换号后用例自动失效变假绿（§28.5.8 同源教训）。
+    print("  [--] (19) 记忆层存在·不抄判据·不写死版本　单独一档")
+    MEMF = os.path.join(DEV, "CODEBUDDY.md")
+    if not os.path.exists(MEMF):
+        fails.append((19, "记忆层", "文件不存在"))
+        print("  [E] (19) 记忆层文件不存在（%s）——§29.3 必备结构缺失" % MEMF)
+    else:
+        mbak = open(MEMF, "rb").read()
+        try:
+            # 病征一：文件"被删"
+            os.remove(MEMF)
+            rc19, out19 = run_check()
+            hit19 = [h for h in parse_dims(out19).get(19, []) if "缺失" in h]
+            if rc19 != 0 and hit19:
+                standalone_n[0] += 1
+                print("  [OK] (19) %-22s 拦住（报「记忆层文件缺失」）" % "文件被删")
+            else:
+                fails.append((19, "文件被删", "未报「缺失」（守卫失效）"))
+                print("  [E] (19) %-22s 未拦住（守卫失效）" % "文件被删")
+            with open(MEMF, "wb") as f:
+                f.write(mbak)
+
+            # 病征二：把判据层一节的**节标题全文**抄进记忆层（运行期从真源现抠）
+            m19 = re.search(r"(?m)^### §12 (.+)$", src)
+            if not m19:
+                fails.append((19, "抄判据条文", "注入点未命中（真源 §12 标题已改形）"))
+                print("  [E] (19) %-22s 注入点未命中" % "抄判据条文")
+            else:
+                with open(MEMF, "a", encoding="utf-8") as f:
+                    f.write("\n\n抄来的条文：%s\n" % ("§12 " + m19.group(1).strip()))
+                rc19b, out19b = run_check()
+                hit19b = [h for h in parse_dims(out19b).get(19, []) if "抄了判据" in h]
+                if rc19b != 0 and hit19b:
+                    standalone_n[0] += 1
+                    print("  [OK] (19) %-22s 拦住（报「抄了判据」）" % "抄判据条文")
+                else:
+                    fails.append((19, "抄判据条文", "未报「抄了判据」（守卫失效）"))
+                    print("  [E] (19) %-22s 未拦住（守卫失效）" % "抄判据条文")
+                with open(MEMF, "wb") as f:
+                    f.write(mbak)
+
+            # 病征三：写死版本号（运行期从真源头部现抠，不写死字面量）
+            v19 = re.search(r"\*\*版本 ([Vv]\d+\.\d+\.\d+)\*\*", src)
+            if not v19:
+                fails.append((19, "写死版本号", "注入点未命中（真源版本串已改形）"))
+                print("  [E] (19) %-22s 注入点未命中" % "写死版本号")
+            else:
+                with open(MEMF, "a", encoding="utf-8") as f:
+                    f.write("\n当前铁律 %s（写死即欠债）\n" % v19.group(1))
+                rc19c, out19c = run_check()
+                hit19c = [h for h in parse_dims(out19c).get(19, []) if "版本号" in h]
+                if rc19c != 0 and hit19c:
+                    standalone_n[0] += 1
+                    print("  [OK] (19) %-22s 拦住（报「写死了版本号」）" % "写死版本号")
+                else:
+                    fails.append((19, "写死版本号", "未报「版本号」（守卫失效）"))
+                    print("  [E] (19) %-22s 未拦住（守卫失效）" % "写死版本号")
+        finally:
+            with open(MEMF, "wb") as f:
+                f.write(mbak)
+        if digest(MEMF) != hashlib.sha256(mbak).hexdigest():
+            fails.append((19, "记忆层", "还原失败：记忆层哈希未复原"))
+            print("  [E] (19) 还原失败——**记忆层被污染**，请立即检查 %s" % MEMF)
+        else:
+            print("  [OK] (19) 记忆层已逐字节还原")
 
     # ── 第 (3b) 档：外部文件里的铁律条号引用（2026-10-20 新增）──
     # 12.5.1.1 承认的盲区：条号被脚本注释、随包文档写死引用，真源改号后全部悬空，
