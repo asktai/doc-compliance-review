@@ -196,11 +196,11 @@ def xl_compare(spec):
     return wb
 
 def xl_report(spec):
-    wb, ws = _new_sheet("审查意见", ["序号", "条款定位", "评级", "风险描述", "法律依据", "修改建议"])
+    wb, ws = _new_sheet("审查意见", ["序号", "条款定位", "评级", "风险描述", "修改建议", "法律依据"])
     if wb is None: return None
     for i, c in enumerate(clauses(spec), 1):
-        ws.append([i, c.get("heading", ""), c.get("rating", ""), c.get("comment", ""), c.get("basis", ""), c.get("revised", "")])
-    _widths(ws, [6, 34, 12, 60, 34, 60])
+        ws.append([i, c.get("heading", ""), c.get("rating", ""), c.get("comment", ""), c.get("revised", ""), c.get("basis", "")])
+    _widths(ws, [6, 34, 12, 60, 60, 34])
     return wb
 
 def xl_clause_table(spec):
@@ -494,7 +494,7 @@ def mindmap_html(root, nodes, slug, spec, ctx):
 <main class="mm-page">
   <h1>%(root)s</h1>
   %(body)s
-  <div class="mm-foot">%(meta)s　｜　本文件由「文档合规审查助手AI合同」生成，仅供辅助参考，不构成法律意见。</div>
+  <div class="mm-foot">%(meta)s　｜　本文件由「文档合规审查助手AI合同」生成，仅供辅助参考，不构成最终法律意见。</div>
 </main>
 <script>%(js)s</script>
 </body></html>
@@ -651,7 +651,7 @@ def _img_card_canvas(spec):
         dr.rectangle([x, 320, x + 460, 332], fill=_img_hex(col))
         dr.text((x + 40, 380), str(val), font=f_num, fill=_img_hex(col))
         dr.text((x + 40, 540), lab, font=f_lab, fill=_img_hex("fg2"))
-    dr.text((70, 730), "本图由「文档合规审查助手AI合同」生成，仅供辅助参考，不构成法律意见。",
+    dr.text((70, 730), "本图由「文档合规审查助手AI合同」生成，仅供辅助参考，不构成最终法律意见。",
             font=_img_font(24)[0], fill=_img_hex("fg2"))
     dr.text((70, 780), "逐条意见与法律依据以 WORD / HTML 报告正文为准。",
             font=_img_font(24)[0], fill=_img_hex("fg2"))
@@ -718,7 +718,7 @@ def _img_long_canvas(spec, slug):
                 y += 34
             dr.line([pad, y + 8, W - pad, y + 8], fill=_img_hex("line"), width=1)
             y += 26
-    dr.text((pad, y + 20), "本图由「文档合规审查助手AI合同」生成，仅供参考，不构成法律意见。",
+    dr.text((pad, y + 20), "本图由「文档合规审查助手AI合同」生成，仅供参考，不构成最终法律意见。",
             font=f_meta, fill=_img_hex("fg2"))
     return img, dr
 
@@ -749,7 +749,7 @@ def img_svg(root, nodes, spec):
         parts.append('<text x="%d" y="580" font-size="28" fill="#5A6478">%s</text>'
                      % (x + 40, esc(lab)))
     parts.append('<text x="70" y="760" font-size="24" fill="#5A6478">'
-                 '本图由「文档合规审查助手AI合同」生成，仅供辅助参考，不构成法律意见。</text>')
+                 '本图由「文档合规审查助手AI合同」生成，仅供辅助参考，不构成最终法律意见。</text>')
     parts.append('<text x="70" y="810" font-size="24" fill="#5A6478">'
                  '逐条意见与法律依据以 WORD / HTML 报告正文为准。</text>')
     parts.append("</svg>")
@@ -918,7 +918,7 @@ except Exception:
 BRAND = {"navy": (0x0B, 0x20, 0x38), "gold": (0xC9, 0xA2, 0x4A),
          "r3": (0xD8, 0x44, 0x3C), "r2": (0xE3, 0xA6, 0x37), "r1": (0x3E, 0x9B, 0x6B),
          "fg2": (0x5A, 0x64, 0x78), "line": (0xE3, 0xE7, 0xEF)}
-PPT_DISCLAIM = "本演示由「文档合规审查助手AI合同」生成，仅供辅助参考，不构成法律意见；须经执业律师复核后方可据此决策。"
+PPT_DISCLAIM = "本演示由「文档合规审查助手AI合同」生成，仅供辅助参考，不构成最终法律意见；须人工复审核查后方可据此决策。"
 PPT_MAX_SLIDES = 80   # 逐条意见一页一条，大合同封顶；超出并入分组页
 
 def _ppt_text(slide, x, y, w, h, text, size=18, bold=False, color="fg2", align=None):
@@ -1440,7 +1440,7 @@ def html_page(slug, spec, body, ctx, online=False):
 </div>%(banner)s
 <main class="page">
 %(body)s
-<div class="foot">%(meta)s　｜　本文件由「文档合规审查助手AI合同」生成，仅供辅助参考，不构成法律意见；须经执业律师复核后方可据此决策。</div>
+<div class="foot">%(meta)s　｜　本文件由「文档合规审查助手AI合同」生成，仅供辅助参考，不构成最终法律意见；须人工复审核查后方可据此决策。</div>
 </main>
 <script>%(js)s</script>
 </body></html>

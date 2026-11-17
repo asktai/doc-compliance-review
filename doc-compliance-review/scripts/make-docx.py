@@ -396,13 +396,51 @@ def add_delivery_note(doc, runs, slug, spec=None):
         return False
 
 
-def _note_text(c):
-    """一条审查意见的批注正文：5 批注版与 1／4 的条款批注共用同一份措辞（一概念一处）。"""
+def _note_fields(c):
+    """一条审查意见的四个字段，**统一顺序**：评级→风险描述→修改建议→法律依据（v3.36.0 定稿）。
+
+    5 批注版、修订版/红线版条款批注、原稿就地批注、报告正文、Excel 审查意见表共用此顺序，
+    避免同一条意见在不同交付物里长得不一样。
+    """
     if not (c.get("rating") or c.get("comment") or c.get("basis") or c.get("revised")):
-        return ""
-    return ("【评级】%s\n【风险描述】%s\n【法律依据】%s\n【修改建议】%s"
-            % (c.get("rating") or "—", c.get("comment") or "—",
-               c.get("basis") or "—", c.get("revised") or "—"))
+        return []
+    return [("【评级】", c.get("rating") or "—"),
+            ("【风险描述】", c.get("comment") or "—"),
+            ("【修改建议】", c.get("revised") or "—"),
+            ("【法律依据】", c.get("basis") or "—")]
+
+
+def _note_text(c):
+    """一条审查意见的批注正文（纯文本形态，供不支持富文本批注的降级路径使用）。"""
+    return "\n".join("%s%s" % (k, v) for k, v in _note_fields(c))
+
+
+RATE_COLOR = RGBColor(0xFF, 0x00, 0x00)   # 星级红色（与报告标题星级同一套色值）
+
+
+def _attach_note_comment(doc, runs, c):
+    """挂审查意见批注（富文本形态）：一行一字段，评级 ★★ 红色显示。
+
+    修订版/红线版/批注版/原稿就地批注四处共用；Word 原生修订版里批注同样上色
+    （颜色写在批注 run 的 w:color 上，与正文修订痕迹无关）。
+    返回 False 表示未挂上（由调用方记 miss，不静默吞掉）。
+    """
+    fields = _note_fields(c)
+    if not fields or not runs or not can_comment(doc):
+        return False
+    try:
+        cm = doc.add_comment(runs, text="", author=REVIEWER or "AI 文档合规审查助手",
+                             initials=(REVIEWER or "AI")[:3])
+        for label, val in fields:
+            p = cm.add_paragraph()
+            p.add_run(label)
+            r = p.add_run(val)
+            if label == "【评级】":
+                r.font.color.rgb = RATE_COLOR          # ★★ 红色
+        return True
+    except Exception as e:
+        print("[make-docx] 富文本批注挂载失败：%s" % str(e)[:80])
+        return False
 
 
 def _attach_comment(doc, runs, text):
@@ -420,15 +458,16 @@ def add_clause_note(doc, runs, c):
     """条款标题上挂 1 条审查意见批注；无实质意见时不挂。
 
     锚点只能取条款标题：修订版的正文文字都在 w:ins／w:del 里，取不到可锚定的 run。
-    措辞与 5 批注版共用 _note_text（同一份「评级／风险描述／法律依据／修改建议」口径），
-    避免同一条意见在两类交付物里长得不一样。
+    措辞与 5 批注版共用 _note_fields（同一份「评级／风险描述／修改建议／法律依据」口径），
+    避免同一条意见在两类交付物里长得不一样。富文本挂载失败时降级纯文本批注。
     """
     if not runs or not can_comment(doc):
         return False
-    txt = _note_text(c)
-    if not txt:
+    if not _note_fields(c):
         return False
-    return _attach_comment(doc, runs, txt)
+    if _attach_note_comment(doc, runs, c):
+        return True
+    return _attach_comment(doc, runs, _note_text(c))
 
 
 def render_diff_runs(p, o, v, kind):
@@ -451,8 +490,8 @@ def render_diff_runs(p, o, v, kind):
 DISCLAIMER_REPORT = ("本报告仅基于所提供文档之文本字面表述和当事人表述以及需求，进行理解与风险提示，"
                      "不代表对交易背景、履约事实或商业安排的确认，所引法条、判例、法院名称、标准号、示范文本及链接"
                      "请以现行有效版本为准，使用者应自行核验其真实性与现行有效性。")
-DISCLAIMER_USAGE = ("免责声明：AI不能替代人工，人工不能依赖AI，个人仅限研究、学习、交流、体验自用，商业使用须获作者书面授权；本技能仅作为辅助法律工作，不构成法律意见，不可直接作为决策依据；条文检索与适用要件呈现仅为法律信息提供，不预测案件结果、不判断具体情形是否成立；"
-                    "输出内容须经执业律师复核后方可使用；使用风险与后果由使用者自行承担。"
+DISCLAIMER_USAGE = ("免责声明：AI不能替代人工，人工不能依赖AI，个人仅限研究、学习、交流、体验自用，商业使用须获作者书面授权；本技能仅作为辅助法律工作，不构成最终法律意见，不可直接作为决策依据，须人工复审核查；条文检索与适用要件呈现仅为法律信息提供，不预测案件结果、不判断具体情形是否成立；"
+                    "使用风险与后果由使用者自行承担。"
                     "使用即为已知晓后果并免责作者，否则，请勿使用！")
 
 
@@ -553,8 +592,8 @@ def doc_report(spec):
         if rt:
             r = h.add_run("  " + rt); r.font.color.rgb = RGBColor(0xFF, 0x00, 0x00)  # 星级红色
         doc.add_paragraph("风险描述：" + (c.get("comment", "") or "—"))
-        doc.add_paragraph("法律依据：" + (c.get("basis", "") or "—"))
         doc.add_paragraph("修改建议（可直接采用的条款文本）：" + (c.get("revised", "") or "—"))
+        doc.add_paragraph("法律依据：" + (c.get("basis", "") or "—"))
     # v3.27.0 保真注记（§3.3）：列全轮实际产出类型的贴合度，含 CONTENT_ONLY/NEWDOC 项
     # （不列＝默认"它没问题"，使用者无从判断）。report 挪到最后生成，台账此刻已完整。
     if TIER_LEDGER:
@@ -608,9 +647,9 @@ def doc_report_comments(spec):
         if c.get("revised"):
             p = doc.add_paragraph(); p.add_run("修改后：").bold = True; p.add_run(c.get("revised", ""))
         note = _note_text(c) or "（本条款无实质意见）"
-        if _ok_cm and not _attach_comment(doc, h.runs, note):
-            doc.add_paragraph("批注内容：" + note.replace("\n", " "))
-        elif not _ok_cm:
+        _attached = _ok_cm and (_attach_note_comment(doc, h.runs, c)
+                                or _attach_comment(doc, h.runs, note))
+        if not _attached:
             doc.add_paragraph("批注内容：" + note.replace("\n", " "))
     return doc
 
@@ -1249,7 +1288,7 @@ def from_source_docx_comment(spec):
         if not runs:
             miss.append(c.get("heading") or (c.get("original") or "")[:16] or "（空段落）")
             continue
-        if _attach_comment(doc, runs, txt):
+        if _attach_note_comment(doc, runs, c) or _attach_comment(doc, runs, txt):
             hit += 1
         else:
             miss.append(c.get("heading") or (c.get("original") or "")[:16])

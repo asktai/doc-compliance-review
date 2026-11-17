@@ -1071,12 +1071,12 @@ def verify(strict=False):
 
 # ---------------------------------------------------------- 免责声明口径
 DISC_VERBATIM = ("AI不能替代人工，人工不能依赖AI，个人仅限研究、学习、交流、体验自用，商业使用须获作者书面授权"
-                 "；本技能仅作为辅助法律工作，不构成法律意见，不可直接作为决策依据；条文检索与适用要件呈现"
-                 "仅为法律信息提供，不预测案件结果、不判断具体情形是否成立，具体适用须经执业律师结合事实认定；"
-                 "输出内容须经执业律师复核后方可使用；使用风险与后果由使用者自行承担。"
+                 "；本技能仅作为辅助法律工作，不构成最终法律意见，不可直接作为决策依据，须人工复审核查；"
+                 "条文检索与适用要件呈现仅为法律信息提供，不预测案件结果、不判断具体情形是否成立；"
+                 "使用风险与后果由使用者自行承担。"
                  "使用即为已知晓后果并免责作者，否则，请勿使用！")
 DISC_KEYS = ["AI不能替代人工", "人工不能依赖AI", "商业使用须获作者书面授权",
-             "不构成法律意见", "执业律师复核", "免责作者",
+             "不构成最终法律意见", "须人工复审核查", "免责作者",
              "不预测案件结果", "不判断具体情形是否成立"]
 DISC_FULL_DOCS = ["SKILL.md", "LICENSE.md", "安装使用教程.md", "文档合规审查助手AI合同提示词版.md"]
 DISC_KEY_DOCS = ["README.md", "scripts/make-docx.py", "SECURITY.md", "core/01-general-risk-rules.md"]
@@ -1116,6 +1116,53 @@ def check_disclaimer():
     sk = _read(os.path.join(ROOT, "SKILL.md"))
     if "步骤 0.0 免责声明" not in sk:
         err("SKILL.md 启动流程缺「步骤 0.0 免责声明」（同一对话内首次使用先输出）")
+
+
+# ---------------------------------------------------------------- 意见四字段顺序口径
+NOTE_ORDER = ["【评级】", "【风险描述】", "【修改建议】", "【法律依据】"]
+
+
+def check_note_order():
+    """审查意见四字段呈现顺序咬合（v3.36.0 定稿）：**评级→风险描述→修改建议→法律依据**。
+
+    三处同序才算「一概念一处」：make-docx.py 的 _note_fields（Word 批注四处共用同一份）、
+    doc_report 正文段落、format-engine.py 的 xl_report 表头。
+    顺序漂移＝同一条意见在不同交付物里长得不一样，改一处忘其余就靠这里拦；
+    文档侧旧列序由 _check_doc_consistency 的 FORBID 注册表拦。
+    """
+    mk = _read(os.path.join(ROOT, "scripts", "make-docx.py"))
+    pos = [mk.find(k) for k in NOTE_ORDER]
+    if -1 in pos:
+        err("意见顺序：make-docx.py 缺四字段标记（%s）" % "、".join(
+            k for k, p in zip(NOTE_ORDER, pos) if p < 0))
+    elif pos != sorted(pos):
+        err("意见顺序：make-docx.py 四字段不是「评级→风险描述→修改建议→法律依据」——"
+            "批注与报告共用的顺序真源被改序")
+    else:
+        info("意见顺序：make-docx.py 批注四字段按定稿顺序")
+    # doc_report 正文段落：风险描述 → 修改建议 → 法律依据
+    trio = ["风险描述：", "修改建议（可直接采用的条款文本）：", "法律依据："]
+    tpos = [mk.find(k) for k in trio]
+    if -1 in tpos:
+        warn("意见顺序：make-docx.py doc_report 缺段落标签（%s）" % "、".join(
+            k for k, p in zip(trio, tpos) if p < 0))
+    elif tpos != sorted(tpos):
+        err("意见顺序：doc_report 正文段落不是「风险描述→修改建议→法律依据」")
+    # Excel 审查意见表表头：评级 → 风险描述 → 修改建议 → 法律依据
+    fe = _read(os.path.join(ROOT, "scripts", "format-engine.py"))
+    m = re.search(r"def xl_report\(spec\):\s*\n.*?_new_sheet\([^,]+,\s*\[(.*?)\]", fe, re.S)
+    if not m:
+        warn("意见顺序：format-engine.py 未解析到 xl_report 表头（函数被改形？）")
+    else:
+        hdr = m.group(1)
+        hpos = [hdr.find('"%s"' % k) for k in ("评级", "风险描述", "修改建议", "法律依据")]
+        if -1 in hpos:
+            err("意见顺序：xl_report 表头缺列（%s）" % "、".join(
+                k for k, p in zip(("评级", "风险描述", "修改建议", "法律依据"), hpos) if p < 0))
+        elif hpos != sorted(hpos):
+            err("意见顺序：xl_report 表头不是「评级→风险描述→修改建议→法律依据」")
+        else:
+            info("意见顺序：xl_report 表头按定稿顺序")
 
 
 # ---------------------------------------------------------------- 长文档分批口径
@@ -1727,6 +1774,13 @@ def _check_doc_consistency():
         # 项数也钉住：可查看清单＝5 项（README／版本身份证／LICENSE／教程／提示词版）。
         # 写 6 项的一定是把 VERSION.md 又算进去了——数字与清单两头都拦，防「改了话没改数」。
         ("可查看项数仍写 6 项", r"(?:可查看的只有|可以看的只有|可看的只有)\s*\*{0,2}\s*6\s*项"),
+        # v3.36.0 意见四字段顺序定稿（评级→风险描述→修改建议→法律依据），
+        # 文档里旧列序（法律依据排在修改建议前）一律禁止——改了代码没改话就是这条抓的。
+        ("意见表旧列序·风险描述在评级前", r"条款定位\s*\|\s*风险描述\s*\|\s*评级"),
+        ("意见表旧列序·法律依据在修改建议前", r"法律依据[^|\n]{0,14}\|\s*修改建议"),
+        ("意见摘要旧序·定位/描述/评级/法条/修改建议", r"定位/描述/评级/法条/修改建议"),
+        # 免责声明新旧表述不在此拦：《免责声明》本体由 check_disclaimer 的逐字＋关键句判据咬死；
+        # 撰写链路等处的「不构成法律意见」属另一概念（起草边界），一概禁会误伤。
     ]
     bad = []
     for rel in DOCS:
@@ -4233,6 +4287,7 @@ def main():
         check_id_group_whitelist()
         check_rule_baseline()
         check_disclaimer()
+        check_note_order()
         check_batch_guidance()
         check_md_fences()
         check_header_version()

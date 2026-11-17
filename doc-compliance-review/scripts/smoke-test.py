@@ -1141,7 +1141,7 @@ def main():
                 _txt = "\n".join(sh.text_frame.text
                                  for sl in _prs.slides
                                  for sh in sl.shapes if sh.has_text_frame)
-                ok_ppt = len(_prs.slides._sldIdLst) >= 3 and "不构成法律意见" in _txt
+                ok_ppt = len(_prs.slides._sldIdLst) >= 3 and "不构成最终法律意见" in _txt
                 why_ppt = f"{len(_prs.slides._sldIdLst)} 页"
             except Exception as e:
                 ok_ppt, why_ppt = False, repr(e)
@@ -1240,7 +1240,7 @@ def main():
         body = "\n".join(p.text for p in d.paragraphs)
         check("报告含免责声明（报告段＋使用段全文）",
               "免责声明" in body and "现行有效" in body
-              and "执业律师复核" in body and "商业使用须获作者书面授权" in body)
+              and "须人工复审核查" in body and "商业使用须获作者书面授权" in body)
         check("报告含风险描述与法条", "风险描述" in body and "法律依据" in body)
     except Exception as e:
         check("报告内容自检", False, str(e))
@@ -1250,6 +1250,13 @@ def main():
         with zipfile.ZipFile(p) as z:
             xml = z.read("word/comments.xml").decode("utf-8", "ignore") if "word/comments.xml" in z.namelist() else ""
         check("批注版含 Word 批注（comments.xml）", xml.count("<w:comment ") >= 3, f"{xml.count('<w:comment ')} 条")
+        # v3.36.0 意见四字段新顺序（评级→风险描述→修改建议→法律依据）＋评级星级红色
+        _pos = [xml.find(k) for k in ("【评级】", "【风险描述】", "【修改建议】", "【法律依据】")]
+        check("批注意见四字段按新顺序呈现（评级→风险描述→修改建议→法律依据）",
+              all(x >= 0 for x in _pos) and _pos == sorted(_pos),
+              "位置 " + ",".join(str(x) for x in _pos))
+        check("批注评级星级红色（w:color FF0000 且含 ★）",
+              "★" in xml and 'FF0000' in xml)
     except Exception as e:
         check("批注版内容自检", False, str(e))
     try:
