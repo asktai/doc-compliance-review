@@ -1405,15 +1405,41 @@ def check_smoke_count():
     real = d.get("total")
     if not isinstance(real, int) or not real:
         return
+    # v3.36.1（H-21 收口，第二段）：文档比对与守恒断言**都锚定源码指纹**。
+    # 台账 sig_<mode> 记的是「total 那次跑的是哪个 smoke-test.py」。指纹 ≠ 当前脚本
+    # ⇒ 台账是旧源码跑的：文档刚改过、冒烟还没重跑——此时拿旧 total 校验新文档、
+    # 拿两档旧项数判守恒，都只会误伤（[3.57]／[3.58] 三轮假红的另一半根源就在这）。
+    # 只提示「跑一遍冒烟即恢复」，不判错。旧格式台账（缺指纹）无法锚定，同样放行。
+    # 指纹对齐才进严格校验区：守恒断言＋文档比对，一条不少。
+    _mode = d.get("mode") or "fast"
+    try:
+        import hashlib as _hl_sc
+        _sig_cur = _hl_sc.sha256(
+            open(os.path.join(HERE, "smoke-test.py"), "rb").read()).hexdigest()
+    except Exception:
+        _sig_cur = ""
+    _sig_tot = str(d.get("sig_" + str(_mode)) or "")
+    if not _sig_tot or (not _sig_cur) or _sig_tot != _sig_cur:
+        info("冒烟项数：台账是旧源码（或旧格式）跑的，本轮校验暂不生效"
+             "（重跑一遍 smoke-test 即恢复严格校验）")
+        return
     # 两档守恒断言（v3.30.0）：快速档与全量档的项数必须相等——快档是把耗时项记 SKIP 保留占位，
     # 不是删掉条目。曾经 fast 用一条 skip 顶掉四条 check，fast=265／full=270，
     # 于是 check_smoke_count 拿 fast 的 total 去比文档就报错，表现为「装完即红」。
-    # 两个键都在时才判（只跑过一档时不误报）。
+    # 两个键都在时才判（只跑过一档时不误报）。判据三支（H-21 收口）：
+    #   另一档指纹也是当前源码 ⇒ 同一份 smoke-test.py 跑出两个项数＝真不守恒，报错（守卫力不减）；
+    #   另一档指纹不同或缺 ⇒ 旧源码的记录，属正常中间态，只提示不误伤。
     _tf, _tk = d.get("total_full"), d.get("total_fast")
     if isinstance(_tf, int) and isinstance(_tk, int) and _tf != _tk:
-        err("冒烟两档项数不守恒（全量 %d 项 ／ 快速 %d 项）——快速档须用 skip 保留占位，"
-            "不得删减条目；请对齐 fast 分支的 skip 与 else 分支的 check 后再跑两档"
-            % (_tf, _tk))    # 只扫与冒烟/自检同一行的数字。须排除两类干扰，否则会把别的脚本的项数当成冒烟项数：
+        _sig_oth = str(d.get("sig_" + ("fast" if str(_mode) == "full" else "full")) or "")
+        if _sig_oth and _sig_oth == _sig_cur:
+            err("冒烟两档项数不守恒（全量 %d 项 ／ 快速 %d 项）——同一份 smoke-test.py"
+                "（指纹 %s…）跑出两个项数，快速档须用 skip 保留占位，不得删减条目；"
+                "请对齐 fast 分支的 skip 与 else 分支的 check 后再跑两档"
+                % (_tf, _tk, _sig_cur[:12]))
+        else:
+            info("冒烟两档项数暂时不同（全量 %d ／ 快速 %d）——另一档是旧源码的记录："
+                 "跑一遍另一档即自愈，不算不守恒" % (_tf, _tk))    # 只扫与冒烟/自检同一行的数字。须排除两类干扰，否则会把别的脚本的项数当成冒烟项数：
     # (1) 其他脚本所在行（check.py 的 12 项、pack.py 的 5 项都不是冒烟项数）
     # (2) 列表式表述「N 项：结构／字段／…」——那是分项的枚举，不是总数
     kw = ("smoke-test", "冒烟", "自检")

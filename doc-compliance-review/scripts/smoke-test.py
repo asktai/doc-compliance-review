@@ -3055,26 +3055,55 @@ def main():
         # 两档项数守恒（v3.30.0）：快档是用 skip **占位**，不是删条目。台账分键记两档 total，
         # check.py 据 total_full／total_fast 断言相等。这里做判据反证——把一份台账改坏，
         # 直接喂给判据函数，必须报错；不落盘、不碰真台账。
+        # v3.36.1（H-21 收口）：判据按源码指纹分三支，守卫的 triple 反证各取一支——
+        #   两档指纹都是当前源码却两个数＝真不守恒，必须报错（证明守卫没被放宽掉）；
+        #   一档当前一档旧＝正常中间态，必须放行（证明 [3.57]／[3.58] 不再被误伤）；
+        #   旧格式缺指纹＝无法锚定，必须放行（装包的人不得被「装完即红」拦住）。
+        # 注入台账的「当前源码指纹」运行期现算真值（写死的假指纹会随脚本改动失真——
+        # 与铁律教训同一型：注入内容须运行期现算，才不会随升版变假绿/假红）。
         try:
-            import tempfile as _tf_fast
+            import tempfile as _tf_fast, hashlib as _hl_fast
+            _sig_now = _hl_fast.sha256(
+                open(os.path.join(HERE, "smoke-test.py"), "rb").read()).hexdigest()
+            _sig_old = _hl_fast.sha256(b"demo-source-older").hexdigest()
             _bad_dir = _tf_fast.mkdtemp(prefix="dcr_led_")
             os.makedirs(os.path.join(_bad_dir, "core"), exist_ok=True)
             _bad_led = os.path.join(_bad_dir, "core", "_smoke-baseline.json")
             open(_bad_led, "w", encoding="utf-8").write(json.dumps(
                 {"total": 270, "total_full": 270, "total_fast": 265,
-                 "failed": 0, "mode": "full"}, ensure_ascii=False))
+                 "failed": 0, "mode": "full", "sig_full": _sig_now, "sig_fast": _sig_now},
+                ensure_ascii=False))
             _errs_before = len(_m.ERRS)
             _old_root = getattr(_m, "ROOT", None)
             _m.ROOT = _bad_dir     # 让判据在临时目录找台账
             _m.check_smoke_count()
             _caught = len(_m.ERRS) > _errs_before
             _m.ERRS[:] = _m.ERRS[:_errs_before]
+            # 异指纹（mode 档＝当前源码、另一档＝旧源码）＝正常中间态，必须放行不报错
+            open(_bad_led, "w", encoding="utf-8").write(json.dumps(
+                {"total": 270, "total_full": 270, "total_fast": 265,
+                 "failed": 0, "mode": "fast", "sig_full": _sig_old, "sig_fast": _sig_now},
+                ensure_ascii=False))
+            _m.check_smoke_count()
+            _passed_mid = len(_m.ERRS) == _errs_before
+            _m.ERRS[:] = _m.ERRS[:_errs_before]
+            # 旧格式（缺指纹）＝无法锚定，也必须放行（装包的人不得被「装完即红」拦住）
+            open(_bad_led, "w", encoding="utf-8").write(json.dumps(
+                {"total": 270, "total_full": 270, "total_fast": 265, "failed": 0, "mode": "full"},
+                ensure_ascii=False))
+            _m.check_smoke_count()
+            _passed_legacy = len(_m.ERRS) == _errs_before
+            _m.ERRS[:] = _m.ERRS[:_errs_before]
             if _old_root is not None:
                 _m.ROOT = _old_root
-            check("两档守恒判据：台账 total_full≠total_fast 须报「不守恒」", _caught,
+            check("两档守恒判据：同指纹（同一份源码）两档项数不等须报「不守恒」", _caught,
                   "已报不守恒" if _caught else "未拦（假绿）")
+            check("两档守恒判据：异指纹（源码改过只跑一档）须放行不报错——H-21 中间态", _passed_mid,
+                  "放行" if _passed_mid else "误伤（假红）")
+            check("两档守恒判据：旧格式台账（缺指纹）须放行不报错——装包不得「装完即红」", _passed_legacy,
+                  "放行" if _passed_legacy else "误伤（假红）")
         except Exception as e:
-            check("两档守恒判据：台账 total_full≠total_fast 须报「不守恒」", False, repr(e))
+            check("两档守恒判据：指纹三支反证（同指纹报／异指纹放／缺指纹放）", False, repr(e))
 
         # ── 反向注入（铁律 25.5.3：门禁须证明拦得住，不做注入等于"尚未落实"）──
         # 上面几条是**正向断言**（现状必须合规），只能证明"现在是对的"；
@@ -3104,16 +3133,25 @@ def main():
             _old = json.loads(open(SMOKE_LEDGER, encoding="utf-8").read())
         except Exception:
             _old = {}
+        # v3.36.1（H-21 收口）：台账给每档各记一份「源码指纹」＝跑该档时 smoke-test.py
+        # 自身的 sha256。check_smoke_count 据此区分「两档数值不等」的真伪：
+        # 同指纹却两个数＝真不守恒（须报错）；异指纹＝源码改过、另一档待刷新（正常中间态）。
+        import hashlib as _hl
+        _sig = _hl.sha256(open(os.path.join(HERE, "smoke-test.py"), "rb").read()).hexdigest()
         with open(SMOKE_LEDGER, "w", encoding="utf-8") as f:
             json.dump({"_说明": "冒烟结果台账（smoke-test.py 自动生成，运行侧生成物不随开发侧留存）；"
                                "供 check.py 校验 README/教程所写项数是否为真。"
                                "total_full／total_fast 两键各自记最近一次该档的项数，"
-                               "check.py 断言二者相等——两档项数必须守恒，否则文档口径无法同时成立。",
+                               "check.py 断言二者相等——两档项数必须守恒，否则文档口径无法同时成立。"
+                               "sig_full／sig_fast 记跑该档时 smoke-test.py 的 sha256（v3.36.1）："
+                               "项数不等时同指纹＝真不守恒（报错），异指纹＝源码改过的正常中间态（放行）。",
                        "generated": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                        "mode": _mode,
                        "total": _tot,
                        "total_full": _tot if _mode == "full" else _old.get("total_full"),
                        "total_fast": _tot if _mode == "fast" else _old.get("total_fast"),
+                       "sig_full": _sig if _mode == "full" else _old.get("sig_full"),
+                       "sig_fast": _sig if _mode == "fast" else _old.get("sig_fast"),
                        "passed": len(PASSES), "failed": len(FAILS), "skipped": len(SKIPS)},
                       f, ensure_ascii=False, indent=2)
     except Exception as e:
