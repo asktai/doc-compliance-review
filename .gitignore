@@ -39,3 +39,7 @@ doc-compliance-review/_发布包/
 # 顶层 dist/ 曾长期入库，历史里堆了 259 MB 旧包，首次推送因此被网络切断——
 # 构建产物不进版本库，版本库只放源码与文档。
 dist/
+
+# 元冒烟临时注入件：meta-smoke-dev-rules.py 运行时把脚本打瘸成 _crippled_N.py 再验守卫，
+# 跑完自清。属运行期产物——**不得入库**（它们是故意打瘸的副本，公开仓库里挂着会被人当正式脚本）。
+maint/tools/_crippled_*.py
