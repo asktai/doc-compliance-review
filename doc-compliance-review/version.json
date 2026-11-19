@@ -3,24 +3,32 @@
   "product": "文档合规审查助手AI合同",
   "skill_id": "doc-compliance-review",
   "latest": {
-    "version": "v3.36.2",
+    "version": "v3.37.1",
     "date": "2026-11-19",
-    "summary": "在线源恢复：仓库转 public 后，清单与下载页均实测可匿名读取，检查更新真正可用；在线源与文档表述加双向咬合守卫",
+    "summary": "头图去掉版本号，升版不再需要重绘图；含合规咨询窄版与法规检索加深",
     "changes": [
-      "在线检查更新恢复（挂账 H-22 收口）：仓库已转为 public，raw 上的版本清单与 Releases 页都能匿名读，`--check-online` 实测能读出「当前版 → 最新版」，不再是「未配在线源」。此前置空是如实声明（私有仓库 raw 一律 404）；现在条件具备，两处地址一并回填——清单与下载页同时可读才成立，只回填一处等于「查得到、下不了」。",
-      "新增守卫「在线源双向咬合」：配置说配了源、文档说没配（或反之），门禁当场报错。上一轮把两处地址置空、同步改了五份文档，两者之间却没有任何机械判据——口径漂了也发现不了，只有使用者点「检查更新」才看出对不上。判据双向：配了源则文档不得再称「未配在线源」、download_page 不得留空、清单与配置的下载页须是同一处；没配源则文档必须仍写着「未配在线源」。",
-      "冒烟配套三支反证（配源却说未配／未配却不说／一致不得误报）——只做前两支，一个「见谁都咬」的判据同样能过，对照支才证明它分得清。项数 302→305 两档守恒。",
-      "文档口径同步改回：README 五处、SKILL 两处、教程四处，从「本分发未配在线源、零请求」改为「已配公开源、`--notice` 仍零请求、`--check-online` 真读清单」；联网边界（只读清单、只做 GET、不上传任何信息）不变。",
-      "`check_online_by_default` 总闸**保持出厂 false**：查不查仍由使用者开口，本版只恢复「能查」，不恢复「自动查」。",
-      "审查链路、交付物、规则库零变化；铁律侧本轮零触碰。"
+      "头图不再写版本号：图面左下角只留「作者：胡皓」，PNG 元数据只写恒定口径标记 Header-Design=no-version。此前版本串既烧进像素又写进元数据，升版忘了重绘就「图片显示旧版」，而人眼不会去看图片里的版本号——现在把这条会出错的路删掉，版本真源只剩 SKILL.md frontmatter 一处，**升版不必再重绘**。",
+      "生成器同步精简：make-header.py 不再读 SKILL.md 版本、不再收 --version（传了即报错退出，防止机制被悄悄加回）。",
+      "守卫反向改写：门禁由「比对头图版本是否过期」改为「查版本戳是否回潮」——图里重新出现 Skill-Version、或生成器又把它写回图里即报错；冒烟两条用例同步反转（不带版本号且带口径标记／传 --version 须报错），项数不变、两档守恒。",
+      "同版本内含合规咨询窄版（第二十四节 ＋ 菜单第 21 项）、条款反查 --from-clause、多法对照 --cross、《库外检索单》与第十一节划界表，详见包内 VERSION.md 的上一版条目。"
     ],
     "download_page": "https://github.com/asktai/doc-compliance-review/releases",
     "files": {
-      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.36.2/doc-compliance-review_v3.36.2_20261119.skill",
-      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.36.2/doc-compliance-review_v3.36.2_20261119.zip"
+      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.37.1/doc-compliance-review_v3.37.1_20261119.skill",
+      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.37.1/doc-compliance-review_v3.37.1_20261119.zip"
     }
   },
   "history": [
+    {
+      "version": "v3.37.1",
+      "date": "2026-11-19",
+      "summary": "头图去掉版本号（与版本解耦，升版不必重绘）；守卫改为查版本戳回潮"
+    },
+    {
+      "version": "v3.37.0",
+      "date": "2026-11-19",
+      "summary": "合规咨询窄版入册（只接已审文档追问）；条款反查与多法对照；案例／地方政策划界"
+    },
     {
       "version": "v3.36.2",
       "date": "2026-11-19",
@@ -1091,5 +1099,5 @@
   ],
   "_维护说明": "出包后请同步更新本文件（latest 段与 history）。真源是 SKILL.md 的 version 与 VERSION.md 的沿革；本文件是'对外公布的清单'，须与真源一致，否则使用者会被引向旧版。",
   "schema": 1,
-  "version": "3.36.2"
+  "version": "3.37.1"
 }

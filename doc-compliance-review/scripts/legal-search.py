@@ -238,6 +238,133 @@ def _row(law, no, ent, score, hit):
     }
 
 
+# ─────────────────────── 条款反查（条款 → 条文） ───────────────────────
+#
+# 与 --ask 的分工：--ask 问「我想查什么」，反查问「我手上这条款对应哪几条」。
+# 检索方向相反，判据也不同：--ask 用覆盖率（问句与条文语义近），
+# 反查用**术语连续命中**（条款里的专有名词在条文原文里原样出现）。
+#
+# 为什么反查不能用覆盖率（实测过，不是拍脑袋）：
+#   条文短，「违约金」三字切不出 4 字窗，覆盖率恒为 0；长条款又被长度稀释成普遍低分。
+#   改用「3–6 字片段中能整段出现在原文里的部分」，只留最长的若干段。
+#
+# 为什么必须把「命中术语」摆出来：
+#   词面匹配分不清「竞业限制」和「不得从事」——两者都是 4 字，分数一样。
+#   把命中的术语列出来，使用者一眼能判相关性真假，这是**可核验**的做法；
+#   只报一个相关度数字、把依据藏起来，等于让人凭排序相信一个查不了的东西。
+#
+# 红线不变：仍只给候选条文与要件，**不判断该条款是否合规、是否有效**。
+
+# 纯句式套话——命中它们不代表主题相关，反而会淹没真术语。
+# 铁则：这张表里**不许出现任何法律实体术语**（「违约金」「竞业限制」「商业秘密」
+# 这类必须留着）。误收一个，该主题就再也检不出来——这是实测踩过的坑。
+_STOP_PHRASES = (
+    "不得从事", "范围内的", "有权解除", "应当承担", "承担赔偿", "赔偿损失",
+    "依照本法", "本法规定", "本条规定", "当事人的", "约定的期", "合同约定",
+    "按照约定", "可以要求", "要求对方", "向人民法", "人民法院", "提起诉讼",
+    "本解释", "下列情形", "情形之一的", "的期限", "期限内", "履行期限",
+    "届满", "可以解除", "解除合同", "的，应", "，应当", "有权要", "照约定",
+    "超过三十", "三十日内", "分之五",
+)
+
+
+def _strip_punct(s):
+    # 全角半角都要去：法条用全角「，」，条款原文常被输入法写成半角「,」——
+    # 只去全角，半角会留在片段里（`逾期付款的,` 就是这么来的）
+    return re.sub(r"[，,、：:；;（）()“”\"'‘’。.\s]", "", lv.norm(s))
+
+
+def _clause_grams(s):
+    """条款切成 3–6 字片段。3 字起——「违约金」三字是有效术语，2 字全是噪声。"""
+    t = _strip_punct(s)
+    out = set()
+    for n in range(3, 7):
+        for i in range(len(t) - n + 1):
+            out.add(t[i:i + n])
+    return out
+
+
+def _is_stop(g):
+    """双向包含判定：g 是某条套话的子串、或某条套话是 g 的子串，都算套话。"""
+    return any(g in st or st in g for st in _STOP_PHRASES)
+
+
+def _hit_terms(grams_, target):
+    """条款片段里，能整段出现在 target 中的最长若干段（剔掉被更长段包含的碎渣）。
+
+    **以「的」结尾的一律丢弃**：那是定语残片不是术语——「期付款的」「范围内的」
+    「约定的期」都是半截话。实测这条过滤最管用：不加它，「分期付款的」会排在
+    「违约金」前面（4 字比 3 字分高），律师一眼就看出排错了。
+    """
+    tn = _strip_punct(target)
+    hit = [g for g in grams_
+           if g in tn and not _is_stop(g)
+           and not g.endswith("的") and g[0] not in "的了在与和或"]
+    if not hit:
+        return []
+    hit.sort(key=len, reverse=True)
+    keep = []
+    for x in hit:
+        if not any(x != y and x in y for y in hit):
+            keep.append(x)
+    return keep[:3]
+
+
+def search_from_clause(clause, db, law_filter=None, limit=6):
+    """条款 → 候选条文。返回结构与 search_in_db 一致，另带 terms／score_kind。"""
+    cg = _clause_grams(clause)
+    if not cg:
+        return []
+    laws = db.get("laws") or {}
+    pools = [law_filter] if law_filter else list(laws)
+    out = []
+    for law in pools:
+        for no_s, ent in (laws.get(law) or {}).items():
+            txt = ent.get("text", "")
+            if not txt:
+                continue
+            anc = ent.get("anchor", "")
+            ht = _hit_terms(cg, txt)
+            if not ht:
+                continue
+            ha = _hit_terms(cg, anc) if anc else []
+            # 最长命中不足 4 字、条旨也没对上——多半是句式套话漏网，不当作候选。
+            # 宁可少给几条，也不拿噪声充数（噪声会让人以为检出了，实际没对上）。
+            if len(ht[0]) < 4 and not ha:
+                continue
+            score = sum(len(x) ** 2 for x in ht) + sum(len(x) ** 2 * 1.5 for x in ha)
+            row = _row(law, no_s, ent, 0.0, "术语命中")
+            row["score"] = round(score, 1)
+            row["score_kind"] = "术语分"
+            row["terms"] = ha or ht
+            out.append(row)
+    # 同分时条号靠前者优先——只是给一个稳定次序，不代表更相关
+    out.sort(key=lambda r: (-r["score"], r["law"], lv.art_base(r["no"]), lv.art_key(r["no"])))
+    return out[:limit]
+
+
+def _external_query_sheet(q, db, kind):
+    """库外检索单：本库没有的东西，写成一份可复制的单子交出去。
+
+    **不调用任何外部服务**（本脚本 E0）。两个技能之间靠这份单子衔接，不靠代码耦合——
+    审查技能只负责「说清缺什么」，查什么、怎么查由使用者拿到检索侧去做。
+    """
+    total = sum(len(v) for v in (db.get("laws") or {}).values())
+    L = []
+    L.append("### 库外检索单（可整段复制）")
+    L.append("")
+    L.append("| 项 | 内容 |")
+    L.append("|---|---|")
+    L.append("| 检索对象 | %s |" % q.strip().replace("|", "\\|"))
+    L.append("| 检索类型 | %s |" % ("法条原文核对（法名＋条号）" if kind == "article"
+                                     else "按事项反查法条／司法解释／案例"))
+    L.append("| 为什么在本库查不到 | 本库 %d 条按审查场景精选，非法律全集 |" % total)
+    L.append("| 建议去处 | 「法律与案例检索助手」技能；或国家法律法规数据库 flk.npc.gov.cn |")
+    L.append("| 本技能的立场 | **不代查、不猜测、不凭记忆补条文**——查不到就说查不到 |")
+    L.append("")
+    return L
+
+
 def coverage_report(db):
     laws = db.get("laws") or {}
     total = sum(len(v) for v in laws.values())
@@ -250,6 +377,60 @@ def coverage_report(db):
         lines.append("| %s | %d |" % (k, n))
     lines.append("| **合计** | **%d** |" % total)
     return "\n".join(lines), total
+
+
+def _article_block(r):
+    """单条条文的渲染块（原文 ＋ 要件 ＋ 不作判断声明）。
+
+    抽成函数，供三种渲染路径共用：列表式（`render`）、按法分组式（`render_cross`）、
+    条款反查式（`render_clause`）。**三条路径共用同一块**，是为了让「只讲要件不下结论」
+    这条红线只有一处实现——分散成三份，改一处漏两处，迟早有一条路径把结论说出来。
+    """
+    b = []
+    conf = CONF_LABEL.get(r["status"], r["status"] or "未标")
+    flag = "" if r["verified"] else "　⚠ 未通过多源验证"
+    b.append("### 《%s》第%s" % (r["law"], lv.art_label(r["no"])))
+    b.append("")
+    if r.get("score_kind") == "术语分":
+        b.append("`%s` ｜ 相关度 %s（%s）%s" % (conf, r["score"], r["hit"], flag))
+        b.append("")
+        b.append("**命中的术语**：%s（术语在该条原文或条旨中整段出现，可自行核验）"
+                 % "、".join("`%s`" % t for t in (r.get("terms") or [])))
+    else:
+        b.append("`%s` ｜ %s ｜ 匹配度 %.2f（%s）%s" % (conf, r["hit"], r["score"], r["hit"], flag))
+    b.append("")
+    b.append("**原文**")
+    b.append("")
+    b.append("> " + r["text"])
+    b.append("")
+
+    req = split_requirements(r["text"])
+    if req["scene"]:
+        b.append("**本条针对的情形**")
+        b.append("")
+        b.append("- " + req["scene"])
+        b.append("")
+    if req["reqs"]:
+        b.append("**适用要件**（摘自本条原文结构，未作改写）")
+        b.append("")
+        for i, x in enumerate(req["reqs"], 1):
+            b.append("%d. %s" % (i, x))
+        b.append("")
+    if req["excepts"]:
+        b.append("**除外／但书**")
+        b.append("")
+        for x in req["excepts"]:
+            b.append("- " + x)
+        b.append("")
+    if not (req["reqs"] or req["excepts"]):
+        b.append("> 本条无可机械拆解的构成要件句式（多为定义性／原则性条文），"
+                 "请直接依据上引原文判断。")
+        b.append("")
+
+    b.append("> **你的具体情形是否满足上述要件，本技能不作判断**——"
+             "需由执业律师结合事实认定。")
+    b.append("")
+    return b
 
 
 def render(results, q, db):
@@ -267,44 +448,93 @@ def render(results, q, db):
     out.append("")
 
     for r in results:
-        conf = CONF_LABEL.get(r["status"], r["status"] or "未标")
-        flag = "" if r["verified"] else "　⚠ 未通过多源验证"
-        out.append("### 《%s》第%s" % (r["law"], lv.art_label(r["no"])))
-        out.append("")
-        out.append("`%s` ｜ %s ｜ 匹配度 %.2f（%s）%s" % (conf, r["hit"], r["score"], r["hit"], flag))
-        out.append("")
-        out.append("**原文**")
-        out.append("")
-        out.append("> " + r["text"])
-        out.append("")
+        out.extend(_article_block(r))
 
-        req = split_requirements(r["text"])
-        if req["scene"]:
-            out.append("**本条针对的情形**")
-            out.append("")
-            out.append("- " + req["scene"])
-            out.append("")
-        if req["reqs"]:
-            out.append("**适用要件**（摘自本条原文结构，未作改写）")
-            out.append("")
-            for i, x in enumerate(req["reqs"], 1):
-                out.append("%d. %s" % (i, x))
-            out.append("")
-        if req["excepts"]:
-            out.append("**除外／但书**")
-            out.append("")
-            for x in req["excepts"]:
-                out.append("- " + x)
-            out.append("")
-        if not (req["reqs"] or req["excepts"]):
-            out.append("> 本条无可机械拆解的构成要件句式（多为定义性／原则性条文），"
-                       "请直接依据上引原文判断。")
-            out.append("")
+    out.append("---")
+    out.append("")
+    out.append("*本技能提供条文检索与要件呈现，不构成法律意见、不预测案件结果；"
+               "具体适用须经执业律师结合事实判断后方可据此决策。*")
+    return "\n".join(out)
 
-        out.append("> **你的具体情形是否满足上述要件，本技能不作判断**——"
-                   "需由执业律师结合事实认定。")
+
+def render_clause(results, clause, db):
+    """条款 → 候选条文。**给候选，不给结论**，并把命中术语摆出来供人核验。"""
+    if not results:
+        return None
+    total = sum(len(v) for v in (db.get("laws") or {}).values())
+    brief = re.sub(r"\s+", " ", clause).strip()
+    if len(brief) > 40:
+        brief = brief[:40] + "…"
+    out = []
+    out.append("## 条款反查：%s" % brief)
+    out.append("")
+    out.append("> **检索路径：本地库**（E0 档，全程未联网）。覆盖 %d 部法 %d 条，"
+               "全部经 ≥2 个独立来源交叉验证；按审查场景精选，**不是法律全集**。"
+               % (len(db.get("laws") or {}), total))
+    out.append("")
+    out.append("> **这是按「术语重合」排出的候选条文，不是法律适用结论。**"
+               "判据只有一条：你条款里的词，在该条原文或条旨里**原样整段出现**——"
+               "每条的命中术语都列在表里，可以自己核。"
+               "**相关度只说明用词接近，不说明该条就管这件事**；"
+               "本库未收录真正对应的条文也是常事，候选之外请另行检索。")
+    out.append("")
+    out.append("| # | 法名 | 条号 | 条旨 | 相关度 | 命中术语 |")
+    out.append("|---|---|---|---|---|---|")
+    for i, r in enumerate(results, 1):
+        out.append("| %d | %s | %s | %s | %s | %s |" % (
+            i, r["law"], lv.art_label(r["no"]),
+            (r["anchor"] or "—").replace("|", "\\|")[:24],
+            r["score"],
+            "、".join(r.get("terms") or []) or "—"))
+    out.append("")
+    for r in results:
+        out.extend(_article_block(r))
+    out.append("---")
+    out.append("")
+    out.append("*本技能提供条文检索与要件呈现，不构成法律意见、不预测案件结果；"
+               "具体适用须经执业律师结合事实判断后方可据此决策。*")
+    return "\n".join(out)
+
+
+def render_cross(results, q, db):
+    """同一主题在各法中的规定，按法横向排开。
+
+    「违约金」在民法典怎么写、在合同编通则解释里怎么调、在劳动合同法里又怎么受限——
+    分法看是一屏，混在八条里看是八条不相干的条文。分组只是渲染层的组织方式，
+    判据与红线跟列表式完全一致（共用 _article_block，红线不另写一份）。
+    """
+    if not results:
+        return None
+    total = sum(len(v) for v in (db.get("laws") or {}).values())
+    groups = {}
+    for r in results:
+        groups.setdefault(r["law"], []).append(r)
+    order = sorted(groups.items(), key=lambda kv: (-len(kv[1]), kv[0]))
+
+    out = []
+    out.append("## 多法对照：%s" % q)
+    out.append("")
+    out.append("> **检索路径：本地库**（E0 档，全程未联网）。覆盖 %d 部法 %d 条，"
+               "按审查场景精选，**不是法律全集**。" % (len(db.get("laws") or {}), total))
+    out.append("")
+    out.append("> **只并列规定，不比较优劣、不判断该适用哪一部。**"
+               "适用顺序（特别法优于一般法、上位法优于下位法、新法优于旧法）属于法律适用判断，"
+               "本技能**不作**——同一件事在不同法里规定不一致时，以现行有效文本与有权机关解释为准，"
+               "由执业律师认定。")
+    out.append("")
+    out.append("| 法名 | 命中条数 | 条号 |")
+    out.append("|---|---|---|")
+    for law, rows in order:
+        nos = "、".join(lv.art_label(r["no"]) for r in rows)
+        out.append("| %s | %d | %s |" % (law, len(rows), nos))
+    out.append("")
+    for law, rows in order:
+        out.append("---")
         out.append("")
-
+        out.append("## 《%s》（%d 条）" % (law, len(rows)))
+        out.append("")
+        for r in rows:
+            out.extend(_article_block(r))
     out.append("---")
     out.append("")
     out.append("*本技能提供条文检索与要件呈现，不构成法律意见、不预测案件结果；"
@@ -315,9 +545,14 @@ def render(results, q, db):
 def main():
     ap = argparse.ArgumentParser(description="法规检索（要件呈现）")
     ap.add_argument("--ask", help="自然语言问题或关键词")
+    ap.add_argument("--from-clause", dest="from_clause",
+                    help="条款原文 → 反查候选条文（按术语重合排序，给候选不给结论）")
     ap.add_argument("--article", nargs=2, metavar=("LAW", "NO"), help="按「法名 条号」精确查")
     ap.add_argument("--law", help="限定法名")
-    ap.add_argument("--limit", type=int, default=8)
+    ap.add_argument("--limit", type=int, default=None,
+                    help="返回条数（默认：列表 8、反查 6、对照 40）")
+    ap.add_argument("--cross", action="store_true",
+                    help="按法分组横向对照（配 --ask 用：同一主题各部法分别怎么规定）")
     ap.add_argument("--coverage", action="store_true", help="只看本库覆盖面")
     ap.add_argument("--json", help="机读结果输出到文件")
     # 2026-11-06：这里原本注册着 `--online`，是个**假开关**——本脚本自标 E0、全文无网络库，
@@ -345,6 +580,7 @@ def main():
         return 0
 
     if a.article:
+        mode = "article"
         law_raw, no_raw = a.article
         law = lv.pick_law(law_raw) or law_raw
         _m = re.match(r"^\s*([一二三四五六七八九十百千零〇\d]{1,8})\s*"
@@ -355,9 +591,18 @@ def main():
             return 2
         q = "《%s》第%s" % (law, lv.art_label(no))
         results = search_in_db(q, db, law_filter=law, limit=1)
+    elif a.from_clause:
+        mode = "clause"
+        q = a.from_clause
+        results = search_from_clause(
+            q, db, law_filter=a.law,
+            limit=a.limit if a.limit is not None else 6)
     elif a.ask:
+        mode = "ask"
         q = a.ask
-        results = search_in_db(q, db, law_filter=a.law, limit=a.limit)
+        results = search_in_db(
+            q, db, law_filter=a.law,
+            limit=a.limit if a.limit is not None else (40 if a.cross else 8))
     else:
         ap.print_help()
         return 2
@@ -382,16 +627,34 @@ def main():
                   "它把该法已登记的两个独立源各抓一遍，**双源一致才认**，单源会标「未核」而不冒充已核。")
             print("> 不允许联网（涉密件／内网）时**别跑它**：直接按「未收录」处理，报告里标「待核验」。")
         else:
-            print("### 本地没搜到可匹配的条文")
-            print()
-            print("> `--ask` 的自然语言问题**永不联网**——问题里可能带案情，出网就等于外发。")
-            print("> 若已知法名与条号，改用 `--article`：`python scripts/legal-search.py --article 民法典 585`；")
-            print("> 那时再走 `legal-lookup.py` 联网核对才有意义（它只发法名与条号，不带问题原文）。")
+            if a.from_clause:
+                print("### 这条款没有与库内条文对上的术语")
+                print()
+                print("> 一个术语都对不上，通常是两种情况：")
+                print("> ① **本库没收这件事**（如仲裁程序、票据、海事海商、税收征管）——本库是审查场景精选的子集；")
+                print("> ② **用词与法条差得太远**（如「罚息」对「逾期利息」、「竞业禁止」对「竞业限制」）。")
+                print()
+                print("> 换个更贴近法条的词再试（`--from-clause \"逾期利息\"`），"
+                      "或改用 `--ask` 按主题检索。")
+            else:
+                print("### 本地没搜到可匹配的条文")
+                print()
+                print("> `--ask` 的自然语言问题**永不联网**——问题里可能带案情，出网就等于外发。")
+                print("> 若已知法名与条号，改用 `--article`：`python scripts/legal-search.py --article 民法典 585`；")
+                print("> 那时再走 `legal-lookup.py` 联网核对才有意义（它只发法名与条号，不带问题原文）。")
         print()
         print("> **不凭记忆补条文，也不猜测。** 查不到就说查不到——把「没查到」写成「没问题」是最坏的一种错。")
+        print()
+        for _ln in _external_query_sheet(q, db, "article" if a.article else "matter"):
+            print(_ln)
         return 1
 
-    md = render(results, q, db)
+    if mode == "clause":
+        md = render_clause(results, q, db)
+    elif a.cross and mode == "ask":
+        md = render_cross(results, q, db)
+    else:
+        md = render(results, q, db)
     print(md)
 
     if a.json:

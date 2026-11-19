@@ -9,7 +9,7 @@
 
 特点：
   · **纯本地绘制**（Pillow），零联网、零外部素材、可重复生成；
-  · 版本号自动读自 SKILL.md frontmatter —— 版本升级后重跑一次即可刷新头图；
+  · **头图不含版本号**：版本只在 SKILL.md frontmatter 一处，升版不必重绘图；
   · 超采样绘制（默认 4×）再降采样，边缘平滑；中文用系统字体，不会出现 AI 生图乱码；
   · 视觉基调＝中式文书（宣纸 / 朱印 / 天平）＋ 轻量 AI 点缀（扫描线 / 取景框 / AI 胶囊）；
   · 标题拆**主副两行**：主行「文档合规审查助手」，副行「AI 合同」，
@@ -18,8 +18,12 @@
 用法：
   python make-header.py                    生成横幅一张（深色 1600×420）到 ../assets
   python make-header.py --out <目录>       指定输出目录
-  python make-header.py --version Vx.y.z     覆盖版本串（默认自动读 SKILL.md，无需手填）
   python make-header.py --list             只看将产出哪些文件，不实际绘制
+
+**头图上不再烧版本号**：此前版本串既画进像素、又写进 PNG 的 tEXt 元数据，
+升版忘了重绘就"图片显示旧版"，还得每次迭代重画一张。改成不留版本后，版本真源只剩
+SKILL.md frontmatter，头图与版本彻底解耦。为防止旧机制悄悄回潮，本文件**不得**再把
+版本写进图里，`check.py` 的 `check_header_no_version()` 反着查这一点。
 
 v3.35.0 起**只出 banner-dark 一张**：此前五张（横幅/图标 × 明暗 + 技能卡片）中仅
 banner-dark 被 SKILL/README 顶部引用，其余四张是无引用的孤儿图，白占 530 KB 包容量、
@@ -348,7 +352,7 @@ def draw_seal_scan(img, cx, cy, size, t, unit=1, font_heavy=None, frame_size=Non
                        t["gold"] + (170,), max(2, int(3.2 * unit)), corner)
 
 
-def render_banner(theme_name, version, font_bold, font_reg, ss=4, k=1.0, font_seal=None):
+def render_banner(theme_name, font_bold, font_reg, ss=4, k=1.0, font_seal=None):
     t = THEMES[theme_name]
     fseal = font_seal or font_bold
     W, H = int(BOARD_W * k), int(BOARD_H * k)
@@ -399,8 +403,8 @@ def render_banner(theme_name, version, font_bold, font_reg, ss=4, k=1.0, font_se
     # —— 标签行 ——
     d.text((PAD, 268 * U), TAGS, font=f_tag, fill=t["fg2"], anchor="la")
 
-    # —— 版本 / 作者 ——
-    d.text((PAD, 336 * U), version + "   ｜   作者：胡皓", font=f_meta, fill=t["fg3"], anchor="la")
+    # —— 作者（**不写版本号**：版本真源只在 SKILL.md，头图与版本解耦，升版无需重绘）——
+    d.text((PAD, 336 * U), "作者：胡皓", font=f_meta, fill=t["fg3"], anchor="la")
 
     # —— 右侧：分隔线 + 徽标 ——
     d.rectangle([1010 * U, 74 * U, 1011 * U, 346 * U], fill=t["sep"])
@@ -452,34 +456,15 @@ def render_banner(theme_name, version, font_bold, font_reg, ss=4, k=1.0, font_se
     return img.convert("RGB").resize((W, H), Image.LANCZOS)
 
 
-def read_version():
-    p = os.path.join(ROOT, "SKILL.md")
-    try:
-        with open(p, encoding="utf-8-sig") as f:
-            head = f.read(12000)
-        m = re.search(r"(?m)^version:\s*([0-9][0-9A-Za-z.\-]*)", head)
-        if m:
-            v = m.group(1).strip()
-            return v if v.lower().startswith("v") else "v" + v
-    except OSError:
-        pass
-    return None
-
-
 def main():
     ap = argparse.ArgumentParser(description="文档合规审查助手AI合同 · 头标（横幅）生成")
     ap.add_argument("--out", default=os.path.join(ROOT, "assets"), help="输出目录（默认 ../assets）")
-    ap.add_argument("--version", default=None, help="覆盖版本串（默认读 SKILL.md frontmatter）")
     ap.add_argument("--font", default=None, help="中文字体文件（非 Windows 环境用）")
     ap.add_argument("--scale", type=float, default=1.0, help="横幅尺寸倍率（1=1600×420，2=3200×840）")
     ap.add_argument("--list", action="store_true", help="只列出将产出的文件")
     a = ap.parse_args()
 
-    ver = a.version or read_version()
-    if not ver:
-        print("无法从 SKILL.md 读取版本号（frontmatter 缺 version 或过长）；"
-              "请用 --version 显式指定，避免头图烧错版本串。", file=sys.stderr)
-        return 2
+    # 不读版本号、不接 --version：头图与版本解耦后，升版不必重绘（见文件头说明）。
     fb = pick_font("bold", a.font)
     fr = pick_font("reg", a.font)
     if not fb or not fr:
@@ -500,15 +485,15 @@ def main():
 
     os.makedirs(a.out, exist_ok=True)
     for path, kind, th in jobs:
-        im = render_banner(th, ver, fb, fr, ss=4, k=a.scale, font_seal=fseal)
-        # 把绘制时的版本串写进 PNG 元数据（tEXt），供 check.py 校验
-        # 「图片里烧的版本」与 SKILL.md 版本是否一致——升版忘了重绘时会当场报警。
+        im = render_banner(th, fb, fr, ss=4, k=a.scale, font_seal=fseal)
+        # PNG 元数据只留一个**恒定的口径标记**，不写任何版本串：
+        # 供 check.py 分辨「这张图是按『不带版本号』口径重绘过的」还是「旧机制留下的」。
         _info = PngInfo()
-        _info.add_text("Skill-Version", ver)
+        _info.add_text("Header-Design", "no-version")
         im.save(path, "PNG", optimize=True, pnginfo=_info)
         kb = os.path.getsize(path) / 1024.0
         print("[OK] %-34s %4d×%-4d  %6.1f KB" % (os.path.basename(path), im.width, im.height, kb))
-    print("完成：%d 个文件 → %s（版本串 %s）" % (len(jobs), a.out, ver))
+    print("完成：%d 个文件 → %s（不含版本号）" % (len(jobs), a.out))
     return 0
 
 

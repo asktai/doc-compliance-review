@@ -1245,37 +1245,42 @@ def _png_text(path):
     return out
 
 
-def check_header_version():
-    """头标 PNG 内嵌的 Skill-Version 是否与 SKILL.md 版本一致。
+def check_header_no_version():
+    """头标 PNG **不得**内嵌版本串（头图与版本已解耦）。
 
-    头图上的版本串是**烧进像素**的，升版时若忘了重绘，图片看起来正常、
-    脚本也全绿，只有肉眼能发现。故由 make-header.py 在出图时把版本写进 PNG
-    的 tEXt 元数据，这里比对即可当场发现「图片版本过期」。
+    旧机制把版本烧进像素、又写进 PNG 的 tEXt 元数据，于是升版忘重绘就"图片显示旧版"，
+    而且每次迭代都得重画一张图。现在版本真源只剩 SKILL.md frontmatter 一处，
+    头图不带版本。本项**反着查**：图里一旦重新出现版本戳（旧机制回潮），
+    或生成器又把版本写回图里，立即报错——否则下一次升版会重新背上"记得重绘图"的负担。
     """
     base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    m = re.search(r"(?m)^version:\s*([0-9][0-9.]*)\s*$", _read(os.path.join(base, "SKILL.md")))
-    cur = ("v" + m.group(1)) if m else None
     adir = os.path.join(base, "assets")
-    if not cur or not os.path.isdir(adir):
+    if not os.path.isdir(adir):
         return
-    seen, stale, unstamped = 0, [], []
+    seen, relapsed, unmarked = 0, [], []
     for x in sorted(os.listdir(adir)):
         if not x.lower().endswith(".png"):
             continue
         seen += 1
-        v = _png_text(os.path.join(adir, x)).get("Skill-Version")
-        if v is None:
-            unstamped.append(x)
-        elif v != cur:
-            stale.append("%s（内嵌 %s）" % (x, v))
-    if stale:
-        err("头标版本串过期：%s —— SKILL.md 现为 %s，请重跑 `python scripts/make-header.py` 刷新头图"
-            % ("、".join(stale), cur))
-    elif unstamped:
-        warn("头标缺版本戳（%s）：建议用 make-header.py 重绘一次；此后升版漏重绘会被本项检出"
-             % "、".join(unstamped))
-    if seen and not stale and not unstamped:
-        info("头标版本戳：%d 张图的 Skill-Version 均为 %s" % (seen, cur))
+        meta = _png_text(os.path.join(adir, x))
+        if meta.get("Skill-Version") is not None:
+            relapsed.append("%s（内嵌 %s）" % (x, meta.get("Skill-Version")))
+        elif meta.get("Header-Design") != "no-version":
+            unmarked.append(x)
+    if relapsed:
+        err("头标又烧上了版本号：%s —— 头图与版本应已解耦，"
+            "请删掉写版本的那段并重跑 `python scripts/make-header.py`" % "、".join(relapsed))
+    if unmarked:
+        warn("头标非「无版本号」口径（%s）：重跑 `python scripts/make-header.py` 一次即可"
+             % "、".join(unmarked))
+    # 生成器源码侧同查一遍：判据只看图会被"改了生成器但没重绘"绕过
+    gen = os.path.join(base, "scripts", "make-header.py")
+    if os.path.exists(gen):
+        src = _read(gen)
+        if re.search(r"add_text\(\s*[\"']Skill-Version", src):
+            err("make-header.py 又把版本串写进图片元数据了：头图不该带版本号")
+    if seen and not relapsed and not unmarked:
+        info("头标不带版本串：%d 张图均为「无版本号」口径（升版无需重绘）" % seen)
 
 
 def check_rule_metadata():
@@ -2333,8 +2338,7 @@ def check_version_consistency():
     """版本号一致性：SKILL.md frontmatter 为准，正文标题与各文档里的版本串都要跟上。
 
     升版要改 10 处，最容易漏的就是"frontmatter 改了、正文没改"、"README 还是旧版"
-    与"漏了重绘头标（图片里的版本串是烧进像素的，只有肉眼看得出来，见
-    check_header_version）"。
+    与"头图里又烧回版本串（头图已与版本解耦，见 check_header_no_version）"。
     这里让脚本守着，漏一处即报错（error，不是警告）。
     """
     skill = os.path.join(ROOT, "SKILL.md")
@@ -2569,6 +2573,7 @@ def _check_menu_entries():
         "结构化": "结构化引擎",
         "法规检索": "legal-search",
         "法规汇编": "legal-compile",
+        "合规咨询": "第二十四节窄版问答（引擎 4/6/7/15 组合，不新增引擎）",
         "引用核验": "legal-verify",
         "公文写作": "gb9704 版式与体检",
         "套用模板": "tpl-engine.py use（模板库复用）",
@@ -2594,6 +2599,54 @@ def _check_menu_entries():
     if no_dest:
         err("0.5 菜单第 %s 项没有去向（「去向」段里查不到该编号）——"
             "只列不指路，用户点进去仍是死路" % "、".join(map(str, no_dest)))
+
+
+def check_compliance_scope():
+    """合规咨询窄版 + 检索加深：能力边界必须写死（2026-11-19 加）。
+
+    为什么单独立一项来守：这功能最容易被「顺手做宽」——今天在文档里写一句
+    「帮你分析合规风险」，明天就变成拍脑袋给法律意见。窄版边界不是文案措辞，
+    是四条硬接缝：
+      ① 必须有一节专讲它（不写，使用者既不知道有这功能，也不知道它有多窄）；
+      ② 必须写明「无文档的泛咨询」不接——这是与原红线（只讲要件不下结论）的接缝；
+      ③ 必须写明案例检索不做——不写，就会被当成「什么都能查」；
+      ④ 检索加深必须真在代码里（--from-clause / --cross / 库外检索单），
+         不能只写文档——**文档承诺了、代码没有，就是编造**（与编造法条同性质）。
+    只查「有没有」，不查措辞：措辞会改，判据不能跟着改。
+    """
+    bad = 0
+    p = os.path.join(ROOT, "SKILL.md")
+    src = _read(p)
+    if "## 二十四、合规咨询" not in src:
+        err("SKILL.md 缺第二十四节「合规咨询」——功能做了没写进说明书，等于没做")
+        bad += 1
+    else:
+        for k, msg in (
+            ("无文档的泛咨询", "合规咨询未写明拒绝「无文档的泛咨询」——窄版的接缝没了"),
+            ("案例检索", "合规咨询未划清案例检索的边界——不写就会被当成什么都能查"),
+        ):
+            if k not in src:
+                err(msg)
+                bad += 1
+
+    sp = os.path.join(ROOT, "scripts", "legal-search.py")
+    if not os.path.exists(sp):
+        err("缺 scripts/legal-search.py")
+        bad += 1
+    else:
+        code = _read(sp)
+        for flag, msg in (
+            ("--from-clause", "条款反查未实现（文档写了、代码没有）"),
+            ("--cross", "多法对照未实现（文档写了、代码没有）"),
+            ("_external_query_sheet", "库外检索单未实现（查不到时必须给出下一步）"),
+        ):
+            if flag not in code:
+                err(msg)
+                bad += 1
+
+    if not bad:
+        info("合规咨询：窄版边界（只接有文档的追问、不接泛咨询）"
+             "与检索加深（条款反查／多法对照／库外检索单）均在场")
 
 
 def _check_engine_count():
@@ -4376,7 +4429,7 @@ def main():
         check_note_order()
         check_batch_guidance()
         check_md_fences()
-        check_header_version()
+        check_header_no_version()
         check_rule_metadata()
         check_smoke_count()
         check_doc_number_caliber()
@@ -4384,6 +4437,7 @@ def main():
         check_type_numbering()
         _check_pseudo_controls()
         _check_menu_entries()
+        check_compliance_scope()
         check_package_fields()
         check_naming_fields()
         check_platform_limit()

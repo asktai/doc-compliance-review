@@ -2119,6 +2119,30 @@ def main():
                     dirty.append((_q, _hit))
             check("法规检索：脚本生成部分无结论性用语（只讲要件不下结论）",
                   not dirty, "越界: %s" % dirty[:3])
+
+            # (e) 条款反查：给候选 ＋ 命中术语，且必须自陈「不作适用判断」
+            rc = run([PY, lp, "--from-clause",
+                      "乙方逾期付款的，每逾期一日按应付未付金额的万分之五支付违约金"])
+            oc = rc.stdout or ""
+            check("条款反查：出候选并列出命中术语（可核验，不是黑箱打分）",
+                  rc.returncode == 0 and "命中术语" in oc and "不是法律适用结论" in oc,
+                  head_lines(oc))
+            check("条款反查：自陈不作适用判断（相关度≠该条就管这件事）",
+                  "不说明该条就管这件事" in oc, head_lines(oc))
+
+            # (f) 多法对照：必须按法分组，且不得比较优劣
+            rx = run([PY, lp, "--ask", "违约金", "--cross"])
+            ox = rx.stdout or ""
+            check("多法对照：按法分组横向列出，且自陈不判该适用哪一部",
+                  rx.returncode == 0 and "多法对照" in ox and "不判断该适用哪一部" in ox,
+                  head_lines(ox))
+
+            # (g) 库外必须给检索单——「没查到」不能就这么完了
+            rs = run([PY, lp, "--article", "民法典", "9999"])
+            oq = rs.stdout or ""
+            check("库外检索单：查不到时给出下一步去处（不把没查到说成没问题）",
+                  rs.returncode == 1 and "库外检索单" in oq and "法律与案例检索助手" in oq,
+                  head_lines(oq))
     except Exception as e:
         check("法规检索引擎自检", False, repr(e))
 
@@ -2331,12 +2355,8 @@ def main():
     # v3.35.0 明确撤销「五张」口径——仅 banner-dark 被 SKILL/README 顶部引用，其余四张是
     # 无引用孤儿图，白占 530 KB 包容量。守卫的下半句仍然有效：**删图须连生成器一起删**，
     # 否则下次重绘它们会长回来——本段四条用例把「只出一张」钉住，防口径悄悄回潮。
-    print("\n[3.55] 品牌头标（1 张横幅）")
+    print("\n[3.55] 品牌头标（1 张横幅，不含版本号）")
     try:
-        import re as _re3
-        with open(os.path.join(HERE, "..", "SKILL.md"), encoding="utf-8-sig") as _sf:
-            _mv = _re3.search(r"(?m)^version:\s*([\d.]+)\s*$", _sf.read(4000))
-        _ver = _mv.group(1) if _mv else ""
         _hd = os.path.join(work, "hdr")
         _lst = run([PY, os.path.join(HERE, "make-header.py"), "--list"])
         _items = [x.strip() for x in (_lst.stdout or "").splitlines() if x.strip().endswith(".png")]
@@ -2353,20 +2373,18 @@ def main():
             _lo, _hi = _gray.getextrema()
             _spread = _hi - _lo
             _ok = (_im3.format == "PNG" and _im3.size == (1600, 420)
-                   and _im3.info.get("Skill-Version") == "v" + _ver)
-            _detail = "%s %s 版本戳=%r（期望 v%s）" % (
-                _im3.format, _im3.size, _im3.info.get("Skill-Version"), _ver)
-        check("品牌头标：横幅实跑生成（PNG 1600×420，版本戳＝当前版本）", _ok, _detail)
-        # 版本戳必须是**真参数**而非写死：换一个版本串重出，元数据须跟着变
-        _hd2 = os.path.join(work, "hdr-v0")
-        run([PY, os.path.join(HERE, "make-header.py"), "--out", _hd2, "--version", "v0.0.0"])
-        _c2 = os.path.join(_hd2, "banner-dark.png")
-        _v2 = None
-        if os.path.exists(_c2):
-            from PIL import Image as _Im4
-            _v2 = _Im4.open(_c2).info.get("Skill-Version")
-        check("品牌头标：横幅版本戳随 --version 变化（烧的是参数，不是写死值）",
-              _v2 == "v0.0.0", "实测 %r" % (_v2,))
+                   and _im3.info.get("Skill-Version") is None
+                   and _im3.info.get("Header-Design") == "no-version")
+            _detail = "%s %s 版本戳=%r 口径标记=%r（应为 None / no-version）" % (
+                _im3.format, _im3.size, _im3.info.get("Skill-Version"),
+                _im3.info.get("Header-Design"))
+        check("品牌头标：横幅实跑生成（PNG 1600×420，**不带版本号**）", _ok, _detail)
+        # 机制不许回潮：--version 已删除，传了必须非零退出。若改成"接受但忽略"，
+        # 下一个人会以为版本还能烧进图里，于是又背上"每次迭代重绘图"的负担。
+        _rv = run([PY, os.path.join(HERE, "make-header.py"),
+                   "--out", os.path.join(work, "hdr-v0"), "--version", "v0.0.0"])
+        check("品牌头标：--version 已移除（传了即报错，防版本戳机制悄悄加回）",
+              _rv.returncode != 0, "exit=%s" % _rv.returncode)
         # 非空白：横幅由多色区块与文字构成，灰度极差过小＝只出了一张底色
         check("品牌头标：横幅非空白（灰度极差 > 60，防生成一张纯色图）",
               _spread > 60, "灰度极差 %d" % _spread)
@@ -2664,11 +2682,11 @@ def main():
         _blk = _mm.group(1) if _mm else ""
         _nums = [int(x) for x in re.findall(r"(?m)^\s*(\d+)\.\s", _blk)]
         # 编号连续是硬要求：跳号的话用户回「12」会打空，而菜单看上去毫无异样
-        check("功能菜单 21 项、编号 0–20 连续",
-              len(_nums) == 21 and _nums == list(range(21)),
+        check("功能菜单 22 项、编号 0–21 连续",
+              len(_nums) == 22 and _nums == list(range(22)),
               "实有 %d 项：%s" % (len(_nums), _nums))
         # 七类曾漏掉（或从未有过入口）的能力必须在场——正面断言，缺一项即红
-        _need = ["格式转换", "OCR", "结构化", "法规检索", "法规汇编", "引用核验", "公文写作"]
+        _need = ["格式转换", "OCR", "结构化", "法规检索", "法规汇编", "引用核验", "公文写作", "合规咨询"]
         _lost = [k for k in _need if k not in _blk]
         check("菜单含曾漏掉的七类能力入口（格式转换/OCR/结构化/法规检索/汇编/引用核验/公文写作）",
               not _lost, "缺：%s" % "、".join(_lost) if _lost else "七类齐备")
