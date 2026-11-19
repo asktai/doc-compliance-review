@@ -34,3 +34,8 @@ doc-compliance-review/report/
 
 # 出包产物：由 scripts/pack.py 每次生成，不入档（发布走 release 附件）。
 doc-compliance-review/_发布包/
+
+# 出包落点：由 publish.py --pack 每次生成，不入档（分发走 Release 附件）。
+# 顶层 dist/ 曾长期入库，历史里堆了 259 MB 旧包，首次推送因此被网络切断——
+# 构建产物不进版本库，版本库只放源码与文档。
+dist/

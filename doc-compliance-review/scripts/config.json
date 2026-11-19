@@ -1,41 +1,41 @@
 {
- "_说明": "本文件用于外置配置：工具路径、默认工作目录、隐私与输出策略。**留空即自动**——tools 各项留空时按 PATH 自动探测命令位置，不必手工填写；想把工具固定到某个安装位置，跑 `python scripts/detect-tools.py --write`，结果写入本机覆盖层 `scripts/config.local.json`（不进 git、不随发布包），不会污染本文件。命令行参数（--base/--in/--out/--ts 等）优先级高于本文件。修改后无需改脚本。",
- "tools": {
-  "soffice": "",
-  "pdftotext": "",
-  "pdftoppm": "",
-  "tesseract": "",
-  "tessdata": ""
- },
- "_workdir_说明": "工作根目录。base_dir 填绝对路径＝自定义（最高优先）；填 auto 或留空＝按候选链自动探测：推荐盘 D:\\文档合规审查报告 → 文档库 → 用户目录 → 临时目录，前一个不可用自动顺延，因此无 D 盘的机器也能直接跑。临时覆盖用环境变量 DOC_REVIEW_BASE。查看/切换：python scripts/set-workdir.py [--set <路径>|--auto]。",
- "workdir": {
-  "base_dir": "auto",
-  "in_dir": "",
-  "out_dir": ""
- },
- "render": {
-  "pdf_export": true,
-  "pdf_timeout_sec": 180
- },
- "_privacy_说明": "隐私与数据出域策略（低危-1）。fulltext_gate=true 时，读取全文进模型前必须先确认文档密级；涉密文档应走 local_only.py 的纯本地脱敏链路，全文不进模型上下文。",
- "privacy": {
-  "fulltext_gate": true,
-  "on_confidential": "local_only",
-  "warn_before_context": true
- },
- "_output_说明": "输出隔离策略（低危-2）。per_source_subdir=true 时，未显式指定 --subdir 的交付物自动落到「以文档名命名的子目录」，避免多客户文档在输出目录混放、被整体打包外泄。harden_acl=true 时（需显式运行 harden-dir.py 生效）只授权当前用户访问输出目录。",
- "output": {
-  "per_source_subdir": true,
-  "harden_acl": false
- },
- "_legal_说明": "库外条文联网核对（`legal-lookup.py`，E2 档）。allow_online=false 时该脚本一律不出网，直接明示降级到本地库——机构／涉密场景一处关掉即可，不必逐个命令行加 --offline。默认 true：脚本被显式调用本身就是一次知情同意（与 update.check_online_by_default 的「默认关」不同——那里的默认动作可能被隐式触发，这里的脚本只在你亲手敲命令时才跑）。无论开关如何，它发出的请求**只有法名与条号**，不发送文档内容、问题原文或任何使用者信息。",
- "legal": {
-  "allow_online": true
- },
- "_update_说明": "在线检查更新（**默认关闭，且本分发未配在线源**）。check_online_by_default 是总闸：仅当它被**显式设为 true** 时，`version.py --notice` 才会自动联网检查。manifest_url 故意留空——分发仓库为非公开仓库，公开可匿名读取的版本清单并不存在，写上任何地址都只会让「检查更新」撞 404；空值在这里是**明确的声明**（本分发只走离线升级），不是漏填，别拿一个地址去填它。download_page 同理留空（非公开仓库的页面对外不可见）。升级通道＝`--watch` 登记本地目录或已下载的 zip（教程 7.2），功能不降级。若将来改为公开分发，再同时填 manifest_url 与 download_page，两处缺一都不成立。",
- "update": {
-  "manifest_url": "",
-  "download_page": "",
-  "check_online_by_default": false
- }
+  "_说明": "本文件用于外置配置：工具路径、默认工作目录、隐私与输出策略。**留空即自动**——tools 各项留空时按 PATH 自动探测命令位置，不必手工填写；想把工具固定到某个安装位置，跑 `python scripts/detect-tools.py --write`，结果写入本机覆盖层 `scripts/config.local.json`（不进 git、不随发布包），不会污染本文件。命令行参数（--base/--in/--out/--ts 等）优先级高于本文件。修改后无需改脚本。",
+  "tools": {
+    "soffice": "",
+    "pdftotext": "",
+    "pdftoppm": "",
+    "tesseract": "",
+    "tessdata": ""
+  },
+  "_workdir_说明": "工作根目录。base_dir 填绝对路径＝自定义（最高优先）；填 auto 或留空＝按候选链自动探测：推荐盘 D:\\文档合规审查报告 → 文档库 → 用户目录 → 临时目录，前一个不可用自动顺延，因此无 D 盘的机器也能直接跑。临时覆盖用环境变量 DOC_REVIEW_BASE。查看/切换：python scripts/set-workdir.py [--set <路径>|--auto]。",
+  "workdir": {
+    "base_dir": "auto",
+    "in_dir": "",
+    "out_dir": ""
+  },
+  "render": {
+    "pdf_export": true,
+    "pdf_timeout_sec": 180
+  },
+  "_privacy_说明": "隐私与数据出域策略（低危-1）。fulltext_gate=true 时，读取全文进模型前必须先确认文档密级；涉密文档应走 local_only.py 的纯本地脱敏链路，全文不进模型上下文。",
+  "privacy": {
+    "fulltext_gate": true,
+    "on_confidential": "local_only",
+    "warn_before_context": true
+  },
+  "_output_说明": "输出隔离策略（低危-2）。per_source_subdir=true 时，未显式指定 --subdir 的交付物自动落到「以文档名命名的子目录」，避免多客户文档在输出目录混放、被整体打包外泄。harden_acl=true 时（需显式运行 harden-dir.py 生效）只授权当前用户访问输出目录。",
+  "output": {
+    "per_source_subdir": true,
+    "harden_acl": false
+  },
+  "_legal_说明": "库外条文联网核对（`legal-lookup.py`，E2 档）。allow_online=false 时该脚本一律不出网，直接明示降级到本地库——机构／涉密场景一处关掉即可，不必逐个命令行加 --offline。默认 true：脚本被显式调用本身就是一次知情同意（与 update.check_online_by_default 的「默认关」不同——那里的默认动作可能被隐式触发，这里的脚本只在你亲手敲命令时才跑）。无论开关如何，它发出的请求**只有法名与条号**，不发送文档内容、问题原文或任何使用者信息。",
+  "legal": {
+    "allow_online": true
+  },
+  "_update_说明": "在线检查更新（**默认关闭**：`check_online_by_default` 是总闸，仅当显式设为 true 时 `version.py --notice` 才自动联网；一次性检查用 `--check-online`，不依赖总闸）。manifest_url 指向本仓库 raw 上的版本清单（仓库已转为 public，2026-11-19 实测可匿名读取）；download_page 指向 Releases 页。两处必须同时可匿名访问才成立——只填一处等于「查得到、下不了」。升级通道另有离线路径：`--watch` 登记本地目录或已下载的 zip（教程 7.2），不依赖网络。",
+  "update": {
+    "manifest_url": "https://raw.githubusercontent.com/asktai/doc-compliance-review/main/doc-compliance-review/version.json",
+    "download_page": "https://github.com/asktai/doc-compliance-review/releases",
+    "check_online_by_default": false
+  }
 }

@@ -3131,6 +3131,66 @@ def check_manifest_version():
                 "history 是对外清单，不得公布沿革里没有的版本" % ("、".join(sorted(_lost))))
 
 
+def check_update_source():
+    """在线源：配置状态与文档表述必须双向咬合。
+
+    这是 §16.1 元规则的落实。v3.35.2 把两处地址置空、五份文档同步改成「未配在线源」，
+    但**两者之间没有任何机械判据**——文档说未配而配置填了地址（或反之），门禁一条都不报，
+    只有使用者点「检查更新」时才发现对不上。同类漂移在 v3.35.2 已出过一次
+    （清单空值掉进 else 被报成「已配置」），那次修的是清单侧，文档侧仍无守卫。
+
+    判据双向：
+      · **配了源**（manifest_url 非空）⇒ ① download_page 必须同时非空，缺一即「查得到、下不了」；
+        ② 文档不得再说「未配在线源／零在线源／不配在线源」；
+        ③ version.json 的 latest.download_page 必须与 config 的 download_page 一致
+           （两处对不上＝提示里给的下载页与清单页不是一个地方）。
+      · **没配源**（manifest_url 为空）⇒ 文档必须仍写着「未配在线源」类表述——
+        否则读文档的人以为能查，实际一查就撞空。
+    """
+    try:
+        cfg = json.loads(_read(os.path.join(HERE, "config.json")))
+    except Exception:
+        return
+    u = cfg.get("update") or {}
+    murl = str(u.get("manifest_url") or "").strip()
+    page = str(u.get("download_page") or "").strip()
+    docs = ["README.md", "SKILL.md", "安装使用教程.md"]
+    # 这几种写法都等于「对外宣称没有在线源」
+    off_pat = re.compile(r"未配在线源|未配置在线源|未配源|零在线源|不配在线源|manifest_url`?\s*故意留空")
+    hits = []
+    for d in docs:
+        p = os.path.join(ROOT, d)
+        if not os.path.exists(p):
+            continue
+        for m in off_pat.finditer(_read(p)):
+            line_no = _read(p)[:m.start()].count("\n") + 1
+            hits.append("%s:%d" % (d, line_no))
+    if murl:
+        # ① 两址缺一不成
+        if not page:
+            err("config.json 配了 update.manifest_url 却把 download_page 留空——"
+                "查得到版本、下不了包，等于把人引到半路")
+        # ② 文档说未配源＝与事实相反
+        if hits:
+            err("config.json 已配在线源（manifest_url 非空），但文档仍宣称「未配在线源」：%s——"
+                "使用者读到的是「查不了」，实际能查，口径与事实相反" % "、".join(hits[:5]))
+        # ③ 清单里的下载页与配置里的必须是同一个地方
+        try:
+            lat = (json.loads(_read(os.path.join(ROOT, "version.json"))).get("latest") or {})
+            lp = str(lat.get("download_page") or "").strip()
+            if lp and page and lp.rstrip("/") != page.rstrip("/"):
+                warn("version.json 的 latest.download_page 与 config.json 的 update.download_page 不一致"
+                     "（清单指向 %s，配置指向 %s）——提示里给的下载页会与清单页对不上"
+                     % (lp[-40:], page[-40:]))
+        except Exception:
+            pass
+    else:
+        # 反向：没配源却在文档里说能查，同样是把人引到空处
+        if not hits:
+            err("config.json 的 manifest_url 为空（未配在线源），但三份文档里找不到任何"
+                "「未配在线源」类表述——文档会让人以为能查更新，实际一查即空")
+
+
 def check_platform_limit():
     """平台上限口径：文档里写的 zip 体积上限，必须等于 `pack.py` 的 `PLATFORM_MAX_MB`。
 
@@ -4351,6 +4411,7 @@ def main():
         check_version_consistency()
         _check_questionnaire_libraries()
         check_manifest_version()
+        check_update_source()
         check_config()
         check_hardcoded_paths()
         check_security()

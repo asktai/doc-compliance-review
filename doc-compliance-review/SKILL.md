@@ -8,7 +8,7 @@ description_zh: "给每天要看合同的人。合同、协议、授权书、承
 description_en: "Clause-by-clause review of contracts, agreements, authorisation letters, notices and policies, with three-colour risk grading, redlines, desensitisation, comparison ledgers and opinion reports. Every cited provision is compared verbatim against locally stored statutory text rather than recalled by the model, and document text never leaves the machine. Also drafts contracts and templates, summarises into key points and a mind map, searches and compiles statutory text, and checks GB/T 9704 official-document format. Advisory only, not legal advice."
 category: writing
 argument-hint: "<文档路径或文本> [版本/角色/尺度] | 审查 | 起草 | 比对 | 背景资料 | 脱敏 | 精要总结 | 思维导图 | 向导 | 撰写合同 | 撰写模板 | 文档转模板 | 合同转模板 | 套用模板 | 技能版本 | 技能更新 | 技能升级 | 立查得 | 小查 | 帮助|help|? | 教程 | 私有库维护/备份/回溯/导入/导出 | 行业库维护/备份/回溯/导入/导出"
-version: 3.36.1
+version: 3.36.2
 license: 个人使用授权 · 商业使用须取得书面授权（见 `LICENSE.md`）
 author: 胡皓
 examples_zh:
@@ -27,7 +27,7 @@ examples_en:
 
 ![文档合规审查助手AI合同 · 合同与商务文档逐条审查 · 风险三色分级](assets/banner-dark.png)
 
-**v3.36.1** ｜ 作者：胡皓 ｜ 许可：个人使用授权 · 商业使用须取得书面授权（详见 `LICENSE.md`）
+**v3.36.2** ｜ 作者：胡皓 ｜ 许可：个人使用授权 · 商业使用须取得书面授权（详见 `LICENSE.md`）
 
 > **免责声明**：本技能仅作辅助法律工作，**不构成最终法律意见**，输出内容须**人工复审核查**；**同一对话内首次使用时由技能先输出全文**（同一对话只此一次）——见**步骤 0.0**，全文亦见 `LICENSE.md`。
 
@@ -125,7 +125,7 @@ examples_en:
 
 **三条对外口径（不得违反）**：
 1. **「规划中」必须说成规划中；做完了也须及时改口**。v3.23.6 及以前结构化引擎、公文格式引擎确未实现，如实标规划中；**v3.24.0 起两者已实现**（`structure.py`／`gb9704.py`），对外可按在用能力介绍。**两个方向都是编造**：把没做的说成做了，与编造法条同性质；做完了仍写"规划中"，同样是说假话。
-2. **数字只报实测值**：159 条、内置 9 个行业库（可自建）、20 部法 725 条（725 条均已多源交叉验证）、10 类 × 8 格式（image 家族含 6 子格式）、302 项冒烟、二十个引擎、二十项能力、34 个脚本；这些数字不是手填的，改完代码忘了同步文档，门禁会当场报错——**别靠记忆报数**。
+2. **数字只报实测值**：159 条、内置 9 个行业库（可自建）、20 部法 725 条（725 条均已多源交叉验证）、10 类 × 8 格式（image 家族含 6 子格式）、305 项冒烟、二十个引擎、二十项能力、34 个脚本；这些数字不是手填的，改完代码忘了同步文档，门禁会当场报错——**别靠记忆报数**。
 3. **"能"都有边界**：能审不等于审对（须执业律师复核）、能查不等于查全（库里没有的标待核验）、能写不等于能签（占位符填实后即为具体合同）、**能检索不等于给法律意见**（只讲要件不下结论，具体适用须律师认定）、能检只能兜住机械错误（格式/占位符/条文原文），**兜不住判断错误**。
 
 ### 核验引擎（第 15 引擎）：产物出得去出不去的唯一裁判
@@ -1125,14 +1125,15 @@ python scripts/guard.py check <路径> --op <read|write|delete|copy|export|impor
 
 | 环节 | 联网？ | 说明 |
 |---|---|---|
-| **查有无新版** | **会联网**（**默认关；本分发未配在线源，实际零请求**） | 只有两种情形才够条件联网：使用者打 `--check-online`（查一次），或 `config.json` 的 `update.check_online_by_default` 被显式设为 `true`（长期开）。**本分发未配在线源**——`manifest_url` 故意留空（清单所在仓库不公开，填任何地址都只会撞 404），故两条命令都直接答「未配置在线源」，**零请求、不撞空地址**。若将来改为公开分发并填了清单地址，行为即回到：只读一份清单（版本号／日期／更新内容／下载页），**只做 GET、不上传任何信息**，连不上静默降级 |
+| **查有无新版** | **会联网**（**默认关；显式要求才读一份公开清单**） | 只有两种情形才够条件联网：使用者打 `--check-online`（查一次），或 `config.json` 的 `update.check_online_by_default` 被显式设为 `true`（长期开）。`manifest_url` 指向本仓库 raw 上的**公开版本清单**（仓库已转 public，实测可匿名读），故 `--notice` **零请求**、`--check-online` 只读这一份清单（版本号／日期／更新内容／下载页），**只做 GET、不上传任何信息**，连不上静默降级 |
 | **下载新版包** | **不联网** | 工具**只给下载指引**；包由**你自己在浏览器下载**，**从不自动下载** |
 | **安装新版** | **不联网** | 接到的都是一个本地目录或本地 zip，走同一套校验／预演／备份／装 |
 
-**本分发零在线源**（`check_online_by_default` 出厂 `false`，且 `manifest_url` 留空）：`--check-online`
-会直接答「未配置在线源」，**不去撞一个空地址**。升级一律走 `--watch` 登记本地目录或已下载 zip，
-走的是**同一套**校验／预演／备份／安装，**功能不降级**。留空是**声明**（本分发只走离线），不是漏填——
-别拿一个地址去补它：补了就是重新引入一个必然 404 的假承诺。
+**联网默认关**（`check_online_by_default` 出厂 `false`，`manifest_url` 指向公开清单）：`--notice` 零请求，
+`--check-online` 会真的读出**当前版 → 最新版**，读不到就明说连不上、不假装查过。升级包仍由**你自己下载**
+（工具从不代下、从不自动装），也可走 `--watch` 登记本地目录或已下载 zip，
+走的是**同一套**校验／预演／备份／安装，**功能不降级**。清单与下载页两处必须同时可匿名读——
+缺一即「查得到、下不了」，只填一处不算配好。
 
 **有新版时会看到什么**：**当前版 → 最新版**、**新版更新了哪些内容**、**下载指引（下载页地址）**——
 知道了再决定要不要升。**是否升级由你定，工具绝不自动升级、也绝不替你下载。**

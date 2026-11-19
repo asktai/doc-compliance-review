@@ -3102,6 +3102,54 @@ def main():
                   "放行" if _passed_mid else "误伤（假红）")
             check("两档守恒判据：旧格式台账（缺指纹）须放行不报错——装包不得「装完即红」", _passed_legacy,
                   "放行" if _passed_legacy else "误伤（假红）")
+            # 在线源双向咬合：配置状态与文档表述必须一致。判据是双向的，
+            # 故两向各注入一次，再加一支「配了源且文档一致」的对照——
+            # 只做两向注入，一个"见谁都咬"的判据同样能过；对照才证明它分得清。
+            try:
+                import tempfile as _tf_up, json as _js_up, shutil as _sh_up
+
+                def _mk_up(murl, page, doctext):
+                    _d = _tf_up.mkdtemp(prefix="dcr_up_")
+                    os.makedirs(os.path.join(_d, "scripts"), exist_ok=True)
+                    open(os.path.join(_d, "scripts", "config.json"), "w", encoding="utf-8").write(
+                        _js_up.dumps({"update": {"manifest_url": murl, "download_page": page,
+                                                 "check_online_by_default": False}}, ensure_ascii=False))
+                    open(os.path.join(_d, "version.json"), "w", encoding="utf-8").write(
+                        _js_up.dumps({"latest": {"download_page": page or ""}}, ensure_ascii=False))
+                    for _fn in ("README.md", "SKILL.md", "安装使用教程.md"):
+                        open(os.path.join(_d, _fn), "w", encoding="utf-8").write(doctext)
+                    return _d
+
+                def _probe_up(murl, page, doctext):
+                    _d = _mk_up(murl, page, doctext)
+                    _m.HERE = os.path.join(_d, "scripts")
+                    _m.ROOT = _d
+                    _n0 = len(_m.ERRS)
+                    _m.check_update_source()
+                    _caught_up = len(_m.ERRS) > _n0
+                    del _m.ERRS[_n0:]
+                    _sh_up.rmtree(_d, ignore_errors=True)
+                    return _caught_up
+
+                _oh, _orr = _m.HERE, _m.ROOT
+                try:
+                    _u = "https://example.invalid/version.json"
+                    _p = "https://example.invalid/releases"
+                    _decl_off = "本分发未配在线源，manifest_url 故意留空。"
+                    _decl_on = "在线源已配：manifest_url 指向公开的版本清单。"
+                    _c_on_off = _probe_up(_u, _p, _decl_off)   # 配了源却说未配 → 须报
+                    _c_off_on = _probe_up("", "", _decl_on)    # 没配源却说能查 → 须报
+                    _c_ok = _probe_up(_u, _p, _decl_on)        # 一致 → 不得误报
+                finally:
+                    _m.HERE, _m.ROOT = _oh, _orr
+                check("在线源咬合：配置已配源而文档仍称「未配在线源」→ 须报", _c_on_off,
+                      "已报" if _c_on_off else "未拦（口径与事实相反却放行）")
+                check("在线源咬合：配置未配源而文档不提「未配」→ 须报", _c_off_on,
+                      "已报" if _c_off_on else "未拦（读者会以为能查，实际一查即空）")
+                check("在线源咬合（对照）：配置已配源且文档一致 → 不得误报", not _c_ok,
+                      "放行" if not _c_ok else "误伤（见谁都咬）")
+            except Exception as e:
+                check("在线源咬合：双向注入＋对照（配源说未配／未配不说／一致）", False, repr(e))
         except Exception as e:
             check("两档守恒判据：指纹三支反证（同指纹报／异指纹放／缺指纹放）", False, repr(e))
 
@@ -3143,7 +3191,7 @@ def main():
                                "供 check.py 校验 README/教程所写项数是否为真。"
                                "total_full／total_fast 两键各自记最近一次该档的项数，"
                                "check.py 断言二者相等——两档项数必须守恒，否则文档口径无法同时成立。"
-                               "sig_full／sig_fast 记跑该档时 smoke-test.py 的 sha256（v3.36.1）："
+                               "sig_full／sig_fast 记跑该档时 smoke-test.py 的 sha256："
                                "项数不等时同指纹＝真不守恒（报错），异指纹＝源码改过的正常中间态（放行）。",
                        "generated": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                        "mode": _mode,
