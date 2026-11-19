@@ -15,7 +15,10 @@
       "审查链路、交付物、规则库零变化；铁律侧本轮零触碰。"
     ],
     "download_page": "https://github.com/asktai/doc-compliance-review/releases",
-    "files": {}
+    "files": {
+      "skill": "https://github.com/asktai/doc-compliance-review/releases/download/v3.36.2/doc-compliance-review_v3.36.2_20261119.skill",
+      "zip": "https://github.com/asktai/doc-compliance-review/releases/download/v3.36.2/doc-compliance-review_v3.36.2_20261119.zip"
+    }
   },
   "history": [
     {
